@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2712%27 fill=%27none%27 stroke=%27%234ff2ff%27 stroke-width=%273%27/%3E%3C/svg%3E" />
+<title>TRON :: DISC ARENA</title>
+<style>
+  :root { --cyan:#4ff2ff; --orange:#ff7b1a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#000; overflow:hidden;
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif; color:var(--cyan); }
+  canvas { display:block; }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:5; }
+  .panel { position:absolute; padding:10px 14px; border:1px solid rgba(79,242,255,.35);
+    background:rgba(0,16,22,.45); backdrop-filter:blur(2px);
+    text-transform:uppercase; letter-spacing:2px; font-size:12px;
+    box-shadow:0 0 18px rgba(79,242,255,.18) inset, 0 0 12px rgba(79,242,255,.12); }
+  #tl { top:18px; left:18px; min-width:260px; }
+  #tr { top:18px; right:18px; text-align:right; }
+  .bar { height:9px; margin-top:6px; border:1px solid rgba(79,242,255,.5); background:rgba(0,0,0,.6); }
+  .bar > i { display:block; height:100%; background:var(--cyan); box-shadow:0 0 12px var(--cyan); transition:width .12s linear; }
+  #discbar > i { background:#fff; box-shadow:0 0 12px #fff; }
+  #energybar > i { background:var(--orange); box-shadow:0 0 12px var(--orange); }
+  .big { font-size:26px; letter-spacing:6px; }
+  /* reticle: the disc flies at whatever sits under this */
+  #crosshair { position:absolute; left:50%; top:50%; width:34px; height:34px; margin:-17px 0 0 -17px;
+    transition:transform .1s ease, opacity .1s; }
+  #crosshair .ring { position:absolute; inset:0; border:1px solid rgba(79,242,255,.75); border-radius:50%;
+    box-shadow:0 0 10px rgba(79,242,255,.5), inset 0 0 8px rgba(79,242,255,.25); }
+  #crosshair .dot { position:absolute; left:50%; top:50%; width:3px; height:3px; margin:-1.5px 0 0 -1.5px;
+    background:#fff; border-radius:50%; box-shadow:0 0 8px #fff; }
+  #crosshair .tick { position:absolute; background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+  #crosshair .t1 { left:50%; top:-9px; width:1px; height:6px; margin-left:-.5px; }
+  #crosshair .t2 { left:50%; bottom:-9px; width:1px; height:6px; margin-left:-.5px; }
+  #crosshair .t3 { top:50%; left:-9px; height:1px; width:6px; margin-top:-.5px; }
+  #crosshair .t4 { top:50%; right:-9px; height:1px; width:6px; margin-top:-.5px; }
+  /* locked onto a program */
+  #crosshair.hot { transform:scale(1.25) rotate(45deg); }
+  #crosshair.hot .ring { border-color:var(--orange); box-shadow:0 0 16px var(--orange), inset 0 0 10px rgba(255,106,16,.4); }
+  #crosshair.hot .tick { background:var(--orange); box-shadow:0 0 8px var(--orange); }
+  /* disc is in flight - nothing to throw */
+  #crosshair.empty { opacity:.28; }
+  #crosshair.empty .ring { border-style:dashed; }
+  #crosshair.bank .ring { border-color:#fff; box-shadow:0 0 18px #fff, inset 0 0 10px rgba(255,255,255,.4); }
+  #crosshair.bank .tick { background:#fff; box-shadow:0 0 8px #fff; }
+  #lockstate { position:absolute; left:50%; bottom:54px; transform:translateX(-50%);
+    font-size:10px; letter-spacing:3px; padding:6px 14px; text-transform:uppercase;
+    border:1px solid rgba(255,106,16,.5); color:#ffb37a; background:rgba(30,10,0,.5); display:none; }
+  #range { position:absolute; left:50%; top:26px; transform:translateX(-50%); font-size:10px;
+    letter-spacing:2px; opacity:.6; }
+  #sens { position:absolute; left:50%; top:62%; transform:translateX(-50%); font-size:11px;
+    letter-spacing:4px; opacity:0; transition:opacity .25s; }
+  #msg { position:absolute; left:50%; top:24%; transform:translateX(-50%); text-align:center;
+    font-size:38px; letter-spacing:10px; text-shadow:0 0 22px var(--cyan); opacity:0; transition:opacity .3s; }
+  #hint { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); font-size:11px;
+    letter-spacing:3px; opacity:.55; text-transform:uppercase; }
+  #overlay { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 50%, rgba(0,30,40,.9), rgba(0,0,0,.97)); cursor:pointer; }
+  #overlay .card { text-align:center; max-width:640px; padding:40px 48px; border:1px solid rgba(79,242,255,.4);
+    box-shadow:0 0 60px rgba(79,242,255,.15); background:rgba(0,10,16,.6); }
+  h1 { margin:0 0 6px; font-size:54px; letter-spacing:18px; text-shadow:0 0 30px var(--cyan); }
+  h2 { margin:0 0 26px; font-size:13px; letter-spacing:8px; font-weight:400; color:#9fe9f2; }
+  .keys { display:grid; grid-template-columns:auto auto; gap:8px 18px; font-size:13px; text-align:left;
+    margin:0 auto 26px; width:max-content; color:#bff4fb; }
+  .keys b { color:#fff; font-weight:600; }
+  .start { display:inline-block; padding:12px 34px; border:1px solid var(--cyan); letter-spacing:6px;
+    font-size:14px; animation:pulse 1.8s infinite; }
+  @keyframes pulse { 50% { background:rgba(79,242,255,.18); } }
+  .dead h1 { color:var(--orange); text-shadow:0 0 30px var(--orange); }
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="panel" id="tl">
+    <div>Program Integrity</div>
+    <div class="bar" id="hpbar"><i style="width:100%"></i></div>
+    <div style="margin-top:10px">Identity Disc</div>
+    <div class="bar" id="discbar"><i style="width:100%"></i></div>
+    <div style="margin-top:10px">Energy</div>
+    <div class="bar" id="energybar"><i style="width:100%"></i></div>
+  </div>
+  <div class="panel" id="tr">
+    <div>Cycle <span id="wave" class="big">1</span></div>
+    <div style="margin-top:8px">Score <span id="score">0</span></div>
+    <div style="margin-top:4px">Hostiles <span id="foes">0</span></div>
+  </div>
+  <div id="crosshair">
+    <div class="ring"></div><div class="dot"></div>
+    <span class="tick t1"></span><span class="tick t2"></span>
+    <span class="tick t3"></span><span class="tick t4"></span>
+    <div id="range"></div>
+  </div>
+  <div id="sens"></div>
+  <div class="panel" id="keymon" style="display:none;left:18px;bottom:18px;font-size:11px;line-height:1.7"></div>
+  <div id="lockstate">Cursor not captured — click the arena to lock · move mouse off-centre to turn · open preview in a new tab for full mouse lock</div>
+  <div id="msg"></div>
+  <div id="hint">WASD move &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; F1 input monitor &nbsp;·&nbsp; ESC release cursor</div>
+</div>
+
+<div id="overlay"><div class="card">
+  <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
+  <div class="keys">
+    <b>W A S D</b><span>Move across the grid</span>
+    <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
+    <b>Wheel</b><span>Adjust look sensitivity</span>
+    <b>Arc</b><span>A live dotted trajectory shows every bounce before you throw</span>
+    <b>Left Click</b><span>Throw identity disc (it ricochets &amp; returns)</span>
+    <b>Right Click</b><span>Raise disc shield — deflects incoming</span>
+    <b>Space</b><span>Jump — tap twice to air-jump, hold for height</span>
+    <b>Shift</b><span>Dash (costs energy)</span>
+    <b>Tip</b><span>Bank a disc off a wall into an enemy's <i>back</i> for double damage</span>
+  </div>
+  <div class="start" id="startbtn">CLICK TO ENTER THE GRID</div>
+</div></div>
+
+<script type="module" src="./game.js"></script>
+<script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v31edd6df95cf4e85bb4c19e7a9bdbcba1788362987495" integrity="sha512-iIg7k2xntmwu6/uSb5tpc/hySgZc4eoL31yB29W6tJFo2akwjPWcEqnCEdJvGexCL0KEQwVYv5BlowfhVz26hg==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f","spa":2}' crossorigin="anonymous"></script>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a41b3ec2cb4e9e01',t:'MTc5MDUxOTgzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
