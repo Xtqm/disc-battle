@@ -4,6 +4,8 @@ import * as THREE from './vendor/three.module.js';
 const ARENA = 46;              // half-extent of the square grid
 const CYAN = 0x4ff2ff, ORANGE = 0xff6a10, WHITE = 0xffffff;
 const PLAYER_R = 0.9, FOE_R = 0.95, DISC_R = 0.55;
+const CURVE_ACCEL = 38.0;              // lateral Magnus acceleration m/s^2 (hooks around pillars)
+const CURVE_LAMBDA = 0.45;             // exponential decay rate per second
 
 // ───────────────────────────── renderer ──────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -85,6 +87,14 @@ for (const [x, z] of pillarSpots) {
 
 // ───────────────────────────── helpers ───────────────────────────────
 const tmp = new THREE.Vector3();
+const _discMat = new THREE.Matrix4();
+const _fwd = new THREE.Vector3();
+const _r0 = new THREE.Vector3();
+const _u0 = new THREE.Vector3();
+const _uBank = new THREE.Vector3();
+const _rBank = new THREE.Vector3();
+const _localX = new THREE.Vector3();
+const _localY = new THREE.Vector3();
 
 function makeProgram(color) {
   const g = new THREE.Group();
@@ -155,14 +165,37 @@ function burst(pos, color, n = 22, power = 10) {
 // Runs the EXACT same integration the live disc uses, so the dotted arc is a
 // real simulation of the throw (walls, pillars, bounce count, return curve),
 // not a decorative straight line.
-function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90) {
+function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, curve = 0) {
   const p = origin.clone(), v = vel.clone();
   const pts = [p.clone()], bounceAt = [];
   let bounces = 0, t = 0, hitFoe = null;
+  let k = curve;
   const lim = ARENA - 1.5;
 
   while (t < tMax && bounces <= maxBounces) {
     t += step;
+
+    if (k) {
+      const vx = v.x, vy = v.y, vz = v.z;
+      const speed = Math.hypot(vx, vy, vz);
+      const hSpeed = Math.hypot(vx, vz);
+      if (hSpeed > 1e-4) {
+        const nx = -vz / hSpeed;
+        const nz = vx / hSpeed;
+        const latAcc = k * CURVE_ACCEL * step;
+        let nvx = vx + nx * latAcc;
+        let nvz = vz + nz * latAcc;
+        const newSpeed = Math.hypot(nvx, vy, nvz);
+        if (newSpeed > 1e-4) {
+          const s = speed / newSpeed;
+          v.x = nvx * s;
+          v.y = vy * s;
+          v.z = nvz * s;
+        }
+      }
+      k *= Math.exp(-CURVE_LAMBDA * step);
+    }
+
     p.addScaledVector(v, step);
     p.y += (1.7 - p.y) * Math.min(1, step * 2.2);        // same hover easing
 
@@ -182,7 +215,11 @@ function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90) {
         hit = true;
       }
     }
-    if (hit) { bounces++; bounceAt.push(p.clone()); }
+    if (hit) {
+      bounces++;
+      bounceAt.push(p.clone());
+      k = -k * 0.5;
+    }
 
     // does it intercept a program?
     for (const f of foes) {
@@ -237,7 +274,7 @@ function updateThreatPaths() {
   for (const D of discs) {
     if (D.owner === 'player' || D.returning || n >= threatLines.length) continue;
     const L = threatLines[n++];
-    const sim = simulatePath(D.pos.clone(), D.vel.clone(), 2, 0.8);
+    const sim = simulatePath(D.pos.clone(), D.vel.clone(), 2, 0.8, 1 / 90, D.curve || 0);
     const arr = L.geometry.attributes.position.array;
     const c = Math.min(sim.pts.length, 400);
     for (let i = 0; i < c; i++) { arr[i*3] = sim.pts[i].x; arr[i*3+1] = sim.pts[i].y; arr[i*3+2] = sim.pts[i].z; }
@@ -262,7 +299,9 @@ function updateTrajectory(aim, dt) {
 
   const chest = player.pos.clone().setY(1.7 + player.y);
   const dir = aim.point.clone().sub(chest).normalize();
-  const sim = simulatePath(chest.clone().addScaledVector(dir, 1.1), dir.clone().multiplyScalar(38));
+  const origin = chest.clone().addScaledVector(dir, 1.1);
+  const curve = getPlayerCurveIntent();
+  const sim = simulatePath(origin, dir.clone().multiplyScalar(38), 3, 1.5, 1 / 90, curve);
 
   // colour the arc by outcome: white-hot when the line actually connects
   const willHit = !!sim.hitFoe;
@@ -272,8 +311,12 @@ function updateTrajectory(aim, dt) {
     const seg = sim.pts[sim.pts.length - 1].clone().sub(sim.pts[Math.max(0, sim.pts.length - 4)]).setY(0).normalize();
     return seg.dot(facing) > 0.25 && sim.hitFoe.bounces > 0;
   })();
-  trajLine.material.color.setHex(rearKill ? 0xffffff : willHit ? ORANGE : CYAN);
-  trajLine.material.opacity = willHit ? .95 : .45;
+
+  const isCurving = Math.abs(curve) > 0.05;
+  trajLine.material.color.setHex(rearKill ? 0xffffff : willHit ? ORANGE : isCurving ? 0x7cf6ff : CYAN);
+  trajLine.material.opacity = willHit ? .95 : isCurving ? .75 : .45;
+  trajLine.material.dashSize = isCurving ? 0.28 : 0.45;
+  trajLine.material.gapSize = isCurving ? 0.20 : 0.35;
 
   const arr = trajLine.geometry.attributes.position.array;
   const n = Math.min(sim.pts.length, 1500);
@@ -289,7 +332,7 @@ function updateTrajectory(aim, dt) {
     const pip = bouncePips[i];
     pip.visible = true; pip.position.copy(b);
     pip.lookAt(camera.position);
-    pip.material.color.setHex(willHit ? ORANGE : CYAN);
+    pip.material.color.setHex(willHit ? ORANGE : isCurving ? 0x7cf6ff : CYAN);
     pip.scale.setScalar(1 + Math.sin(time * 7 + i) * .12);
   });
 
@@ -297,7 +340,7 @@ function updateTrajectory(aim, dt) {
   impactMark.visible = true;
   impactMark.position.copy(end);
   impactMark.lookAt(camera.position);
-  impactMark.material.color.setHex(rearKill ? 0xffffff : willHit ? ORANGE : CYAN);
+  impactMark.material.color.setHex(rearKill ? 0xffffff : willHit ? ORANGE : isCurving ? 0x7cf6ff : CYAN);
   impactMark.scale.setScalar((willHit ? 1.3 : .9) + Math.sin(time * 9) * .1);
 
   return { willHit, rearKill, bounces: sim.bounceAt.length };
@@ -317,7 +360,25 @@ let foes = [], discs = [], wave = 1, score = 0, running = false, spawnTimer = 0,
 // ───────────────────────────── input ─────────────────────────────────
 let paused = false, lockFailed = false;
 const keys = {};
-const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
+const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
+
+function getPlayerCurveIntent() {
+  if (keys.KeyQ && !keys.KeyE) return -1.0;
+  if (keys.KeyE && !keys.KeyQ) return 1.0;
+  if (keys.KeyQ && keys.KeyE) return 0.0;
+  if (keys.KeyA && !keys.KeyD) return -0.55;
+  if (keys.KeyD && !keys.KeyA) return 0.55;
+  if (player.alive && player.vel) {
+    const fwdX = -Math.sin(player.yaw), fwdZ = -Math.cos(player.yaw);
+    const rightX = -fwdZ, rightZ = fwdX;
+    const latSpeed = player.vel.x * rightX + player.vel.z * rightZ;
+    if (Math.abs(latSpeed) > 1.2) {
+      return THREE.MathUtils.clamp(latSpeed / 12, -0.55, 0.55);
+    }
+  }
+  return 0.0;
+}
+
 function codeOf(e) {
   if (e.code) return e.code;
   const k = (e.key || '').toLowerCase();          // fallback for odd/synthetic events
@@ -494,7 +555,8 @@ function throwDisc() {
   // aim from the chest at the exact point under the crosshair => reticle is truthful
   const dir = aim.point.clone().sub(chest).normalize();
   const origin = chest.add(dir.clone().multiplyScalar(1.1));
-  spawnDisc(origin, dir.multiplyScalar(38), 'player', CYAN);
+  const curve = getPlayerCurveIntent();
+  spawnDisc(origin, dir.multiplyScalar(38), 'player', CYAN, curve);
   window.__lastThrowDot = dir.clone().normalize().dot(aim.point.clone().sub(origin).normalize());
   shake(0.12);
 }
@@ -548,9 +610,9 @@ function aimDir() {
   return new THREE.Vector3(-Math.sin(player.yaw) * Math.cos(player.pitch), Math.sin(player.pitch), -Math.cos(player.yaw) * Math.cos(player.pitch)).normalize();
 }
 
-function spawnDisc(pos, vel, owner, color) {
+function spawnDisc(pos, vel, owner, color, curve = 0) {
   const obj = makeDisc(color); obj.position.copy(pos); scene.add(obj);
-  discs.push({ obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0 });
+  discs.push({ obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0, curve });
 }
 
 function damagePlayer(amount, from) {
@@ -768,6 +830,26 @@ function update(dt) {
         if (D.owner === 'player') player.hasDisc = true; else D.owner.hasDisc = true;
         scene.remove(D.obj); discs.splice(i, 1); continue;
       }
+    } else if (D.curve) {
+      // Lateral Magnus-effect curve integration
+      const vx = D.vel.x, vy = D.vel.y, vz = D.vel.z;
+      const speed = Math.hypot(vx, vy, vz);
+      const hSpeed = Math.hypot(vx, vz);
+      if (hSpeed > 1e-4) {
+        const nx = -vz / hSpeed;
+        const nz = vx / hSpeed;
+        const latAcc = D.curve * CURVE_ACCEL * dt;
+        let nvx = vx + nx * latAcc;
+        let nvz = vz + nz * latAcc;
+        const newSpeed = Math.hypot(nvx, vy, nvz);
+        if (newSpeed > 1e-4) {
+          const s = speed / newSpeed;
+          D.vel.x = nvx * s;
+          D.vel.y = vy * s;
+          D.vel.z = nvz * s;
+        }
+      }
+      D.curve *= Math.exp(-CURVE_LAMBDA * dt);
     }
 
     D.pos.addScaledVector(D.vel, dt);
@@ -795,6 +877,7 @@ function update(dt) {
     }
     if (bounced && !D.returning) {
       D.bounces++;
+      D.curve = -D.curve * 0.5;
       burst(D.pos.clone(), D.color, 10, 6);
       shake(.06);
     }
@@ -844,7 +927,7 @@ function update(dt) {
             // parry: reflect back, becomes player-owned
             burst(D.pos.clone(), WHITE, 30, 12);
             shake(.25); score += 50;
-            D.owner = 'player'; D.color = CYAN; D.returning = false; D.bounces = 1; D.t = 0;
+            D.owner = 'player'; D.color = CYAN; D.returning = false; D.bounces = 1; D.t = 0; D.curve = 0;
             D.obj.traverse(o => { if (o.material && o.material.color) o.material.color.setHex(CYAN); if (o.isPointLight) o.color.setHex(CYAN); });
             D.vel.copy(facing).multiplyScalar(40).addScaledVector(toDisc, 6);
             D.pos.addScaledVector(toDisc, 1.2);
@@ -861,7 +944,28 @@ function update(dt) {
     }
 
     D.obj.position.copy(D.pos);
-    D.obj.rotation.set(Math.PI / 2 + Math.sin(D.spin * .2) * .25, 0, D.spin);
+    const vx = D.vel.x, vy = D.vel.y, vz = D.vel.z;
+    const spd = Math.hypot(vx, vy, vz);
+    const hSpd = Math.hypot(vx, vz);
+    if (hSpd > 1e-4 && spd > 1e-4) {
+      _fwd.set(vx / spd, vy / spd, vz / spd);
+      _r0.set(-vz / hSpd, 0, vx / hSpd);
+      _u0.crossVectors(_r0, _fwd);
+
+      const beta = (D.curve || 0) * 0.45 + Math.sin(D.spin * 0.2) * 0.08;
+      const sinB = Math.sin(beta), cosB = Math.cos(beta);
+      _uBank.copy(_u0).multiplyScalar(cosB).addScaledVector(_r0, sinB);
+      _rBank.copy(_r0).multiplyScalar(cosB).addScaledVector(_u0, -sinB);
+
+      const sinS = Math.sin(D.spin), cosS = Math.cos(D.spin);
+      _localX.copy(_rBank).multiplyScalar(cosS).addScaledVector(_fwd, sinS);
+      _localY.copy(_fwd).multiplyScalar(cosS).addScaledVector(_rBank, -sinS);
+
+      _discMat.makeBasis(_localX, _localY, _uBank);
+      D.obj.quaternion.setFromRotationMatrix(_discMat);
+    } else {
+      D.obj.rotation.set(Math.PI / 2 + Math.sin(D.spin * .2) * .25, 0, D.spin);
+    }
   }
 
   // ── waves
@@ -924,8 +1028,9 @@ function update(dt) {
   if (km && km.style.display === 'block') {
     const on = k => keys[k] ? 'style="color:#fff;text-shadow:0 0 8px #fff"' : 'style="opacity:.3"';
     km.innerHTML = `<b ${on('KeyW')}>W</b> <b ${on('KeyA')}>A</b> <b ${on('KeyS')}>S</b> <b ${on('KeyD')}>D</b>
+      <b ${on('KeyQ')}>Q</b> <b ${on('KeyE')}>E</b>
       <b ${on('Space')}>SPACE</b> <b ${on('ShiftLeft')}>SHIFT</b><br>
-      y ${player.y.toFixed(2)} · jumps ${player.jumps} · grounded ${player.grounded}<br>
+      curve ${getPlayerCurveIntent().toFixed(2)} · y ${player.y.toFixed(2)} · jumps ${player.jumps} · grounded ${player.grounded}<br>
       pointerlock ${isLocked()} · focus ${document.hasFocus()}`;
   }
   // lock-state banner
@@ -942,6 +1047,15 @@ function update(dt) {
     ch.classList.toggle('hot', onFoe);
     ch.classList.toggle('bank', !!(traj && traj.willHit && traj.bounces > 0));
     ch.classList.toggle('empty', !player.hasDisc);
+    const curveIntent = getPlayerCurveIntent();
+    const qHeld = !!keys.KeyQ && !keys.KeyE;
+    const eHeld = !!keys.KeyE && !keys.KeyQ;
+    const aHeld = !qHeld && !eHeld && (keys.KeyA && !keys.KeyD || curveIntent < -0.1);
+    const dHeld = !qHeld && !eHeld && (keys.KeyD && !keys.KeyA || curveIntent > 0.1);
+    ch.classList.toggle('curve-l', qHeld);
+    ch.classList.toggle('curve-r', eHeld);
+    ch.classList.toggle('strafe-l', aHeld);
+    ch.classList.toggle('strafe-r', dHeld);
     const range = document.getElementById('range');
     if (range) range.textContent = aim.dist < 300 ? Math.round(aim.dist) + 'M' : '';
   }
@@ -988,18 +1102,29 @@ window.__dbg = {
   setYaw: v => { player.yaw = v; },
   grounded: () => player.grounded,
   jumps: () => player.jumps,
-  keySpace: () => !!keys.Space,
-  traj: () => { const a = aimTarget(); const sim = simulatePath(
-      player.pos.clone().setY(1.7+player.y), a.point.clone().sub(player.pos.clone().setY(1.7+player.y)).normalize().multiplyScalar(38));
+  curve: () => getPlayerCurveIntent(),
+  traj: () => {
+    const a = aimTarget();
+    const chest = player.pos.clone().setY(1.7 + player.y);
+    const dir = a.point.clone().sub(chest).normalize();
+    const origin = chest.clone().addScaledVector(dir, 1.1);
+    const sim = simulatePath(origin, dir.clone().multiplyScalar(38), 3, 1.5, 1 / 90, getPlayerCurveIntent());
     return { points: sim.pts.length, bounces: sim.bounceAt.length, hitsFoe: !!sim.hitFoe,
-             lineVisible: trajLine.visible, drawn: trajLine.geometry.drawRange.count }; },
+             lineVisible: trajLine.visible, drawn: trajLine.geometry.drawRange.count };
+  },
   yaw: () => +player.yaw.toFixed(3),
   pitch: () => +player.pitch.toFixed(3),
   aim: () => { const a = aimTarget(); return { dist: +a.dist.toFixed(1), foe: !!a.foe }; },
   // dot product between the live disc's velocity and the direction to the crosshair point
   discAlign: () => {
     const d = discs.find(x => x.owner === 'player'); if (!d) return null;
-    const a = aimTarget().point.clone().sub(player.pos.clone().setY(1.7 + player.y)).normalize();
-    return +d.vel.clone().normalize().dot(a).toFixed(3);
+    const toTarget = aimTarget().point.clone().sub(player.pos.clone().setY(1.7 + player.y));
+    if (toTarget.lengthSq() < 1e-6 || d.vel.lengthSq() < 1e-6) return 0;
+    const val = d.vel.clone().normalize().dot(toTarget.normalize());
+    return isNaN(val) ? 0 : +val.toFixed(3);
+  },
+  discCurve: () => {
+    const d = discs.find(x => x.owner === 'player');
+    return d ? +(d.curve || 0).toFixed(3) : null;
   }
 };

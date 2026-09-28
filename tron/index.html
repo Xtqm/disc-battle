@@ -44,6 +44,20 @@
   #crosshair.empty .ring { border-style:dashed; }
   #crosshair.bank .ring { border-color:#fff; box-shadow:0 0 18px #fff, inset 0 0 10px rgba(255,255,255,.4); }
   #crosshair.bank .tick { background:#fff; box-shadow:0 0 8px #fff; }
+  /* curve indicator brackets */
+  #crosshair .curve-bracket { position:absolute; top:50%; width:5px; height:20px; margin-top:-10px;
+    border:1.5px solid transparent; opacity:0; pointer-events:none;
+    transition:opacity .12s ease, transform .12s ease, border-color .12s, box-shadow .12s; }
+  #crosshair .cb-left { left:-15px; border-left-color:var(--cyan);
+    border-top:1.5px solid rgba(79,242,255,.4); border-bottom:1.5px solid rgba(79,242,255,.4); border-radius:4px 0 0 4px; }
+  #crosshair .cb-right { right:-15px; border-right-color:var(--cyan);
+    border-top:1.5px solid rgba(79,242,255,.4); border-bottom:1.5px solid rgba(79,242,255,.4); border-radius:0 4px 4px 0; }
+  #crosshair.curve-l .cb-left { opacity:1; border-left-color:#fff; border-top-color:#fff; border-bottom-color:#fff;
+    box-shadow:-3px 0 10px var(--cyan), inset -1px 0 6px var(--cyan); transform:translateX(-2px) scale(1.15); }
+  #crosshair.curve-r .cb-right { opacity:1; border-right-color:#fff; border-top-color:#fff; border-bottom-color:#fff;
+    box-shadow:3px 0 10px var(--cyan), inset 1px 0 6px var(--cyan); transform:translateX(2px) scale(1.15); }
+  #crosshair.strafe-l .cb-left { opacity:.5; border-left-color:var(--cyan); box-shadow:-2px 0 6px rgba(79,242,255,.5); }
+  #crosshair.strafe-r .cb-right { opacity:.5; border-right-color:var(--cyan); box-shadow:2px 0 6px rgba(79,242,255,.5); }
   #lockstate { position:absolute; left:50%; bottom:54px; transform:translateX(-50%);
     font-size:10px; letter-spacing:3px; padding:6px 14px; text-transform:uppercase;
     border:1px solid rgba(255,106,16,.5); color:#ffb37a; background:rgba(30,10,0,.5); display:none; }
@@ -89,19 +103,22 @@
     <div class="ring"></div><div class="dot"></div>
     <span class="tick t1"></span><span class="tick t2"></span>
     <span class="tick t3"></span><span class="tick t4"></span>
+    <div class="curve-bracket cb-left"></div>
+    <div class="curve-bracket cb-right"></div>
     <div id="range"></div>
   </div>
   <div id="sens"></div>
   <div class="panel" id="keymon" style="display:none;left:18px;bottom:18px;font-size:11px;line-height:1.7"></div>
   <div id="lockstate">Cursor not captured — click the arena to lock · move mouse off-centre to turn · open preview in a new tab for full mouse lock</div>
   <div id="msg"></div>
-  <div id="hint">WASD move &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; F1 input monitor &nbsp;·&nbsp; ESC release cursor</div>
+  <div id="hint">WASD move &nbsp;·&nbsp; Q / E curve throw &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; F1 input monitor &nbsp;·&nbsp; ESC release cursor</div>
 </div>
 
 <div id="overlay"><div class="card">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys">
     <b>W A S D</b><span>Move across the grid</span>
+    <b>Q / E</b><span>Apply spin to curve disc throws around pillars (or strafe to curve)</span>
     <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
     <b>Wheel</b><span>Adjust look sensitivity</span>
     <b>Arc</b><span>A live dotted trajectory shows every bounce before you throw</span>
