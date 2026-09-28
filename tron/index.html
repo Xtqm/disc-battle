@@ -56,8 +56,6 @@
     box-shadow:-3px 0 10px var(--cyan), inset -1px 0 6px var(--cyan); transform:translateX(-2px) scale(1.15); }
   #crosshair.curve-r .cb-right { opacity:1; border-right-color:#fff; border-top-color:#fff; border-bottom-color:#fff;
     box-shadow:3px 0 10px var(--cyan), inset 1px 0 6px var(--cyan); transform:translateX(2px) scale(1.15); }
-  #crosshair.strafe-l .cb-left { opacity:.5; border-left-color:var(--cyan); box-shadow:-2px 0 6px rgba(79,242,255,.5); }
-  #crosshair.strafe-r .cb-right { opacity:.5; border-right-color:var(--cyan); box-shadow:2px 0 6px rgba(79,242,255,.5); }
   #lockstate { position:absolute; left:50%; bottom:54px; transform:translateX(-50%);
     font-size:10px; letter-spacing:3px; padding:6px 14px; text-transform:uppercase;
     border:1px solid rgba(255,106,16,.5); color:#ffb37a; background:rgba(30,10,0,.5); display:none; }
@@ -82,6 +80,88 @@
     font-size:14px; animation:pulse 1.8s infinite; }
   @keyframes pulse { 50% { background:rgba(79,242,255,.18); } }
   .dead h1 { color:var(--orange); text-shadow:0 0 30px var(--orange); }
+
+  /* HUD Pause Button */
+  .hud-btn {
+    pointer-events:auto; cursor:pointer; background:rgba(0,16,24,.65);
+    border:1px solid var(--cyan); color:var(--cyan); font-family:inherit;
+    font-size:11px; letter-spacing:2px; padding:4px 10px; text-transform:uppercase;
+    box-shadow:0 0 10px rgba(79,242,255,.25), inset 0 0 6px rgba(79,242,255,.12);
+    transition:all .18s ease; outline:none;
+  }
+  .hud-btn:hover {
+    background:rgba(79,242,255,.22); color:#fff;
+    box-shadow:0 0 16px rgba(79,242,255,.65), inset 0 0 10px rgba(79,242,255,.3);
+  }
+
+  /* Boss health bar */
+  #bossbar > i { background:var(--orange); box-shadow:0 0 12px var(--orange); }
+
+  /* Mode selection buttons on Main Menu */
+  .mode-select {
+    display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:8px;
+  }
+  .mode-btn {
+    background:rgba(0,16,24,.75); font-family:inherit; font-size:13px;
+    letter-spacing:4px; padding:14px 26px; cursor:pointer; text-transform:uppercase;
+    transition:all .2s ease; outline:none;
+  }
+  .duel-btn {
+    border:1px solid var(--orange); color:#ffb37a;
+    box-shadow:0 0 14px rgba(255,123,26,.35), inset 0 0 10px rgba(255,123,26,.18);
+  }
+  .duel-btn:hover {
+    background:rgba(255,123,26,.24); color:#fff;
+    box-shadow:0 0 24px rgba(255,123,26,.75), inset 0 0 16px rgba(255,123,26,.4);
+    transform:translateY(-2px);
+  }
+  .swarm-btn {
+    border:1px solid var(--cyan); color:#a5f7ff;
+    box-shadow:0 0 14px rgba(79,242,255,.35), inset 0 0 10px rgba(79,242,255,.18);
+  }
+  .swarm-btn:hover {
+    background:rgba(79,242,255,.24); color:#fff;
+    box-shadow:0 0 24px rgba(79,242,255,.75), inset 0 0 16px rgba(79,242,255,.4);
+    transform:translateY(-2px);
+  }
+
+  /* Pause Menu Modal */
+  .modal {
+    position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 50%, rgba(0,25,35,.88), rgba(0,0,0,.96));
+    backdrop-filter:blur(4px);
+  }
+  .modal .card {
+    text-align:center; max-width:520px; width:90%; padding:36px 44px;
+    border:1px solid rgba(79,242,255,.45);
+    box-shadow:0 0 60px rgba(79,242,255,.2), inset 0 0 30px rgba(79,242,255,.05);
+    background:rgba(0,10,16,.88);
+  }
+  .modal .card h1 { font-size:40px; letter-spacing:14px; margin:0 0 6px; }
+  .modal .card h2 { font-size:12px; letter-spacing:6px; margin:0 0 22px; }
+  .menu-actions {
+    display:flex; flex-direction:column; gap:12px; margin-top:20px;
+  }
+  .btn {
+    background:rgba(0,16,24,.75); border:1px solid var(--cyan); color:var(--cyan);
+    font-family:inherit; font-size:13px; letter-spacing:5px; padding:13px 24px;
+    cursor:pointer; text-transform:uppercase;
+    box-shadow:0 0 14px rgba(79,242,255,.2), inset 0 0 10px rgba(79,242,255,.1);
+    transition:all .2s ease; outline:none;
+  }
+  .btn:hover {
+    background:rgba(79,242,255,.22); color:#fff;
+    box-shadow:0 0 22px rgba(79,242,255,.6), inset 0 0 12px rgba(79,242,255,.25);
+    transform:translateY(-2px);
+  }
+  #restartBtn {
+    border-color:var(--orange); color:#ffb37a;
+    box-shadow:0 0 14px rgba(255,123,26,.22), inset 0 0 10px rgba(255,123,26,.1);
+  }
+  #restartBtn:hover {
+    background:rgba(255,123,26,.22); color:#fff;
+    box-shadow:0 0 22px rgba(255,123,26,.65), inset 0 0 12px rgba(255,123,26,.3);
+  }
 </style>
 </head>
 <body>
@@ -95,9 +175,16 @@
     <div class="bar" id="energybar"><i style="width:100%"></i></div>
   </div>
   <div class="panel" id="tr">
-    <div>Cycle <span id="wave" class="big">1</span></div>
-    <div style="margin-top:8px">Score <span id="score">0</span></div>
-    <div style="margin-top:4px">Hostiles <span id="foes">0</span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+      <div id="roundLabel">Cycle <span id="wave" class="big">1</span></div>
+      <button id="pauseBtn" class="hud-btn">II PAUSE</button>
+    </div>
+    <div style="margin-top:4px">Score <span id="score">0</span></div>
+    <div id="subLabel" style="margin-top:4px">Hostiles <span id="foes">0</span></div>
+    <div id="bossBarWrap" style="display:none;margin-top:8px">
+      <div style="font-size:10px;letter-spacing:2px;color:var(--orange);margin-bottom:3px">RIVAL SHIELD</div>
+      <div class="bar" id="bossbar"><i style="width:100%"></i></div>
+    </div>
   </div>
   <div id="crosshair">
     <div class="ring"></div><div class="dot"></div>
@@ -111,14 +198,26 @@
   <div class="panel" id="keymon" style="display:none;left:18px;bottom:18px;font-size:11px;line-height:1.7"></div>
   <div id="lockstate">Cursor not captured — click the arena to lock · move mouse off-centre to turn · open preview in a new tab for full mouse lock</div>
   <div id="msg"></div>
-  <div id="hint">WASD move &nbsp;·&nbsp; Q / E curve throw &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; F1 input monitor &nbsp;·&nbsp; ESC release cursor</div>
+  <div id="hint">WASD move / strafe &nbsp;·&nbsp; Q / E hook / curve disc &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; P / ESC pause &nbsp;·&nbsp; F1 input monitor</div>
+</div>
+
+<div id="pauseMenu" class="modal" style="display:none;">
+  <div class="card">
+    <h1>SYSTEM PAUSED</h1>
+    <h2>GRID SIMULATION SUSPENDED</h2>
+    <div class="menu-actions">
+      <button id="resumeBtn" class="btn">RESUME</button>
+      <button id="restartBtn" class="btn">RESTART MATCH</button>
+      <button id="modeSelectBtn" class="btn">MODE SELECT</button>
+    </div>
+  </div>
 </div>
 
 <div id="overlay"><div class="card">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys">
-    <b>W A S D</b><span>Move across the grid</span>
-    <b>Q / E</b><span>Apply spin to curve disc throws around pillars (or strafe to curve)</span>
+    <b>W A S D</b><span>Move &amp; strafe across the grid</span>
+    <b>Q / E</b><span>Apply curve spin — hook discs around pillars &amp; obstacles</span>
     <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
     <b>Wheel</b><span>Adjust look sensitivity</span>
     <b>Arc</b><span>A live dotted trajectory shows every bounce before you throw</span>
@@ -126,9 +225,12 @@
     <b>Right Click</b><span>Raise disc shield — deflects incoming</span>
     <b>Space</b><span>Jump — tap twice to air-jump, hold for height</span>
     <b>Shift</b><span>Dash (costs energy)</span>
-    <b>Tip</b><span>Bank a disc off a wall into an enemy's <i>back</i> for double damage</span>
+    <b>P / ESC</b><span>Pause simulation &amp; release cursor</span>
   </div>
-  <div class="start" id="startbtn">CLICK TO ENTER THE GRID</div>
+  <div class="mode-select">
+    <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
+    <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
+  </div>
 </div></div>
 
 <script type="module" src="./game.js"></script>

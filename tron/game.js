@@ -355,27 +355,20 @@ const player = {
 };
 scene.add(player.obj);
 
+let gameMode = 'swarm'; // 'duel' or 'swarm'
+let duelTier = 1;
 let foes = [], discs = [], wave = 1, score = 0, running = false, spawnTimer = 0, gameOverT = 0;
 
-// ───────────────────────────── input ─────────────────────────────────
+// ───────────────────────────── input & pause ─────────────────────────
 let paused = false, lockFailed = false;
+let lastPauseTime = 0;
+let justResumed = false;
 const keys = {};
-const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
+const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyP','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
 
 function getPlayerCurveIntent() {
   if (keys.KeyQ && !keys.KeyE) return -1.0;
   if (keys.KeyE && !keys.KeyQ) return 1.0;
-  if (keys.KeyQ && keys.KeyE) return 0.0;
-  if (keys.KeyA && !keys.KeyD) return -0.55;
-  if (keys.KeyD && !keys.KeyA) return 0.55;
-  if (player.alive && player.vel) {
-    const fwdX = -Math.sin(player.yaw), fwdZ = -Math.cos(player.yaw);
-    const rightX = -fwdZ, rightZ = fwdX;
-    const latSpeed = player.vel.x * rightX + player.vel.z * rightZ;
-    if (Math.abs(latSpeed) > 1.2) {
-      return THREE.MathUtils.clamp(latSpeed / 12, -0.55, 0.55);
-    }
-  }
   return 0.0;
 }
 
@@ -383,6 +376,7 @@ function codeOf(e) {
   if (e.code) return e.code;
   const k = (e.key || '').toLowerCase();          // fallback for odd/synthetic events
   if (k === ' ' || k === 'spacebar' || k === 'space') return 'Space';
+  if (k === 'escape' || k === 'esc') return 'Escape';
   if (k.length === 1 && k >= 'a' && k <= 'z') return 'Key' + k.toUpperCase();
   if (k === 'shift') return 'ShiftLeft';
   return '';
@@ -393,6 +387,15 @@ function onDown(e) {
   keys[c] = true;
   if (EAT.includes(c)) e.preventDefault();        // no page scroll / button re-trigger
   if (c === 'F1') { const m = document.getElementById('keymon'); if (m) m.style.display = m.style.display === 'block' ? 'none' : 'block'; }
+  if (c === 'KeyP' || c === 'Escape') {
+    if (running) {
+      if (paused) {
+        if (performance.now() - lastPauseTime > 150) resumeGame();
+      } else {
+        pauseGame();
+      }
+    }
+  }
 }
 function onUp(e) { const c = codeOf(e); if (c) keys[c] = false; }
 // bind on BOTH targets in the capture phase so nothing can swallow the key first
@@ -405,48 +408,148 @@ addEventListener('blur', () => { for (const k in keys) keys[k] = false; });  // 
 const canvas = renderer.domElement;
 canvas.tabIndex = 0;                       // canvas can hold keyboard focus
 canvas.style.outline = 'none';
-canvas.addEventListener('mousedown', () => { focusGame(); if (lockFailed === false && document.pointerLockElement !== canvas && running) tryLock(); });
+canvas.addEventListener('mousedown', () => { focusGame(); if (lockFailed === false && document.pointerLockElement !== canvas && running && !paused) tryLock(); });
 const overlay = document.getElementById('overlay');
-overlay.addEventListener('click', () => { if (gameOverT > 0.6 || !running) startGame(); });
 
-function startGame() {
-  overlay.style.display = 'none';
-  resetGame();          // <-- sim starts no matter what; never gated on pointer lock
+function startMode(mode) {
+  gameMode = mode;
+  if (overlay) overlay.style.display = 'none';
+  resetGame();
   paused = false;
+  justResumed = true;
   tryLock();
   focusGame();
 }
+
+function startGame() {
+  startMode(gameMode || 'swarm');
+}
+
+function pauseGame() {
+  if (!running || paused) return;
+  paused = true;
+  lastPauseTime = performance.now();
+  const pm = document.getElementById('pauseMenu');
+  if (pm) pm.style.display = 'flex';
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+  setCursor();
+}
+
+function resumeGame() {
+  if (!running || !paused) return;
+  paused = false;
+  const pm = document.getElementById('pauseMenu');
+  if (pm) pm.style.display = 'none';
+  justResumed = true;
+  tryLock();
+  focusGame();
+  setCursor();
+}
+
+function restartMatch() {
+  const pm = document.getElementById('pauseMenu');
+  if (pm) pm.style.display = 'none';
+  resetGame();
+  paused = false;
+  justResumed = true;
+  tryLock();
+  focusGame();
+  setCursor();
+}
+
+function showModeSelect() {
+  const pm = document.getElementById('pauseMenu');
+  if (pm) pm.style.display = 'none';
+  paused = false;
+  running = false;
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+  setCursor();
+  showModeSelectMenu();
+}
+
+function getMainMenuHtml() {
+  return `<div class="card">
+  <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
+  <div class="keys">
+    <b>W A S D</b><span>Move &amp; strafe across the grid</span>
+    <b>Q / E</b><span>Apply curve spin — hook discs around pillars &amp; obstacles</span>
+    <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
+    <b>Wheel</b><span>Adjust look sensitivity</span>
+    <b>Arc</b><span>A live dotted trajectory shows every bounce before you throw</span>
+    <b>Left Click</b><span>Throw identity disc (it ricochets &amp; returns)</span>
+    <b>Right Click</b><span>Raise disc shield — deflects incoming</span>
+    <b>Space</b><span>Jump — tap twice to air-jump, hold for height</span>
+    <b>Shift</b><span>Dash (costs energy)</span>
+    <b>P / ESC</b><span>Pause simulation &amp; release cursor</span>
+  </div>
+  <div class="mode-select">
+    <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
+    <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
+  </div>
+</div>`;
+}
+
+function showModeSelectMenu() {
+  if (!overlay) return;
+  overlay.style.display = 'flex';
+  overlay.innerHTML = getMainMenuHtml();
+  bindMainMenuEvents();
+}
+
+function bindMainMenuEvents() {
+  const db = document.getElementById('duelBtn');
+  const sb = document.getElementById('swarmBtn');
+  if (db) db.onclick = (e) => { e.stopPropagation(); startMode('duel'); };
+  if (sb) sb.onclick = (e) => { e.stopPropagation(); startMode('swarm'); };
+}
+
+// Bind pause menu & HUD buttons
+const pauseBtn = document.getElementById('pauseBtn');
+if (pauseBtn) pauseBtn.onclick = (e) => { e.stopPropagation(); pauseGame(); };
+const resumeBtn = document.getElementById('resumeBtn');
+if (resumeBtn) resumeBtn.onclick = (e) => { e.stopPropagation(); resumeGame(); };
+const restartBtn = document.getElementById('restartBtn');
+if (restartBtn) restartBtn.onclick = (e) => { e.stopPropagation(); restartMatch(); };
+const modeSelectBtn = document.getElementById('modeSelectBtn');
+if (modeSelectBtn) modeSelectBtn.onclick = (e) => { e.stopPropagation(); showModeSelect(); };
+bindMainMenuEvents();
 
 // Pointer lock can throw synchronously (SecurityError) inside sandboxed/permission-less
 // iframes, and can also fail async. Both paths just enable the cursor-steering fallback.
 function tryLock() {
   try {
     const p = canvas.requestPointerLock();
-    if (p && p.catch) p.catch(() => { lockFailed = true; paused = false; });
+    if (p && p.catch) p.catch(() => { lockFailed = true; });
   } catch (err) {
-    lockFailed = true; paused = false;
+    lockFailed = true;
   }
   setTimeout(() => {
-    if (document.pointerLockElement !== canvas) { lockFailed = true; paused = false; }
+    if (document.pointerLockElement !== canvas) { lockFailed = true; }
   }, 400);
 }
 
 // keyboard events only arrive if this document actually has focus
 function setCursor() {
   const locked = document.pointerLockElement === canvas;
-  document.body.style.cursor = (running && locked) ? 'none' : 'default';
+  document.body.style.cursor = (running && !paused && locked) ? 'none' : 'default';
 }
 
 function focusGame() {
   try { window.focus(); } catch (e) {}
   canvas.focus();
 }
-document.addEventListener('pointerlockerror', () => { lockFailed = true; paused = false; });
+document.addEventListener('pointerlockerror', () => { lockFailed = true; });
 
 document.addEventListener('pointerlockchange', () => {
   if (document.pointerLockElement !== canvas && running) {
-    paused = !lockFailed;
-  } else paused = false;
+    if (!paused && !lockFailed) {
+      pauseGame();
+    }
+  }
   setCursor();
 });
 
@@ -527,9 +630,47 @@ function resetGame() {
   player.y = 0; player.vy = 0; player.grounded = true; player.jumps = 0;
   player.hp = 100; player.energy = 100; player.hasDisc = true; player.alive = true;
   player.yaw = Math.PI; player.pitch = -.12;
-  wave = 1; score = 0; gameOverT = 0; running = true;
-  spawnWave();
-  message('CYCLE 1 — FIGHT');
+  score = 0; gameOverT = 0; running = true;
+  spawnTimer = 0;
+
+  if (gameMode === 'duel') {
+    duelTier = 1;
+    spawnDuelBoss(duelTier);
+    message('DUEL TIER 1 — FIGHT');
+  } else {
+    wave = 1;
+    spawnWave();
+    message('CYCLE 1 — FIGHT');
+  }
+}
+
+function spawnDuelBoss(tier = 1) {
+  for (const f of foes) scene.remove(f.obj);
+  foes = [];
+  const obj = makeProgram(ORANGE);
+  obj.scale.setScalar(1.15);
+  const halo = new THREE.PointLight(ORANGE, 3.2, 14);
+  halo.position.y = 1.6;
+  obj.add(halo);
+  scene.add(obj);
+
+  const maxHp = Math.min(250 + (tier - 1) * 35, 350);
+  const boss = {
+    obj,
+    pos: new THREE.Vector3(0, 0, -28),
+    vel: new THREE.Vector3(),
+    hp: maxHp,
+    maxHp: maxHp,
+    hasDisc: true,
+    cd: 0.8 + Math.random() * 0.6,
+    strafe: Math.random() < 0.5 ? 1 : -1,
+    strafeT: 0.5 + Math.random() * 0.7,
+    hurt: 0,
+    skill: Math.min(0.88 + (tier - 1) * 0.03, 0.98),
+    isBoss: true,
+    speed: 10.5 + (tier - 1) * 0.5
+  };
+  foes.push(boss);
 }
 
 function spawnWave() {
@@ -632,11 +773,18 @@ function killFoe(f) {
   burst(f.pos.clone().setY(1.5), ORANGE, 70, 14);
   scene.remove(f.obj);
   foes = foes.filter(x => x !== f);
-  score += 100 + wave * 10;
-  if (foes.length === 0) {
-    wave++;
-    message('CYCLE ' + wave);
-    spawnTimer = 2.2;
+  if (gameMode === 'duel') {
+    score += 500 + duelTier * 250;
+    message('MATCH WON — TIER ' + duelTier + ' CLEARED');
+    duelTier++;
+    spawnTimer = 2.5;
+  } else {
+    score += 100 + wave * 10;
+    if (foes.length === 0) {
+      wave++;
+      message('CYCLE ' + wave);
+      spawnTimer = 2.2;
+    }
   }
 }
 
@@ -648,12 +796,38 @@ function message(t) { msgEl.textContent = t; msgEl.style.opacity = 1; msgT = 2; 
 
 function showGameOver() {
   overlay.style.display = 'flex';
-  overlay.innerHTML = `<div class="card dead"><h1>DEREZZED</h1>
+  const title = gameMode === 'duel' ? 'DUEL ELIMINATED' : 'DEREZZED';
+  const stats = gameMode === 'duel'
+    ? `TIERS CLEARED <b style="color:#fff">${duelTier - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b>`
+    : `CYCLES SURVIVED <b style="color:#fff">${wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b>`;
+  overlay.innerHTML = `<div class="card dead">
+    <h1>${title}</h1>
     <h2>YOUR DISC WAS CLAIMED</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
-      CYCLES SURVIVED <b style="color:#fff">${wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b></div>
-    <div class="start">CLICK TO RE-COMPILE</div></div>`;
-  overlay.onclick = () => { player.obj.visible = true; overlay.style.display = 'none'; resetGame(); paused = false; tryLock(); focusGame(); };
+      ${stats}
+    </div>
+    <div class="menu-actions" style="max-width:320px;margin:0 auto">
+      <button id="recompileBtn" class="btn">RE-COMPILE (${gameMode.toUpperCase()})</button>
+      <button id="returnMenuBtn" class="btn" style="border-color:var(--orange);color:#ffb37a">MODE SELECT</button>
+    </div>
+  </div>`;
+  const rc = el('recompileBtn');
+  if (rc) rc.onclick = (e) => {
+    e.stopPropagation();
+    player.obj.visible = true;
+    overlay.style.display = 'none';
+    resetGame();
+    paused = false;
+    justResumed = true;
+    tryLock();
+    focusGame();
+  };
+  const rm = el('returnMenuBtn');
+  if (rm) rm.onclick = (e) => {
+    e.stopPropagation();
+    player.obj.visible = true;
+    showModeSelectMenu();
+  };
   gameOverT = 1;
 }
 
@@ -766,16 +940,48 @@ function update(dt) {
     const dist = toP.length(); toP.normalize();
     const see = lineOfSight(f.pos, player.pos) && player.alive;
 
-    f.strafeT -= dt;
-    if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = .9 + Math.random() * 1.8; }
+    if (f.isBoss) {
+      f.strafeT -= dt * (!f.hasDisc ? 1.6 : 1.1);
+      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = 0.45 + Math.random() * 0.65; }
+    } else {
+      f.strafeT -= dt;
+      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = .9 + Math.random() * 1.8; }
+    }
     const side = new THREE.Vector3(toP.z, 0, -toP.x).multiplyScalar(f.strafe);
 
     const want = new THREE.Vector3();
-    const ideal = 15;
-    if (dist > ideal + 3) want.add(toP);
-    else if (dist < ideal - 5) want.sub(toP);
-    want.addScaledVector(side, .85);
-    if (!see) want.add(toP).multiplyScalar(1.2);
+    if (f.isBoss && !f.hasDisc) {
+      // Tactical retreat behind pillars when disc is in flight
+      let bestCover = null;
+      let bestDist = Infinity;
+      for (const pl of pillars) {
+        const plPos = new THREE.Vector3(pl.x, 0, pl.z);
+        const pToPl = plPos.clone().sub(player.pos).setY(0);
+        const len = pToPl.length();
+        if (len > 0.1) {
+          const coverPos = plPos.clone().addScaledVector(pToPl.normalize(), pl.r + 2.4);
+          const d = f.pos.distanceTo(coverPos);
+          if (d < bestDist) {
+            bestDist = d;
+            bestCover = coverPos;
+          }
+        }
+      }
+      if (bestCover) {
+        const coverDir = bestCover.clone().sub(f.pos).setY(0);
+        if (coverDir.length() > 0.4) {
+          want.copy(coverDir.normalize()).multiplyScalar(1.5);
+        }
+      }
+      want.addScaledVector(side, 0.9);
+    } else {
+      const ideal = f.isBoss ? 16 : 15;
+      if (dist > ideal + 3) want.add(toP);
+      else if (dist < ideal - 5) want.sub(toP);
+      want.addScaledVector(side, f.isBoss ? 1.1 : .85);
+      if (!see) want.add(toP).multiplyScalar(1.2);
+    }
+
     // avoid other foes
     for (const o of foes) if (o !== f) {
       const dd = tmp.copy(f.pos).sub(o.pos); dd.y = 0;
@@ -783,28 +989,48 @@ function update(dt) {
       if (L < 4 && L > .01) want.addScaledVector(dd.normalize(), (4 - L) * .5);
     }
     if (want.lengthSq() > 0) want.normalize();
-    f.vel.lerp(want.multiplyScalar(8.2 + wave * .25), 1 - Math.pow(.002, dt));
+
+    const moveSpeed = f.isBoss
+      ? (f.speed || 10.5) * (!f.hasDisc ? 1.25 : 1.0)
+      : (8.2 + wave * .25);
+    const lerpRate = f.isBoss ? 1 - Math.pow(.001, dt) : 1 - Math.pow(.002, dt);
+    f.vel.lerp(want.multiplyScalar(moveSpeed), lerpRate);
     f.pos.addScaledVector(f.vel, dt);
     resolveCircle(f.pos, FOE_R);
 
     f.obj.position.copy(f.pos);
     const face = Math.atan2(-(player.pos.x - f.pos.x), -(player.pos.z - f.pos.z));
-    f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -6 * dt, 6 * dt);
+    const turnRate = f.isBoss ? 8 * dt : 6 * dt;
+    f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
     f.obj.userData.backDisc.visible = f.hasDisc;
     if (f.hurt > 0) { f.hurt -= dt; f.obj.position.x += Math.sin(time * 60) * .05; }
 
     // fire
     f.cd -= dt;
     if (f.cd <= 0 && f.hasDisc && see && player.alive) {
-      f.cd = Math.max(1.1, 3.4 - wave * .18) + Math.random();
       f.hasDisc = false;
-      const lead = player.pos.clone().addScaledVector(player.vel, 0.22 * f.skill);
-      const dir = lead.sub(f.pos).setY(0).normalize();
-      dir.x += (Math.random() - .5) * (1 - f.skill) * .45;
-      dir.z += (Math.random() - .5) * (1 - f.skill) * .45;
-      dir.normalize();
-      const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
-      spawnDisc(origin, dir.multiplyScalar(26 + wave), f, ORANGE);
+      if (f.isBoss) {
+        f.cd = 0.8 + Math.random() * 0.6; // 0.8 - 1.4s cooldown
+        const lead = player.pos.clone().addScaledVector(player.vel, 0.28 * f.skill);
+        const dir = lead.sub(f.pos).setY(0).normalize();
+        dir.x += (Math.random() - .5) * (1 - f.skill) * .18;
+        dir.z += (Math.random() - .5) * (1 - f.skill) * .18;
+        dir.normalize();
+        const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
+        // Capable of curved throws toward the player
+        const curveDir = Math.random() < 0.5 ? 1.0 : -1.0;
+        const curvePower = (Math.random() < 0.7) ? curveDir * (0.8 + Math.random() * 0.4) : 0;
+        spawnDisc(origin, dir.multiplyScalar(28 + duelTier * 2), f, ORANGE, curvePower);
+      } else {
+        f.cd = Math.max(1.1, 3.4 - wave * .18) + Math.random();
+        const lead = player.pos.clone().addScaledVector(player.vel, 0.22 * f.skill);
+        const dir = lead.sub(f.pos).setY(0).normalize();
+        dir.x += (Math.random() - .5) * (1 - f.skill) * .45;
+        dir.z += (Math.random() - .5) * (1 - f.skill) * .45;
+        dir.normalize();
+        const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
+        spawnDisc(origin, dir.multiplyScalar(26 + wave), f, ORANGE);
+      }
     }
   }
 
@@ -968,10 +1194,17 @@ function update(dt) {
     }
   }
 
-  // ── waves
+  // ── waves & duel rematch
   if (spawnTimer > 0) {
     spawnTimer -= dt;
-    if (spawnTimer <= 0) spawnWave();
+    if (spawnTimer <= 0) {
+      if (gameMode === 'duel') {
+        message('DUEL TIER ' + duelTier + ' — FIGHT!');
+        spawnDuelBoss(duelTier);
+      } else {
+        spawnWave();
+      }
+    }
   }
 
   // ── sparks
@@ -1047,15 +1280,10 @@ function update(dt) {
     ch.classList.toggle('hot', onFoe);
     ch.classList.toggle('bank', !!(traj && traj.willHit && traj.bounces > 0));
     ch.classList.toggle('empty', !player.hasDisc);
-    const curveIntent = getPlayerCurveIntent();
     const qHeld = !!keys.KeyQ && !keys.KeyE;
     const eHeld = !!keys.KeyE && !keys.KeyQ;
-    const aHeld = !qHeld && !eHeld && (keys.KeyA && !keys.KeyD || curveIntent < -0.1);
-    const dHeld = !qHeld && !eHeld && (keys.KeyD && !keys.KeyA || curveIntent > 0.1);
     ch.classList.toggle('curve-l', qHeld);
     ch.classList.toggle('curve-r', eHeld);
-    ch.classList.toggle('strafe-l', aHeld);
-    ch.classList.toggle('strafe-r', dHeld);
     const range = document.getElementById('range');
     if (range) range.textContent = aim.dist < 300 ? Math.round(aim.dist) + 'M' : '';
   }
@@ -1068,15 +1296,39 @@ function update(dt) {
   el('hpbar').firstElementChild.style.width = player.hp + '%';
   el('discbar').firstElementChild.style.width = (player.hasDisc ? 100 : 0) + '%';
   el('energybar').firstElementChild.style.width = player.energy + '%';
-  el('wave').textContent = wave;
+
+  if (gameMode === 'duel') {
+    const rl = el('roundLabel');
+    if (rl) rl.innerHTML = `DUEL TIER <span id="wave" class="big">${duelTier}</span>`;
+    const boss = foes[0];
+    const hpPct = boss ? Math.max(0, Math.round((boss.hp / boss.maxHp) * 100)) : 0;
+    const sl = el('subLabel');
+    if (sl) sl.innerHTML = `RIVAL INTEGRITY <span id="rivalHp">${hpPct}%</span>`;
+    const bbw = el('bossBarWrap');
+    if (bbw) bbw.style.display = 'block';
+    const bb = el('bossbar');
+    if (bb && bb.firstElementChild) bb.firstElementChild.style.width = hpPct + '%';
+  } else {
+    const rl = el('roundLabel');
+    if (rl) rl.innerHTML = `CYCLE <span id="wave" class="big">${wave}</span>`;
+    const sl = el('subLabel');
+    if (sl) sl.innerHTML = `HOSTILES <span id="foes">${foes.length}</span>`;
+    const bbw = el('bossBarWrap');
+    if (bbw) bbw.style.display = 'none';
+  }
+
   el('score').textContent = score;
-  el('foes').textContent = foes.length;
   if (msgT > 0) { msgT -= dt; if (msgT <= 0) msgEl.style.opacity = 0; }
 }
 
 function loop() {
   requestAnimationFrame(loop);
-  const dt = Math.min(clock.getDelta(), 0.05);
+  let dt = clock.getDelta();
+  if (justResumed) {
+    dt = 0;
+    justResumed = false;
+  }
+  dt = Math.min(dt, 0.05);
   if (running && !paused) update(dt);
   else if (!running) { // idle camera orbit on menu
     time += dt;
@@ -1093,6 +1345,13 @@ loop();
 window.__dbg = {
   running: () => running,
   paused: () => paused,
+  mode: () => gameMode,
+  duelTier: () => duelTier,
+  pauseGame: () => pauseGame(),
+  resumeGame: () => resumeGame(),
+  restartMatch: () => restartMatch(),
+  startMode: (m) => startMode(m),
+  showModeSelect: () => showModeSelect(),
   pos: () => ({ x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2) }),
   y: () => +player.y.toFixed(2),
   foes: () => foes.length,
