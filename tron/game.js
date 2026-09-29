@@ -96,6 +96,17 @@ const _rBank = new THREE.Vector3();
 const _localX = new THREE.Vector3();
 const _localY = new THREE.Vector3();
 
+// duel AI reusable scratch vectors (zero heap allocations in hot loop)
+const _duelToP = new THREE.Vector3();
+const _duelSide = new THREE.Vector3();
+const _duelWant = new THREE.Vector3();
+const _duelSafe = new THREE.Vector3();
+const _duelCoverDir = new THREE.Vector3();
+const _duelLead = new THREE.Vector3();
+const _duelAimDir = new THREE.Vector3();
+const _duelOrigin = new THREE.Vector3();
+const _duelEvade = new THREE.Vector3();
+
 function makeProgram(color) {
   const g = new THREE.Group();
   const suit = new THREE.MeshStandardMaterial({ color: 0x07090c, roughness: .35, metalness: .9 });
@@ -242,7 +253,7 @@ function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, cu
 
     // does it intercept a program?
     for (const f of foes) {
-      if (p.distanceTo(tmp.copy(f.pos).setY(1.5)) < FOE_R + DISC_R + .35) {
+      if (p.distanceTo(tmp.copy(f.pos).setY(1.5 + (f.y || 0))) < FOE_R + DISC_R + .35) {
         hitFoe = { foe: f, point: p.clone(), bounces };
         pts.push(p.clone());
         return { pts, bounceAt, hitFoe };
@@ -739,7 +750,17 @@ function spawnDuelBoss(tier = 1) {
     hurt: 0,
     skill: Math.min(0.88 + (tier - 1) * 0.03, 0.98),
     isBoss: true,
-    speed: 10.5 + (tier - 1) * 0.5
+    speed: 10.5 + (tier - 1) * 0.5,
+    y: 0,
+    vy: 0,
+    grounded: true,
+    jumps: 0,
+    dashCd: 0,
+    coverTarget: new THREE.Vector3(),
+    coverPillar: null,
+    state: 'ATTACK',
+    aerialThrow: false,
+    peekDir: Math.random() < 0.5 ? 1 : -1
   };
   foes.push(boss);
 }
@@ -806,7 +827,7 @@ function aimTarget() {
   }
   // programs (sphere around the torso)
   for (const f of foes) {
-    const cx = f.pos.x - _ro.x, cy = 1.5 - _ro.y, cz = f.pos.z - _ro.z;
+    const cx = f.pos.x - _ro.x, cy = (1.5 + (f.y || 0)) - _ro.y, cz = f.pos.z - _ro.z;
     const proj = cx * _rd.x + cy * _rd.y + cz * _rd.z;
     if (proj < 0.5) continue;
     const d2 = (cx * cx + cy * cy + cz * cz) - proj * proj;
@@ -824,7 +845,9 @@ function aimDir() {
 
 function spawnDisc(pos, vel, owner, color, curve = 0) {
   const obj = makeDisc(color); obj.position.copy(pos); scene.add(obj);
-  discs.push({ obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0, curve, hitFoes: new Set() });
+  const d = { obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0, curve, hitFoes: new Set() };
+  discs.push(d);
+  return d;
 }
 
 function damagePlayer(amount, from) {
@@ -841,7 +864,7 @@ function damagePlayer(amount, from) {
 }
 
 function killFoe(f) {
-  burst(f.pos.clone().setY(1.5), ORANGE, 70, 14);
+  burst(f.pos.clone().setY(1.5 + (f.y || 0)), ORANGE, 70, 14);
   scene.remove(f.obj);
   foes = foes.filter(x => x !== f);
   if (gameMode === 'duel') {
@@ -933,6 +956,332 @@ function lineOfSight(a, b) {
   return true;
 }
 
+// ───────────────────────────── duel AI helpers & logic ────────────────
+function getPillarCoverPoint(pillar, playerPos, out) {
+  const dx = pillar.x - playerPos.x;
+  const dz = pillar.z - playerPos.z;
+  const len = Math.hypot(dx, dz);
+  if (len < 1e-4) {
+    out.set(pillar.x, 0, pillar.z + pillar.r + 1.8);
+  } else {
+    const inv = 1 / len;
+    out.set(pillar.x + dx * inv * (pillar.r + 1.8), 0, pillar.z + dz * inv * (pillar.r + 1.8));
+  }
+  return out;
+}
+
+function findBestCoverPillar(foePos, playerPos) {
+  let bestPillar = pillars[0];
+  let bestDist = Infinity;
+  for (let i = 0; i < pillars.length; i++) {
+    const pl = pillars[i];
+    getPillarCoverPoint(pl, playerPos, _duelSafe);
+    const dx = foePos.x - _duelSafe.x;
+    const dz = foePos.z - _duelSafe.z;
+    const d = dx * dx + dz * dz;
+    if (d < bestDist) {
+      bestDist = d;
+      bestPillar = pl;
+    }
+  }
+  return bestPillar;
+}
+
+function updateDuelFoe(f, dt) {
+  // 1. Vertical Kinematics & Gravity (Gfoe = 30)
+  const GRAV_FOE = 30;
+  f.vy -= GRAV_FOE * dt;
+  f.y += f.vy * dt;
+  if (f.y <= 0) {
+    f.y = 0;
+    f.vy = 0;
+    f.grounded = true;
+    f.jumps = 0;
+    f.aerialThrow = false;
+  }
+  f.dashCd -= dt;
+
+  const toPx = player.pos.x - f.pos.x;
+  const toPz = player.pos.z - f.pos.z;
+  const pDist = Math.hypot(toPx, toPz);
+  const see = lineOfSight(f.pos, player.pos) && player.alive;
+
+  // 2. Threat Awareness & Ricochet Defense (Section 4)
+  let panicDisc = null;
+  let panicDist = Infinity;
+  for (let i = 0; i < discs.length; i++) {
+    const D = discs[i];
+    if (D.owner === 'player' && !D.returning && D.bounces > 0) {
+      const dx = f.pos.x - D.pos.x;
+      const dz = f.pos.z - D.pos.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < 24 && dist > 0.1) {
+        const vSpd = Math.hypot(D.vel.x, D.vel.z);
+        if (vSpd > 1e-3) {
+          const dotHead = (D.vel.x * dx + D.vel.z * dz) / (vSpd * dist);
+          if (dotHead > 0.35) {
+            // Heading toward rival: check if in rear hemisphere
+            // Foe visor is at +Z in local space: fwd = (sin(rotY), 0, cos(rotY))
+            const fwdX = Math.sin(f.obj.rotation.y);
+            const fwdZ = Math.cos(f.obj.rotation.y);
+            const posRear = (dx * fwdX + dz * fwdZ) / dist > 0.05;
+            const velRear = (D.vel.x * fwdX + D.vel.z * fwdZ) / vSpd > 0.05;
+            if (posRear || velRear) {
+              if (dist < panicDist) {
+                panicDist = dist;
+                panicDisc = D;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  if (panicDisc) {
+    // Flag panic state: turn immediately to face incoming disc
+    f.state = 'EVADE';
+    const faceAngle = Math.atan2(panicDisc.pos.x - f.pos.x, panicDisc.pos.z - f.pos.z);
+    const faceDiff = ((faceAngle - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    f.obj.rotation.y += THREE.MathUtils.clamp(faceDiff, -18 * dt, 18 * dt);
+
+    // Attempt jump or dash to clear the bounce line
+    if (f.dashCd <= 0) {
+      const vSpd = Math.hypot(panicDisc.vel.x, panicDisc.vel.z);
+      let perpX = -panicDisc.vel.z / vSpd;
+      let perpZ = panicDisc.vel.x / vSpd;
+      if ((f.pos.x + perpX * 4) * Math.sign(f.pos.x) > ARENA - 3 || (f.pos.z + perpZ * 4) * Math.sign(f.pos.z) > ARENA - 3) {
+        perpX = -perpX;
+        perpZ = -perpZ;
+      }
+      f.vel.x += perpX * 32;
+      f.vel.z += perpZ * 32;
+      f.dashCd = 1.8 + Math.random() * 0.8;
+      burst(tmp.copy(f.pos).setY(f.y + 0.4), ORANGE, 16, 6);
+      shake(0.12);
+    } else if (f.grounded && f.jumps === 0) {
+      f.vy = 11.5;
+      f.grounded = false;
+      f.jumps = 1;
+      burst(tmp.copy(f.pos).setY(f.y + 0.2), ORANGE, 14, 5);
+    }
+  } else {
+    // Normal smooth facing towards player
+    const face = Math.atan2(toPx, toPz);
+    const turnRate = 8 * dt;
+    f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
+  }
+
+  // 3. Low Disc Jump Evasion (Section 1)
+  if (f.grounded && f.jumps === 0) {
+    for (let i = 0; i < discs.length; i++) {
+      const D = discs[i];
+      if (D.owner === 'player' && !D.returning) {
+        const dx = f.pos.x - D.pos.x;
+        const dz = f.pos.z - D.pos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq < 100) { // within 10 m
+          const dot = D.vel.x * dx + D.vel.z * dz;
+          if (dot > 0 && D.pos.y <= 1.8) {
+            f.vy = 11.5;
+            f.grounded = false;
+            f.jumps = 1;
+            burst(tmp.copy(f.pos).setY(f.y + 0.2), ORANGE, 14, 5);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 4. Tactical Evasive Dash (Section 2)
+  if (!panicDisc && f.dashCd <= 0) {
+    let triggerDash = false;
+    for (let i = 0; i < discs.length; i++) {
+      const D = discs[i];
+      if (D.owner === 'player' && !D.returning) {
+        const dx = f.pos.x - D.pos.x;
+        const dz = f.pos.z - D.pos.z;
+        const dist = Math.hypot(dx, dz);
+        if (dist < 14 && dist > 0.1) {
+          const vSpd = Math.hypot(D.vel.x, D.vel.z);
+          if (vSpd > 1e-3) {
+            const dot = (D.vel.x * dx + D.vel.z * dz) / (vSpd * dist);
+            if (dot > 0.25) {
+              const isCurved = Math.abs(D.curve || 0) > 0.05;
+              const isBanked = D.bounces > 0;
+              const flank = pDist > 0.1 && Math.abs((D.vel.x / vSpd) * (toPz / pDist) - (D.vel.z / vSpd) * (toPx / pDist)) > 0.35;
+              if (isCurved || isBanked || flank) {
+                triggerDash = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (!triggerDash && see && player.hasDisc && (!f.hasDisc || f.hp < f.maxHp * 0.35)) {
+      if (pDist < 16) {
+        triggerDash = true;
+      }
+    }
+
+    if (triggerDash && pDist > 0.1) {
+      const normX = toPx / pDist;
+      const normZ = toPz / pDist;
+      const side = f.strafe || (Math.random() < 0.5 ? 1 : -1);
+      let evadeX = -normZ * side - normX * 0.35;
+      let evadeZ = normX * side - normZ * 0.35;
+      const evLen = Math.hypot(evadeX, evadeZ);
+      evadeX /= evLen;
+      evadeZ /= evLen;
+
+      if (Math.abs(f.pos.x + evadeX * 5) > ARENA - 2) evadeX = -evadeX;
+      if (Math.abs(f.pos.z + evadeZ * 5) > ARENA - 2) evadeZ = -evadeZ;
+
+      f.vel.x += evadeX * 32;
+      f.vel.z += evadeZ * 32;
+      f.dashCd = 1.8 + Math.random() * 0.8;
+      burst(tmp.copy(f.pos).setY(f.y + 0.4), ORANGE, 16, 6);
+      shake(0.12);
+    }
+  }
+
+  // 5. Aerial Throw at Apex (Section 1)
+  if (f.aerialThrow && f.hasDisc && f.vy <= 1.0) {
+    const leadX = player.pos.x + player.vel.x * (0.28 * f.skill);
+    const leadZ = player.pos.z + player.vel.z * (0.28 * f.skill);
+    _duelLead.set(leadX, 1.7 + player.y, leadZ);
+    _duelOrigin.copy(f.pos).setY(1.7 + f.y);
+    _duelAimDir.copy(_duelLead).sub(_duelOrigin).normalize();
+    _duelOrigin.addScaledVector(_duelAimDir, 1.2);
+
+    const curvePower = (Math.random() < 0.6) ? (Math.random() < 0.5 ? 1.0 : -1.0) * (0.8 + Math.random() * 0.4) : 0;
+    spawnDisc(_duelOrigin.clone(), _duelAimDir.clone().multiplyScalar(28 + duelTier * 2), f, ORANGE, curvePower);
+
+    f.hasDisc = false;
+    f.aerialThrow = false;
+    f.state = 'SEEK_COVER';
+    f.cd = 0.8 + Math.random() * 0.6;
+    f.coverPillar = null;
+    f.peekDir = -f.peekDir;
+  }
+
+  // 6. Combat State Machine & Movement (Section 3)
+  if (!f.hasDisc) {
+    if (f.state !== 'EVADE') f.state = 'SEEK_COVER';
+  } else if (f.state === 'SEEK_COVER' || f.state === 'EVADE') {
+    f.state = 'PEEK';
+  }
+
+  _duelWant.set(0, 0, 0);
+
+  if (f.state === 'SEEK_COVER') {
+    if (!f.coverPillar) {
+      f.coverPillar = findBestCoverPillar(f.pos, player.pos);
+    }
+    getPillarCoverPoint(f.coverPillar, player.pos, f.coverTarget);
+    const toCoverX = f.coverTarget.x - f.pos.x;
+    const toCoverZ = f.coverTarget.z - f.pos.z;
+    const coverDist = Math.hypot(toCoverX, toCoverZ);
+
+    if (see) {
+      // Trapped in open: weave between pillars
+      if (coverDist > 0.2) {
+        const dirX = toCoverX / coverDist;
+        const dirZ = toCoverZ / coverDist;
+        const weave = Math.sin(time * 6.0) * 0.45;
+        _duelWant.set(dirX - dirZ * weave, 0, dirZ + dirX * weave).normalize();
+      }
+    } else {
+      if (coverDist > 0.4) {
+        _duelWant.set(toCoverX / coverDist, 0, toCoverZ / coverDist);
+      }
+    }
+  } else if (f.state === 'PEEK') {
+    if (see) {
+      f.state = 'ATTACK';
+    } else {
+      const pl = f.coverPillar || findBestCoverPillar(f.pos, player.pos);
+      const pdx = pl.x - player.pos.x;
+      const pdz = pl.z - player.pos.z;
+      const plen = Math.hypot(pdx, pdz);
+      if (plen > 0.01) {
+        const ndx = pdx / plen;
+        const ndz = pdz / plen;
+        _duelWant.set(-ndz * f.peekDir, 0, ndx * f.peekDir).normalize();
+      }
+    }
+  }
+
+  if (f.state === 'ATTACK') {
+    if (!see) {
+      f.state = 'PEEK';
+    } else {
+      const normX = pDist > 0.1 ? toPx / pDist : 0;
+      const normZ = pDist > 0.1 ? toPz / pDist : 1;
+      f.strafeT -= dt * 1.1;
+      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = 0.45 + Math.random() * 0.65; }
+      const sideX = -normZ * f.strafe;
+      const sideZ = normX * f.strafe;
+
+      if (pDist > 19) _duelWant.add({ x: normX, y: 0, z: normZ });
+      else if (pDist < 12) _duelWant.add({ x: -normX, y: 0, z: -normZ });
+      _duelWant.add({ x: sideX * 1.1, y: 0, z: sideZ * 1.1 });
+      if (_duelWant.lengthSq() > 0) _duelWant.normalize();
+
+      f.cd -= dt;
+      if (f.cd <= 0 && f.hasDisc && player.alive) {
+        if (f.grounded && Math.random() < 0.35 && pDist >= 9) {
+          // Leap throw
+          f.vy = 11.5;
+          f.grounded = false;
+          f.jumps = 1;
+          f.aerialThrow = true;
+          burst(tmp.copy(f.pos).setY(f.y + 0.2), ORANGE, 14, 5);
+        } else {
+          // Ground throw with lead and curve bias
+          const leadX = player.pos.x + player.vel.x * (0.28 * f.skill);
+          const leadZ = player.pos.z + player.vel.z * (0.28 * f.skill);
+          _duelAimDir.set(leadX - f.pos.x, 0, leadZ - f.pos.z);
+          _duelAimDir.x += (Math.random() - .5) * (1 - f.skill) * .18;
+          _duelAimDir.z += (Math.random() - .5) * (1 - f.skill) * .18;
+          _duelAimDir.normalize();
+
+          const curveDir = -f.peekDir;
+          const curvePower = (Math.random() < 0.75) ? curveDir * (0.85 + Math.random() * 0.4) : 0;
+          _duelOrigin.copy(f.pos).setY(1.7 + f.y).addScaledVector(_duelAimDir, 1.2);
+
+          spawnDisc(_duelOrigin.clone(), _duelAimDir.clone().multiplyScalar(28 + duelTier * 2), f, ORANGE, curvePower);
+
+          f.hasDisc = false;
+          f.state = 'SEEK_COVER';
+          f.cd = 0.8 + Math.random() * 0.6;
+          f.coverPillar = null;
+          f.peekDir = -f.peekDir;
+        }
+      }
+    }
+  }
+
+  // 8. Movement simulation & resolve
+  const moveSpeed = (f.state === 'SEEK_COVER')
+    ? (f.speed || 10.5) * 1.35
+    : (f.speed || 10.5);
+  const lerpRate = 1 - Math.pow(.001, dt);
+  f.vel.lerp(_duelWant.multiplyScalar(moveSpeed), lerpRate);
+  f.pos.addScaledVector(f.vel, dt);
+  resolveCircle(f.pos, FOE_R);
+
+  // 9. Visual mesh updates
+  f.obj.position.copy(f.pos);
+  f.obj.position.y = f.y + (f.grounded ? Math.sin(time * 11) * 0.05 * Math.min(f.vel.length() / 8, 1) : 0);
+  f.obj.rotation.x = THREE.MathUtils.clamp(-f.vy * 0.018, -0.22, 0.22);
+  f.obj.userData.backDisc.visible = f.hasDisc;
+  if (f.hurt > 0) { f.hurt -= dt; f.obj.position.x += Math.sin(time * 60) * 0.05; }
+}
+
 // ───────────────────────────── main loop ─────────────────────────────
 const clock = new THREE.Clock();
 let time = 0;
@@ -1007,51 +1356,25 @@ function update(dt) {
 
   // ── foes
   for (const f of foes) {
+    if (gameMode === 'duel' && f.isBoss) {
+      updateDuelFoe(f, dt);
+      continue;
+    }
+
     const toP = tmp.copy(player.pos).sub(f.pos); toP.y = 0;
     const dist = toP.length(); toP.normalize();
     const see = lineOfSight(f.pos, player.pos) && player.alive;
 
-    if (f.isBoss) {
-      f.strafeT -= dt * (!f.hasDisc ? 1.6 : 1.1);
-      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = 0.45 + Math.random() * 0.65; }
-    } else {
-      f.strafeT -= dt;
-      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = .9 + Math.random() * 1.8; }
-    }
+    f.strafeT -= dt;
+    if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = .9 + Math.random() * 1.8; }
     const side = new THREE.Vector3(toP.z, 0, -toP.x).multiplyScalar(f.strafe);
 
     const want = new THREE.Vector3();
-    if (f.isBoss && !f.hasDisc) {
-      // Tactical retreat behind pillars when disc is in flight
-      let bestCover = null;
-      let bestDist = Infinity;
-      for (const pl of pillars) {
-        const plPos = new THREE.Vector3(pl.x, 0, pl.z);
-        const pToPl = plPos.clone().sub(player.pos).setY(0);
-        const len = pToPl.length();
-        if (len > 0.1) {
-          const coverPos = plPos.clone().addScaledVector(pToPl.normalize(), pl.r + 2.4);
-          const d = f.pos.distanceTo(coverPos);
-          if (d < bestDist) {
-            bestDist = d;
-            bestCover = coverPos;
-          }
-        }
-      }
-      if (bestCover) {
-        const coverDir = bestCover.clone().sub(f.pos).setY(0);
-        if (coverDir.length() > 0.4) {
-          want.copy(coverDir.normalize()).multiplyScalar(1.5);
-        }
-      }
-      want.addScaledVector(side, 0.9);
-    } else {
-      const ideal = f.isBoss ? 16 : 15;
-      if (dist > ideal + 3) want.add(toP);
-      else if (dist < ideal - 5) want.sub(toP);
-      want.addScaledVector(side, f.isBoss ? 1.1 : .85);
-      if (!see) want.add(toP).multiplyScalar(1.2);
-    }
+    const ideal = 15;
+    if (dist > ideal + 3) want.add(toP);
+    else if (dist < ideal - 5) want.sub(toP);
+    want.addScaledVector(side, .85);
+    if (!see) want.add(toP).multiplyScalar(1.2);
 
     // avoid other foes
     for (const o of foes) if (o !== f) {
@@ -1061,17 +1384,15 @@ function update(dt) {
     }
     if (want.lengthSq() > 0) want.normalize();
 
-    const moveSpeed = f.isBoss
-      ? (f.speed || 10.5) * (!f.hasDisc ? 1.25 : 1.0)
-      : (8.2 + wave * .25);
-    const lerpRate = f.isBoss ? 1 - Math.pow(.001, dt) : 1 - Math.pow(.002, dt);
+    const moveSpeed = 8.2 + wave * .25;
+    const lerpRate = 1 - Math.pow(.002, dt);
     f.vel.lerp(want.multiplyScalar(moveSpeed), lerpRate);
     f.pos.addScaledVector(f.vel, dt);
     resolveCircle(f.pos, FOE_R);
 
     f.obj.position.copy(f.pos);
     const face = Math.atan2(player.pos.x - f.pos.x, player.pos.z - f.pos.z);
-    const turnRate = f.isBoss ? 8 * dt : 6 * dt;
+    const turnRate = 6 * dt;
     f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
     f.obj.userData.backDisc.visible = f.hasDisc;
     if (f.hurt > 0) { f.hurt -= dt; f.obj.position.x += Math.sin(time * 60) * .05; }
@@ -1080,28 +1401,14 @@ function update(dt) {
     f.cd -= dt;
     if (f.cd <= 0 && f.hasDisc && see && player.alive) {
       f.hasDisc = false;
-      if (f.isBoss) {
-        f.cd = 0.8 + Math.random() * 0.6; // 0.8 - 1.4s cooldown
-        const lead = player.pos.clone().addScaledVector(player.vel, 0.28 * f.skill);
-        const dir = lead.sub(f.pos).setY(0).normalize();
-        dir.x += (Math.random() - .5) * (1 - f.skill) * .18;
-        dir.z += (Math.random() - .5) * (1 - f.skill) * .18;
-        dir.normalize();
-        const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
-        // Capable of curved throws toward the player
-        const curveDir = Math.random() < 0.5 ? 1.0 : -1.0;
-        const curvePower = (Math.random() < 0.7) ? curveDir * (0.8 + Math.random() * 0.4) : 0;
-        spawnDisc(origin, dir.multiplyScalar(28 + duelTier * 2), f, ORANGE, curvePower);
-      } else {
-        f.cd = Math.max(1.1, 3.4 - wave * .18) + Math.random();
-        const lead = player.pos.clone().addScaledVector(player.vel, 0.22 * f.skill);
-        const dir = lead.sub(f.pos).setY(0).normalize();
-        dir.x += (Math.random() - .5) * (1 - f.skill) * .45;
-        dir.z += (Math.random() - .5) * (1 - f.skill) * .45;
-        dir.normalize();
-        const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
-        spawnDisc(origin, dir.multiplyScalar(26 + wave), f, ORANGE);
-      }
+      f.cd = Math.max(1.1, 3.4 - wave * .18) + Math.random();
+      const lead = player.pos.clone().addScaledVector(player.vel, 0.22 * f.skill);
+      const dir = lead.sub(f.pos).setY(0).normalize();
+      dir.x += (Math.random() - .5) * (1 - f.skill) * .45;
+      dir.z += (Math.random() - .5) * (1 - f.skill) * .45;
+      dir.normalize();
+      const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
+      spawnDisc(origin, dir.multiplyScalar(26 + wave), f, ORANGE);
     }
   }
 
@@ -1118,7 +1425,7 @@ function update(dt) {
     if (!D.returning && (D.t > 1.5 || D.bounces >= 3)) D.returning = true;
 
     if (D.returning) {
-      const home = holder.pos.clone().setY(1.7);
+      const home = holder.pos.clone().setY(1.7 + (holder.y || 0));
       const dir = home.sub(D.pos);
       const L = dir.length();
       dir.normalize();
@@ -1206,7 +1513,7 @@ function update(dt) {
     if (D.owner === 'player') {
       for (const f of foes) {
         if (D.hitFoes && D.hitFoes.has(f)) continue;
-        if (D.pos.distanceTo(tmp.copy(f.pos).setY(1.5)) < FOE_R + DISC_R + .35) {
+        if (D.pos.distanceTo(tmp.copy(f.pos).setY(1.5 + (f.y || 0))) < FOE_R + DISC_R + .35) {
           if (!D.hitFoes) D.hitFoes = new Set();
           D.hitFoes.add(f);
 
@@ -1252,7 +1559,7 @@ function update(dt) {
           if (f.hp <= 0) killFoe(f);
 
           // If close enough to player, complete catch
-          if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7)) < 1.4) {
+          if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7 + (holder.y || 0))) < 1.4) {
             player.hasDisc = true;
             scene.remove(D.obj);
             discs.splice(i, 1);
@@ -1280,8 +1587,12 @@ function update(dt) {
           const behind = toDisc.dot(facing) < -0.25;
           damagePlayer((16 + D.bounces * 6) * (behind && D.bounces > 0 ? 1.8 : 1));
           if (behind && D.bounces > 0) message('HIT FROM BEHIND');
-          scene.remove(D.obj); discs.splice(i, 1);
-          continue;
+          D.returning = true;
+          if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7 + (holder.y || 0))) < 1.4) {
+            if (D.owner === 'player') player.hasDisc = true; else D.owner.hasDisc = true;
+            scene.remove(D.obj); discs.splice(i, 1);
+            discCaught = true;
+          }
         }
       }
     }
@@ -1488,5 +1799,35 @@ window.__dbg = {
   score: () => score,
   simulatePath: (origin, vel, maxBounces, tMax, step, curve) => simulatePath(origin, vel, maxBounces, tMax, step, curve),
   throwDisc: () => throwDisc(),
-  foesList: () => foes.map(f => ({ pos: { x: +f.pos.x.toFixed(2), z: +f.pos.z.toFixed(2) }, hp: f.hp, rotY: +f.obj.rotation.y.toFixed(3) }))
+  foesList: () => foes.map(f => ({ pos: { x: +f.pos.x.toFixed(2), z: +f.pos.z.toFixed(2) }, hp: f.hp, rotY: +f.obj.rotation.y.toFixed(3) })),
+  duelBoss: () => {
+    const b = foes.find(f => f.isBoss);
+    return b ? {
+      y: +b.y.toFixed(2),
+      vy: +b.vy.toFixed(2),
+      grounded: b.grounded,
+      jumps: b.jumps,
+      state: b.state,
+      dashCd: +b.dashCd.toFixed(2),
+      hasDisc: b.hasDisc,
+      hp: b.hp,
+      pos: { x: +b.pos.x.toFixed(2), z: +b.pos.z.toFixed(2) }
+    } : null;
+  },
+  spawnTestDisc: (offsetZ = 8) => {
+    const b = foes.find(f => f.isBoss);
+    if (!b) return null;
+    const p = new THREE.Vector3(b.pos.x, 1.7, b.pos.z + offsetZ);
+    spawnDisc(p, new THREE.Vector3(0, 0, -32), 'player', CYAN, 0);
+    return { x: +p.x.toFixed(2), z: +p.z.toFixed(2) };
+  },
+  triggerRearDisc: () => {
+    const b = foes.find(f => f.isBoss);
+    if (!b) return null;
+    const fwdZ = Math.cos(b.obj.rotation.y);
+    const p = new THREE.Vector3(b.pos.x, 1.7, b.pos.z - 8.0 * (fwdZ >= 0 ? 1 : -1));
+    const d = spawnDisc(p, new THREE.Vector3(0, 0, (fwdZ >= 0 ? 30 : -30)), 'player', CYAN, 0);
+    d.bounces = 1;
+    return true;
+  }
 };
