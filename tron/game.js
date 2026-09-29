@@ -197,7 +197,26 @@ function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, cu
     }
 
     p.addScaledVector(v, step);
-    p.y += (1.7 - p.y) * Math.min(1, step * 2.2);        // same hover easing
+    if (p.y > DISC_R) {
+      p.y += (1.7 - p.y) * Math.min(1, step * 2.2);        // same hover easing
+    }
+
+    // floor collision
+    const yFloor = DISC_R;
+    if (p.y <= yFloor) {
+      p.y = yFloor;
+      if (v.y < 0) {
+        const sig = Math.abs(v.y) >= 1.0;
+        v.y = -v.y * 0.65;
+        v.x *= 0.95;
+        v.z *= 0.95;
+        if (Math.abs(v.y) < 1.0) v.y = 0;
+        if (sig) {
+          bounces++;
+          bounceAt.push(p.clone());
+        }
+      }
+    }
 
     let hit = false;
     if (p.x >  lim) { p.x =  lim; v.x *= -1; hit = true; }
@@ -307,9 +326,25 @@ function updateTrajectory(aim, dt) {
   const willHit = !!sim.hitFoe;
   const rearKill = willHit && (() => {
     const f = sim.hitFoe.foe;
-    const facing = new THREE.Vector3(-Math.sin(f.obj.rotation.y), 0, -Math.cos(f.obj.rotation.y));
-    const seg = sim.pts[sim.pts.length - 1].clone().sub(sim.pts[Math.max(0, sim.pts.length - 4)]).setY(0).normalize();
-    return seg.dot(facing) > 0.25 && sim.hitFoe.bounces > 0;
+    // Since visor is at +Z in local space:
+    const fwd = new THREE.Vector3(
+      Math.sin(f.obj.rotation.y),
+      0,
+      Math.cos(f.obj.rotation.y)
+    ).normalize();
+
+    // Approach 1 (Position relative to foe)
+    const dRel = sim.hitFoe.point.clone().sub(f.pos).setY(0);
+    if (dRel.lengthSq() > 1e-6) dRel.normalize();
+    const posRear = dRel.dot(fwd) < 0.05;
+
+    // Approach 2 (Velocity alignment)
+    const seg = sim.pts[sim.pts.length - 1].clone().sub(sim.pts[Math.max(0, sim.pts.length - 4)]).setY(0);
+    if (seg.lengthSq() > 1e-6) seg.normalize();
+    const velRear = seg.dot(fwd) > 0.05;
+
+    const rear = posRear || velRear;
+    return rear && sim.hitFoe.bounces > 0;
   })();
 
   const isCurving = Math.abs(curve) > 0.05;
@@ -361,7 +396,7 @@ let foes = [], discs = [], wave = 1, score = 0, running = false, spawnTimer = 0,
 
 // ───────────────────────────── input & pause ─────────────────────────
 let paused = false, lockFailed = false;
-let lastPauseTime = 0;
+let lastPauseToggle = 0;
 let justResumed = false;
 const keys = {};
 const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyP','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
@@ -389,20 +424,22 @@ function onDown(e) {
   if (c === 'F1') { const m = document.getElementById('keymon'); if (m) m.style.display = m.style.display === 'block' ? 'none' : 'block'; }
   if (c === 'KeyP' || c === 'Escape') {
     if (running) {
-      if (paused) {
-        if (performance.now() - lastPauseTime > 150) resumeGame();
-      } else {
-        pauseGame();
+      const now = performance.now();
+      if (now - lastPauseToggle > 180) {
+        lastPauseToggle = now;
+        if (paused) {
+          resumeGame();
+        } else {
+          pauseGame();
+        }
       }
     }
   }
 }
 function onUp(e) { const c = codeOf(e); if (c) keys[c] = false; }
-// bind on BOTH targets in the capture phase so nothing can swallow the key first
+// Capture phase on window intercepts all keyboard events across the whole document
 addEventListener('keydown', onDown, { passive: false, capture: true });
 addEventListener('keyup', onUp, { capture: true });
-document.addEventListener('keydown', e => { if (e.target !== window) onDown(e); }, { passive: false, capture: true });
-document.addEventListener('keyup', e => { if (e.target !== window) onUp(e); }, { capture: true });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; });  // no stuck keys
 
 const canvas = renderer.domElement;
@@ -428,7 +465,7 @@ function startGame() {
 function pauseGame() {
   if (!running || paused) return;
   paused = true;
-  lastPauseTime = performance.now();
+  lastPauseToggle = performance.now();
   const pm = document.getElementById('pauseMenu');
   if (pm) pm.style.display = 'flex';
   if (document.pointerLockElement) {
@@ -440,6 +477,7 @@ function pauseGame() {
 function resumeGame() {
   if (!running || !paused) return;
   paused = false;
+  lastPauseToggle = performance.now();
   const pm = document.getElementById('pauseMenu');
   if (pm) pm.style.display = 'none';
   justResumed = true;
@@ -622,6 +660,38 @@ addEventListener('mouseup', e => { if (e.button === 2) player.blocking = false; 
 addEventListener('contextmenu', e => e.preventDefault());
 
 // ───────────────────────────── game logic ────────────────────────────
+function updateHUD() {
+  const hpb = el('hpbar');
+  if (hpb && hpb.firstElementChild) hpb.firstElementChild.style.width = player.hp + '%';
+  const db = el('discbar');
+  if (db && db.firstElementChild) db.firstElementChild.style.width = (player.hasDisc ? 100 : 0) + '%';
+  const eb = el('energybar');
+  if (eb && eb.firstElementChild) eb.firstElementChild.style.width = player.energy + '%';
+
+  if (gameMode === 'duel') {
+    const rl = el('roundLabel');
+    if (rl) rl.innerHTML = `DUEL TIER <span id="wave" class="big">${duelTier}</span>`;
+    const boss = foes[0];
+    const hpPct = boss ? Math.max(0, Math.round((boss.hp / boss.maxHp) * 100)) : 0;
+    const sl = el('subLabel');
+    if (sl) sl.innerHTML = `RIVAL INTEGRITY <span id="rivalHp">${hpPct}%</span>`;
+    const bbw = el('bossBarWrap');
+    if (bbw) bbw.style.display = 'block';
+    const bb = el('bossbar');
+    if (bb && bb.firstElementChild) bb.firstElementChild.style.width = hpPct + '%';
+  } else {
+    const rl = el('roundLabel');
+    if (rl) rl.innerHTML = `CYCLE <span id="wave" class="big">${wave}</span>`;
+    const sl = el('subLabel');
+    if (sl) sl.innerHTML = `HOSTILES <span id="foes">${foes.length}</span>`;
+    const bbw = el('bossBarWrap');
+    if (bbw) bbw.style.display = 'none';
+  }
+
+  const sc = el('score');
+  if (sc) sc.textContent = score;
+}
+
 function resetGame() {
   for (const f of foes) scene.remove(f.obj);
   for (const d of discs) scene.remove(d.obj);
@@ -642,6 +712,7 @@ function resetGame() {
     spawnWave();
     message('CYCLE 1 — FIGHT');
   }
+  updateHUD();
 }
 
 function spawnDuelBoss(tier = 1) {
@@ -753,7 +824,7 @@ function aimDir() {
 
 function spawnDisc(pos, vel, owner, color, curve = 0) {
   const obj = makeDisc(color); obj.position.copy(pos); scene.add(obj);
-  discs.push({ obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0, curve });
+  discs.push({ obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0, curve, hitFoes: new Set() });
 }
 
 function damagePlayer(amount, from) {
@@ -999,7 +1070,7 @@ function update(dt) {
     resolveCircle(f.pos, FOE_R);
 
     f.obj.position.copy(f.pos);
-    const face = Math.atan2(-(player.pos.x - f.pos.x), -(player.pos.z - f.pos.z));
+    const face = Math.atan2(player.pos.x - f.pos.x, player.pos.z - f.pos.z);
     const turnRate = f.isBoss ? 8 * dt : 6 * dt;
     f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
     f.obj.userData.backDisc.visible = f.hasDisc;
@@ -1080,7 +1151,28 @@ function update(dt) {
 
     D.pos.addScaledVector(D.vel, dt);
     // gentle gravity-free hover, keep near chest height
-    D.pos.y += (1.7 - D.pos.y) * Math.min(1, dt * 2.2);
+    if (D.pos.y > DISC_R) {
+      D.pos.y += (1.7 - D.pos.y) * Math.min(1, dt * 2.2);
+    }
+
+    // floor collision
+    const yFloor = DISC_R;
+    if (D.pos.y <= yFloor) {
+      D.pos.y = yFloor;
+      if (D.vel.y < 0) {
+        const significant = Math.abs(D.vel.y) >= 1.0;
+        D.vel.y = -D.vel.y * 0.65;
+        D.vel.x *= 0.95;
+        D.vel.z *= 0.95;
+        if (Math.abs(D.vel.y) < 1.0) D.vel.y = 0;
+        if (significant && !D.returning) {
+          D.bounces++;
+          if (D.hitFoes) D.hitFoes.clear();
+          burst(D.pos.clone(), D.color, 10, 6);
+          shake(.06);
+        }
+      }
+    }
 
     // wall bounce
     const lim = ARENA - 1.5;
@@ -1103,71 +1195,98 @@ function update(dt) {
     }
     if (bounced && !D.returning) {
       D.bounces++;
+      if (D.hitFoes) D.hitFoes.clear();
       D.curve = -D.curve * 0.5;
       burst(D.pos.clone(), D.color, 10, 6);
       shake(.06);
     }
 
     // hits
-    if (!D.returning || D.owner !== 'player') {
-      if (D.owner === 'player') {
-        for (const f of foes) {
-          if (D.pos.distanceTo(tmp.copy(f.pos).setY(1.5)) < FOE_R + DISC_R + .35) {
-            // Which side of the program did the disc come from?
-            // foe's facing vector (matches how the model is oriented each frame)
-            const facing = new THREE.Vector3(-Math.sin(f.obj.rotation.y), 0, -Math.cos(f.obj.rotation.y));
-            const travel = D.vel.clone().setY(0).normalize();
-            // disc travelling the SAME way the foe faces => it came in behind them
-            const rear = travel.dot(facing) > 0.25;
+    let discCaught = false;
+    if (D.owner === 'player') {
+      for (const f of foes) {
+        if (D.hitFoes && D.hitFoes.has(f)) continue;
+        if (D.pos.distanceTo(tmp.copy(f.pos).setY(1.5)) < FOE_R + DISC_R + .35) {
+          if (!D.hitFoes) D.hitFoes = new Set();
+          D.hitFoes.add(f);
 
-            let dmg = 55 + D.bounces * 18;          // ricochets already hit harder
-            if (rear && D.bounces > 0) {
-              dmg *= 2.0;                            // banked shot to an exposed back
-              score += 150;
-              message('REAR STRIKE  x2');
-              burst(D.pos.clone(), WHITE, 34, 13);
-              shake(.3);
-            } else if (rear) {
-              dmg *= 1.4;                            // plain backshot still rewarded
-              score += 60;
-              burst(D.pos.clone(), WHITE, 20, 10);
-              shake(.18);
-            } else {
-              burst(D.pos.clone(), ORANGE, 24, 9);
-              shake(.15);
-            }
+          // Truthful foe forward vector (visor is at +Z in local space)
+          const fwd = new THREE.Vector3(
+            Math.sin(f.obj.rotation.y),
+            0,
+            Math.cos(f.obj.rotation.y)
+          ).normalize();
 
-            f.hp -= dmg;
-            f.hurt = .25; score += 25;
-            D.returning = true;
-            if (f.hp <= 0) killFoe(f);
-            break;
-          }
-        }
-      } else if (player.alive) {
-        const pc = tmp.copy(player.pos).setY(1.5);
-        if (D.pos.distanceTo(pc) < PLAYER_R + DISC_R + .35) {
-          const toDisc = D.pos.clone().sub(pc).setY(0).normalize();
-          const facing = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
-          if (player.blocking && player.hasDisc && toDisc.dot(facing) > .35) {
-            // parry: reflect back, becomes player-owned
-            burst(D.pos.clone(), WHITE, 30, 12);
-            shake(.25); score += 50;
-            D.owner = 'player'; D.color = CYAN; D.returning = false; D.bounces = 1; D.t = 0; D.curve = 0;
-            D.obj.traverse(o => { if (o.material && o.material.color) o.material.color.setHex(CYAN); if (o.isPointLight) o.color.setHex(CYAN); });
-            D.vel.copy(facing).multiplyScalar(40).addScaledVector(toDisc, 6);
-            D.pos.addScaledVector(toDisc, 1.2);
-            message('DEFLECT');
+          // Approach 1 (Position relative to foe)
+          const dRel = D.pos.clone().sub(f.pos).setY(0);
+          if (dRel.lengthSq() > 1e-6) dRel.normalize();
+          const posRear = dRel.dot(fwd) < 0.05;
+
+          // Approach 2 (Velocity alignment)
+          const vNorm = D.vel.clone().setY(0);
+          if (vNorm.lengthSq() > 1e-6) vNorm.normalize();
+          const velRear = vNorm.dot(fwd) > 0.05;
+
+          const rear = posRear || velRear;
+
+          let dmg = 55 + D.bounces * 18;          // ricochets already hit harder
+          if (rear && D.bounces > 0) {
+            dmg = (55 + D.bounces * 18) * 2.0;    // banked shot to an exposed back
+            score += 150;
+            message('REAR STRIKE  x2');
+            burst(D.pos.clone(), WHITE, 34, 13);
+            shake(.3);
+          } else if (rear) {
+            dmg *= 1.4;                            // plain backshot still rewarded
+            score += 60;
+            burst(D.pos.clone(), WHITE, 20, 10);
+            shake(.18);
           } else {
-            const behind = toDisc.dot(facing) < -0.25;
-            damagePlayer((16 + D.bounces * 6) * (behind && D.bounces > 0 ? 1.8 : 1));
-            if (behind && D.bounces > 0) message('HIT FROM BEHIND');
-            scene.remove(D.obj); discs.splice(i, 1);
-            continue;
+            burst(D.pos.clone(), ORANGE, 24, 9);
+            shake(.15);
           }
+
+          f.hp -= dmg;
+          f.hurt = .25; score += 25;
+          D.returning = true;
+          if (f.hp <= 0) killFoe(f);
+
+          // If close enough to player, complete catch
+          if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7)) < 1.4) {
+            player.hasDisc = true;
+            scene.remove(D.obj);
+            discs.splice(i, 1);
+            discCaught = true;
+          }
+          break;
+        }
+      }
+    } else if (player.alive) {
+      const pc = tmp.copy(player.pos).setY(1.5);
+      if (D.pos.distanceTo(pc) < PLAYER_R + DISC_R + .35) {
+        const toDisc = D.pos.clone().sub(pc).setY(0).normalize();
+        const facing = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+        if (player.blocking && player.hasDisc && toDisc.dot(facing) > .35) {
+          // parry: reflect back, becomes player-owned
+          burst(D.pos.clone(), WHITE, 30, 12);
+          shake(.25); score += 50;
+          D.owner = 'player'; D.color = CYAN; D.returning = false; D.bounces = 1; D.t = 0; D.curve = 0;
+          if (D.hitFoes) D.hitFoes.clear();
+          D.obj.traverse(o => { if (o.material && o.material.color) o.material.color.setHex(CYAN); if (o.isPointLight) o.color.setHex(CYAN); });
+          D.vel.copy(facing).multiplyScalar(40).addScaledVector(toDisc, 6);
+          D.pos.addScaledVector(toDisc, 1.2);
+          message('DEFLECT');
+        } else {
+          const behind = toDisc.dot(facing) < -0.25;
+          damagePlayer((16 + D.bounces * 6) * (behind && D.bounces > 0 ? 1.8 : 1));
+          if (behind && D.bounces > 0) message('HIT FROM BEHIND');
+          scene.remove(D.obj); discs.splice(i, 1);
+          continue;
         }
       }
     }
+
+    if (discCaught) continue;
 
     D.obj.position.copy(D.pos);
     const vx = D.vel.x, vy = D.vel.y, vz = D.vel.z;
@@ -1293,31 +1412,7 @@ function update(dt) {
   ring.material.opacity = .35 + Math.sin(time * 2.2) * .15;
 
   // ── HUD
-  el('hpbar').firstElementChild.style.width = player.hp + '%';
-  el('discbar').firstElementChild.style.width = (player.hasDisc ? 100 : 0) + '%';
-  el('energybar').firstElementChild.style.width = player.energy + '%';
-
-  if (gameMode === 'duel') {
-    const rl = el('roundLabel');
-    if (rl) rl.innerHTML = `DUEL TIER <span id="wave" class="big">${duelTier}</span>`;
-    const boss = foes[0];
-    const hpPct = boss ? Math.max(0, Math.round((boss.hp / boss.maxHp) * 100)) : 0;
-    const sl = el('subLabel');
-    if (sl) sl.innerHTML = `RIVAL INTEGRITY <span id="rivalHp">${hpPct}%</span>`;
-    const bbw = el('bossBarWrap');
-    if (bbw) bbw.style.display = 'block';
-    const bb = el('bossbar');
-    if (bb && bb.firstElementChild) bb.firstElementChild.style.width = hpPct + '%';
-  } else {
-    const rl = el('roundLabel');
-    if (rl) rl.innerHTML = `CYCLE <span id="wave" class="big">${wave}</span>`;
-    const sl = el('subLabel');
-    if (sl) sl.innerHTML = `HOSTILES <span id="foes">${foes.length}</span>`;
-    const bbw = el('bossBarWrap');
-    if (bbw) bbw.style.display = 'none';
-  }
-
-  el('score').textContent = score;
+  updateHUD();
   if (msgT > 0) { msgT -= dt; if (msgT <= 0) msgEl.style.opacity = 0; }
 }
 
@@ -1352,6 +1447,8 @@ window.__dbg = {
   restartMatch: () => restartMatch(),
   startMode: (m) => startMode(m),
   showModeSelect: () => showModeSelect(),
+  killBoss: () => { if (foes.length > 0) killFoe(foes[0]); },
+  spawnTimer: () => +spawnTimer.toFixed(2),
   pos: () => ({ x: +player.pos.x.toFixed(2), z: +player.pos.z.toFixed(2) }),
   y: () => +player.y.toFixed(2),
   foes: () => foes.length,
@@ -1385,5 +1482,11 @@ window.__dbg = {
   discCurve: () => {
     const d = discs.find(x => x.owner === 'player');
     return d ? +(d.curve || 0).toFixed(3) : null;
-  }
+  },
+  discs: () => discs.map(d => ({ pos: { x: +d.pos.x.toFixed(2), y: +d.pos.y.toFixed(2), z: +d.pos.z.toFixed(2) }, vel: { x: +d.vel.x.toFixed(2), y: +d.vel.y.toFixed(2), z: +d.vel.z.toFixed(2) }, bounces: d.bounces, returning: d.returning, owner: d.owner === 'player' ? 'player' : 'foe' })),
+  lastMessage: () => msgEl.textContent,
+  score: () => score,
+  simulatePath: (origin, vel, maxBounces, tMax, step, curve) => simulatePath(origin, vel, maxBounces, tMax, step, curve),
+  throwDisc: () => throwDisc(),
+  foesList: () => foes.map(f => ({ pos: { x: +f.pos.x.toFixed(2), z: +f.pos.z.toFixed(2) }, hp: f.hp, rotY: +f.obj.rotation.y.toFixed(3) }))
 };
