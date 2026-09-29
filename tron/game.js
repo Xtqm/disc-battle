@@ -8,9 +8,13 @@ const PLAYER_R = 0.9, FOE_R = 0.95, DISC_R = 0.55;
 const CURVE_ACCEL = 38.0;              // lateral Magnus acceleration m/s^2 (hooks around pillars)
 const CURVE_LAMBDA = 0.45;             // exponential decay rate per second
 
+// ───────────────────────────── touch & environment ───────────────────
+let isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+if (isTouchDevice) document.body.classList.add('touch-device');
+
 // ───────────────────────────── renderer ──────────────────────────────
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -21,10 +25,32 @@ scene.background = new THREE.Color(0x01060a);
 scene.fog = new THREE.Fog(0x02090f, 55, 170);
 
 const camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.1, 400);
+
+let orientationPaused = false;
+function checkOrientation() {
+  const isPortrait = window.innerHeight > window.innerWidth;
+  const orientOverlay = document.getElementById('orientationOverlay');
+  if (isTouchDevice && isPortrait) {
+    if (orientOverlay) orientOverlay.style.display = 'flex';
+    if (running && !paused) {
+      orientationPaused = true;
+      pauseGame();
+    }
+  } else {
+    if (orientOverlay) orientOverlay.style.display = 'none';
+    if (orientationPaused) {
+      orientationPaused = false;
+      resumeGame();
+    }
+  }
+}
 addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+  checkOrientation();
 });
+window.addEventListener('orientationchange', checkOrientation);
 
 // ───────────────────────────── arena build ───────────────────────────
 scene.add(new THREE.HemisphereLight(0x3f9ab5, 0x061820, 0.95));
@@ -261,6 +287,7 @@ function makeDisc(color) {
 // particle burst pool
 const sparks = [];
 function burst(pos, color, n = 22, power = 10) {
+  if (isTouchDevice) n = Math.max(1, Math.round(n * 0.5));
   const geo = new THREE.BufferGeometry();
   const p = new Float32Array(n * 3), v = [];
   for (let i = 0; i < n; i++) {
@@ -692,8 +719,10 @@ const keys = {};
 const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyP','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
 
 function getPlayerCurveIntent() {
-  if (keys.KeyQ && !keys.KeyE) return -1.0;
-  if (keys.KeyE && !keys.KeyQ) return 1.0;
+  const q = !!keys.KeyQ || touchCurveL;
+  const e = !!keys.KeyE || touchCurveR;
+  if (q && !e) return -1.0;
+  if (e && !q) return 1.0;
   return 0.0;
 }
 
@@ -730,12 +759,12 @@ function onUp(e) { const c = codeOf(e); if (c) keys[c] = false; }
 // Capture phase on window intercepts all keyboard events across the whole document
 addEventListener('keydown', onDown, { passive: false, capture: true });
 addEventListener('keyup', onUp, { capture: true });
-addEventListener('blur', () => { for (const k in keys) keys[k] = false; });  // no stuck keys
+addEventListener('blur', () => { for (const k in keys) keys[k] = false; if (!touchBlocking) player.blocking = false; });  // no stuck keys
 
 const canvas = renderer.domElement;
 canvas.tabIndex = 0;                       // canvas can hold keyboard focus
 canvas.style.outline = 'none';
-canvas.addEventListener('mousedown', () => { focusGame(); if (lockFailed === false && document.pointerLockElement !== canvas && running && !paused) tryLock(); });
+canvas.addEventListener('mousedown', () => { if (!isTouchDevice) { focusGame(); if (lockFailed === false && document.pointerLockElement !== canvas && running && !paused) tryLock(); } });
 const overlay = document.getElementById('overlay');
 
 function startMode(mode) {
@@ -802,7 +831,7 @@ function showModeSelect() {
 function getMainMenuHtml() {
   return `<div class="card">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
-  <div class="keys">
+  <div class="keys desktop-keys">
     <b>W A S D</b><span>Move &amp; strafe across the grid</span>
     <b>Q / E</b><span>Apply curve spin — hook discs around pillars &amp; obstacles</span>
     <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
@@ -813,6 +842,16 @@ function getMainMenuHtml() {
     <b>Space</b><span>Jump — tap twice to air-jump, hold for height</span>
     <b>Shift</b><span>Dash (costs energy)</span>
     <b>P / ESC</b><span>Pause simulation &amp; release cursor</span>
+  </div>
+  <div class="keys mobile-keys" style="display:none">
+    <b>DRAG LEFT</b><span>Virtual Analog Stick — Move &amp; strafe</span>
+    <b>DRAG RIGHT</b><span>Swipe anywhere to turn &amp; aim camera</span>
+    <b>THROW</b><span>Launch identity disc (ricochets &amp; returns)</span>
+    <b>L / R</b><span>Curve spin — hook disc around obstacles</span>
+    <b>SHIELD</b><span>Raise disc shield — deflect incoming attacks</span>
+    <b>JUMP</b><span>Tap to air-jump, hold for maximum height</span>
+    <b>DASH</b><span>Instant directional sprint impulse</span>
+    <b>PAUSE</b><span>Tap top right II button to suspend grid</span>
   </div>
   <div class="mode-select">
     <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
@@ -831,24 +870,40 @@ function showModeSelectMenu() {
 function bindMainMenuEvents() {
   const db = document.getElementById('duelBtn');
   const sb = document.getElementById('swarmBtn');
-  if (db) db.onclick = (e) => { e.stopPropagation(); startMode('duel'); };
-  if (sb) sb.onclick = (e) => { e.stopPropagation(); startMode('swarm'); };
+  const startDuel = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('duel'); };
+  const startSwarm = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('swarm'); };
+  if (db) {
+    db.onclick = startDuel;
+    db.ontouchstart = startDuel;
+  }
+  if (sb) {
+    sb.onclick = startSwarm;
+    sb.ontouchstart = startSwarm;
+  }
 }
 
 // Bind pause menu & HUD buttons
 const pauseBtn = document.getElementById('pauseBtn');
-if (pauseBtn) pauseBtn.onclick = (e) => { e.stopPropagation(); pauseGame(); };
+const onPauseClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); pauseGame(); };
+if (pauseBtn) { pauseBtn.onclick = onPauseClick; pauseBtn.ontouchstart = onPauseClick; }
+
 const resumeBtn = document.getElementById('resumeBtn');
-if (resumeBtn) resumeBtn.onclick = (e) => { e.stopPropagation(); resumeGame(); };
+const onResumeClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); resumeGame(); };
+if (resumeBtn) { resumeBtn.onclick = onResumeClick; resumeBtn.ontouchstart = onResumeClick; }
+
 const restartBtn = document.getElementById('restartBtn');
-if (restartBtn) restartBtn.onclick = (e) => { e.stopPropagation(); restartMatch(); };
+const onRestartClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); restartMatch(); };
+if (restartBtn) { restartBtn.onclick = onRestartClick; restartBtn.ontouchstart = onRestartClick; }
+
 const modeSelectBtn = document.getElementById('modeSelectBtn');
-if (modeSelectBtn) modeSelectBtn.onclick = (e) => { e.stopPropagation(); showModeSelect(); };
+const onModeSelectClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showModeSelect(); };
+if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; modeSelectBtn.ontouchstart = onModeSelectClick; }
 bindMainMenuEvents();
 
 // Pointer lock can throw synchronously (SecurityError) inside sandboxed/permission-less
 // iframes, and can also fail async. Both paths just enable the cursor-steering fallback.
 function tryLock() {
+  if (isTouchDevice) return;
   try {
     const p = canvas.requestPointerLock();
     if (p && p.catch) p.catch(() => { lockFailed = true; });
@@ -862,6 +917,10 @@ function tryLock() {
 
 // keyboard events only arrive if this document actually has focus
 function setCursor() {
+  if (isTouchDevice) {
+    document.body.style.cursor = 'default';
+    return;
+  }
   const locked = document.pointerLockElement === canvas;
   document.body.style.cursor = (running && !paused && locked) ? 'none' : 'default';
 }
@@ -870,9 +929,10 @@ function focusGame() {
   try { window.focus(); } catch (e) {}
   canvas.focus();
 }
-document.addEventListener('pointerlockerror', () => { lockFailed = true; });
+document.addEventListener('pointerlockerror', () => { if (!isTouchDevice) lockFailed = true; });
 
 document.addEventListener('pointerlockchange', () => {
+  if (isTouchDevice) return;
   if (document.pointerLockElement !== canvas && running) {
     if (!paused && !lockFailed) {
       pauseGame();
@@ -882,11 +942,6 @@ document.addEventListener('pointerlockchange', () => {
 });
 
 // ───────────────────────────── mouse look ───────────────────────────
-// One code path drives the camera: accumulate raw mouse deltas into yaw/pitch.
-// movementX/movementY are reported by the browser with OR without pointer lock,
-// so look works identically in a permission-less iframe. When unlocked we also
-// add edge-steering, because the real cursor eventually hits the window border
-// and stops producing deltas.
 let sens = 0.0023, invertY = false;
 let steerX = 0, steerY = 0;                 // joystick steering (unlocked mode)
 let cursorX = innerWidth / 2, cursorY = innerHeight / 2;
@@ -900,33 +955,25 @@ function look(dx, dy) {
 }
 
 addEventListener('mousemove', e => {
+  if (isTouchDevice) return;
   cursorX = e.clientX; cursorY = e.clientY;
   if (!running || paused) return;
 
   if (isLocked()) {
-    // TRUE POINTER LOCK: cursor is captured, camera follows raw deltas 1:1.
     steerX = steerY = 0;
     look(e.movementX || 0, e.movementY || 0);
   } else {
-    // FALLBACK (iframe denies pointer lock, so the OS cursor can't be captured):
-    // treat the cursor's offset from the crosshair as an analog stick. The camera
-    // turns at a RATE, so the crosshair stays the aim point and the loose cursor
-    // can never "run out of screen" or fight you.
     const nx = (e.clientX / innerWidth)  * 2 - 1;
     const ny = (e.clientY / innerHeight) * 2 - 1;
-    const dz = 0.08;                                    // dead zone at centre
+    const dz = 0.08;
     const curve = v => { const m = Math.abs(v); return m < dz ? 0 : Math.sign(v) * Math.pow((m - dz) / (1 - dz), 1.7); };
-    steerX = curve(nx);                                 // horizontal: turn RATE (can spin 360)
+    steerX = curve(nx);
     steerY = 0;
-    // vertical: ABSOLUTE - cursor height maps straight to pitch, so it settles
-    // instead of drifting to the clamp when you park the mouse off-centre.
     player.pitch = THREE.MathUtils.clamp(-ny * 0.5, -0.6, 0.55);
   }
 });
 
-// Re-request lock on every click: some embedders only grant it after a gesture,
-// and any Esc press drops it. Cheap to retry, silent when refused.
-canvas.addEventListener('click', () => { if (running && !isLocked()) tryLock(); });
+canvas.addEventListener('click', () => { if (!isTouchDevice && running && !isLocked()) tryLock(); });
 
 addEventListener('wheel', e => {
   if (!running) return;
@@ -935,19 +982,239 @@ addEventListener('wheel', e => {
 }, { passive: true });
 function showSens() {
   const s = document.getElementById('sens');
-  if (!s) return;
+  if (!s || isTouchDevice) return;
   s.textContent = 'SENSITIVITY ' + Math.round(sens / 0.0023 * 100) + '%';
   s.style.opacity = 1; clearTimeout(showSens._t);
   showSens._t = setTimeout(() => s.style.opacity = 0, 1200);
 }
 
 addEventListener('mousedown', e => {
-  if (!running || paused) return;
+  if (isTouchDevice || !running || paused) return;
   if (e.button === 0) throwDisc();
   if (e.button === 2) player.blocking = true;
 });
-addEventListener('mouseup', e => { if (e.button === 2) player.blocking = false; });
+addEventListener('mouseup', e => {
+  if (isTouchDevice) return;
+  if (e.button === 2 && !touchBlocking) player.blocking = false;
+});
 addEventListener('contextmenu', e => e.preventDefault());
+
+// ───────────────────────────── mobile touch controls ─────────────────
+let moveTouchId = null;
+const moveStartPos = { x: 0, y: 0 };
+const touchMove = { x: 0, y: 0 }; // normalized: x: [-1, 1], y: [-1, 1]
+
+let lookTouchId = null;
+const lookLastPos = { x: 0, y: 0 };
+
+let touchJumpHeld = false;
+let touchDashRequested = false;
+let touchBlocking = false;
+let touchCurveL = false;
+let touchCurveR = false;
+
+const joyBase = document.getElementById('joystickBase');
+const joyThumb = document.getElementById('joystickThumb');
+const R_STICK = 52; // radius in px
+
+function showJoystick(x, y) {
+  if (!joyBase) return;
+  joyBase.style.left = `${x}px`;
+  joyBase.style.top = `${y}px`;
+  joyBase.style.opacity = '1';
+  joyBase.style.transform = 'scale(1)';
+  if (joyThumb) joyThumb.style.transform = 'translate3d(0, 0, 0)';
+}
+
+function updateJoystick(x, y) {
+  const dx = x - moveStartPos.x;
+  const dy = y - moveStartPos.y;
+  const dist = Math.hypot(dx, dy);
+  let cx = dx, cy = dy;
+  if (dist > R_STICK) {
+    cx = (dx / dist) * R_STICK;
+    cy = (dy / dist) * R_STICK;
+  }
+  touchMove.x = cx / R_STICK;
+  touchMove.y = cy / R_STICK;
+  if (joyThumb) {
+    joyThumb.style.transform = `translate3d(${cx}px, ${cy}px, 0)`;
+  }
+}
+
+function hideJoystick() {
+  if (joyBase) {
+    joyBase.style.opacity = '0';
+    joyBase.style.transform = 'scale(0.85)';
+  }
+  if (joyThumb) {
+    joyThumb.style.transform = 'translate3d(0, 0, 0)';
+  }
+  touchMove.x = 0;
+  touchMove.y = 0;
+}
+
+function updateCurveButtons() {
+  const btnCurveL = document.getElementById('btnCurveL');
+  const btnCurveR = document.getElementById('btnCurveR');
+  if (btnCurveL) btnCurveL.classList.toggle('active', touchCurveL);
+  if (btnCurveR) btnCurveR.classList.toggle('active', touchCurveR);
+}
+
+function onTouchStart(e) {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.target.closest('.touch-btn, .hud-btn, .btn, .mode-btn')) continue;
+    if (!running || paused) continue;
+
+    if (t.clientX < window.innerWidth * 0.45 && moveTouchId === null) {
+      moveTouchId = t.identifier;
+      moveStartPos.x = t.clientX;
+      moveStartPos.y = t.clientY;
+      touchMove.x = 0;
+      touchMove.y = 0;
+      showJoystick(t.clientX, t.clientY);
+      e.preventDefault();
+    } else if (t.clientX >= window.innerWidth * 0.45 && lookTouchId === null) {
+      lookTouchId = t.identifier;
+      lookLastPos.x = t.clientX;
+      lookLastPos.y = t.clientY;
+      e.preventDefault();
+    }
+  }
+}
+
+function onTouchMove(e) {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === moveTouchId) {
+      e.preventDefault();
+      updateJoystick(t.clientX, t.clientY);
+    } else if (t.identifier === lookTouchId) {
+      e.preventDefault();
+      const dx = t.clientX - lookLastPos.x;
+      const dy = t.clientY - lookLastPos.y;
+      lookLastPos.x = t.clientX;
+      lookLastPos.y = t.clientY;
+
+      const touchSens = sens * 1.35;
+      player.yaw -= dx * touchSens;
+      player.pitch = THREE.MathUtils.clamp(
+        player.pitch - dy * touchSens * (invertY ? -1 : 1),
+        -0.6,
+        0.55
+      );
+      if (player.yaw > Math.PI) player.yaw -= Math.PI * 2;
+      if (player.yaw < -Math.PI) player.yaw += Math.PI * 2;
+    }
+  }
+}
+
+function onTouchEnd(e) {
+  for (let i = 0; i < e.changedTouches.length; i++) {
+    const t = e.changedTouches[i];
+    if (t.identifier === moveTouchId) {
+      moveTouchId = null;
+      hideJoystick();
+    } else if (t.identifier === lookTouchId) {
+      lookTouchId = null;
+    }
+  }
+}
+
+window.addEventListener('touchstart', onTouchStart, { passive: false });
+window.addEventListener('touchmove', onTouchMove, { passive: false });
+window.addEventListener('touchend', onTouchEnd, { passive: false });
+window.addEventListener('touchcancel', onTouchEnd, { passive: false });
+
+function bindMobileButtons() {
+  const btnThrow = document.getElementById('btnThrow');
+  const btnJump = document.getElementById('btnJump');
+  const btnDash = document.getElementById('btnDash');
+  const btnBlock = document.getElementById('btnBlock');
+  const btnCurveL = document.getElementById('btnCurveL');
+  const btnCurveR = document.getElementById('btnCurveR');
+
+  if (btnThrow) {
+    const doThrow = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      throwDisc();
+      btnThrow.classList.add('pressed');
+      setTimeout(() => btnThrow.classList.remove('pressed'), 120);
+    };
+    btnThrow.addEventListener('touchstart', doThrow, { passive: false });
+    btnThrow.addEventListener('click', doThrow);
+  }
+
+  if (btnJump) {
+    const startJump = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchJumpHeld = true;
+      player.jumpBuf = 0.15;
+      btnJump.classList.add('pressed');
+    };
+    const endJump = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchJumpHeld = false;
+      btnJump.classList.remove('pressed');
+    };
+    btnJump.addEventListener('touchstart', startJump, { passive: false });
+    btnJump.addEventListener('touchend', endJump, { passive: false });
+    btnJump.addEventListener('touchcancel', endJump, { passive: false });
+  }
+
+  if (btnDash) {
+    const doDash = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchDashRequested = true;
+      btnDash.classList.add('pressed');
+      setTimeout(() => btnDash.classList.remove('pressed'), 140);
+    };
+    btnDash.addEventListener('touchstart', doDash, { passive: false });
+    btnDash.addEventListener('click', doDash);
+  }
+
+  if (btnBlock) {
+    const startBlock = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchBlocking = true;
+      player.blocking = true;
+      btnBlock.classList.add('pressed');
+    };
+    const endBlock = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchBlocking = false;
+      player.blocking = false;
+      btnBlock.classList.remove('pressed');
+    };
+    btnBlock.addEventListener('touchstart', startBlock, { passive: false });
+    btnBlock.addEventListener('touchend', endBlock, { passive: false });
+    btnBlock.addEventListener('touchcancel', endBlock, { passive: false });
+  }
+
+  if (btnCurveL) {
+    const doCurveL = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchCurveL = !touchCurveL;
+      if (touchCurveL) touchCurveR = false;
+      updateCurveButtons();
+    };
+    btnCurveL.addEventListener('touchstart', doCurveL, { passive: false });
+    btnCurveL.addEventListener('click', doCurveL);
+  }
+
+  if (btnCurveR) {
+    const doCurveR = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      touchCurveR = !touchCurveR;
+      if (touchCurveR) touchCurveL = false;
+      updateCurveButtons();
+    };
+    btnCurveR.addEventListener('touchstart', doCurveR, { passive: false });
+    btnCurveR.addEventListener('click', doCurveR);
+  }
+}
+bindMobileButtons();
 
 // ───────────────────────────── game logic ────────────────────────────
 function updateHUD() {
@@ -1088,6 +1355,11 @@ function throwDisc() {
   spawnDisc(origin, dir.multiplyScalar(38), 'player', CYAN, curve);
   window.__lastThrowDot = dir.clone().normalize().dot(aim.point.clone().sub(origin).normalize());
   shake(0.12);
+  if (touchCurveL || touchCurveR) {
+    touchCurveL = false;
+    touchCurveR = false;
+    updateCurveButtons();
+  }
 }
 
 // Cast the camera's centre ray into the arena and return {point, foe, dist}.
@@ -1771,6 +2043,14 @@ function update(dt) {
     if (keys.KeyS) wish.sub(fwd);
     if (keys.KeyD) wish.add(right);
     if (keys.KeyA) wish.sub(right);
+
+    if (touchMove.x !== 0 || touchMove.y !== 0) {
+      wish.addScaledVector(fwd, -touchMove.y);
+      wish.addScaledVector(right, touchMove.x);
+    }
+
+    const stickDeflection = Math.hypot(touchMove.x, touchMove.y);
+    const hasKeys = keys.KeyW || keys.KeyS || keys.KeyA || keys.KeyD;
     if (wish.lengthSq() > 0) wish.normalize();
 
     const prevY = player.y;
@@ -1794,7 +2074,7 @@ function update(dt) {
 
     // ── vertical: jump / double-jump / gravity
     const GRAV = 30, JUMP_V = 11.5;
-    if (keys.Space && !player.jumpHeld) player.jumpBuf = 0.15;     // buffer the press
+    if ((keys.Space || touchJumpHeld) && !player.jumpHeld) player.jumpBuf = 0.15;     // buffer the press
     player.jumpBuf = Math.max(0, (player.jumpBuf || 0) - dt);
     player.coyote = player.grounded ? 0.12 : Math.max(0, (player.coyote || 0) - dt);
     const canJump = player.jumps < 2 || player.coyote > 0;
@@ -1811,8 +2091,8 @@ function update(dt) {
       burst(player.pos.clone().setY(player.y + .2), CYAN, player.jumps === 1 ? 12 : 18, 5);
       shake(.08);
     }
-    player.jumpHeld = !!keys.Space;
-    if (keys.Space && player.vy > 0) player.vy -= GRAV * 0.55 * dt;   // hold for higher jump
+    player.jumpHeld = !!keys.Space || touchJumpHeld;
+    if ((keys.Space || touchJumpHeld) && player.vy > 0) player.vy -= GRAV * 0.55 * dt;   // hold for higher jump
     else player.vy -= GRAV * dt;
     player.y += player.vy * dt;
 
@@ -1836,12 +2116,22 @@ function update(dt) {
       damagePlayer(999);
     }
 
-    let speed = player.blocking ? 5.5 : 12;
+    let speed = (player.blocking || touchBlocking) ? 5.5 : 12;
+    if (!hasKeys && stickDeflection > 0) {
+      speed *= Math.min(1, Math.max(0.3, stickDeflection));
+    }
     if (!player.grounded) speed *= 0.82;                  // reduced air control
     player.dashCd -= dt;
-    if ((keys.ShiftLeft || keys.ShiftRight) && player.energy > 25 && wish.lengthSq() > 0 && player.dashCd <= 0) {
+    const isDashTriggered = (keys.ShiftLeft || keys.ShiftRight || touchDashRequested);
+    if (isDashTriggered && player.energy > 25 && player.dashCd <= 0) {
+      let dashDir = wish.clone();
+      if (dashDir.lengthSq() < 1e-4) {
+        dashDir.copy(fwd);
+      } else {
+        dashDir.normalize();
+      }
       const dashImpulse = inRecoveryZone ? 38 : 34;
-      player.vel.add(wish.clone().multiplyScalar(dashImpulse));
+      player.vel.add(dashDir.multiplyScalar(dashImpulse));
       if (inRecoveryZone && player.vy < 0) {
         player.vy = Math.max(player.vy, 4.0); // upward recovery pop
       }
@@ -1849,6 +2139,7 @@ function update(dt) {
       burst(player.pos.clone().setY(player.y + .4), CYAN, 14, 5);
       if (inRecoveryZone) message('RECOVERY DASH');
     }
+    touchDashRequested = false;
     player.energy = Math.min(100, player.energy + dt * 14);
 
     const target = wish.multiplyScalar(speed);
@@ -2043,8 +2334,6 @@ function update(dt) {
 
     if (!holderAlive) { scene.remove(D.obj); discs.splice(i, 1); continue; }
 
-    if (!D.returning && (D.t > 1.5 || D.bounces >= 3)) D.returning = true;
-
     // Deflection miss handling (Section 3.C)
     if (D.isDeflected) {
       D.deflectTime = (D.deflectTime || 0) + dt;
@@ -2062,6 +2351,8 @@ function update(dt) {
         }
       }
     }
+
+    if (!D.returning && (D.t > 1.5 || D.bounces >= 3)) D.returning = true;
 
     if (D.returning) {
       const home = holder.pos.clone().setY(1.7 + (holder.y || 0));
@@ -2489,7 +2780,7 @@ function update(dt) {
   }
 
   // ── analog steering when the cursor can't be captured
-  if (!isLocked() && steerX) {
+  if (!isLocked() && steerX && !isTouchDevice) {
     const RATE = 3.1;                       // radians/sec at full deflection
     player.yaw -= steerX * RATE * dt;
     if (player.yaw >  Math.PI) player.yaw -= Math.PI * 2;
@@ -2507,7 +2798,7 @@ function update(dt) {
   }
   // lock-state banner
   const lb = document.getElementById('lockstate');
-  if (lb) lb.style.display = isLocked() ? 'none' : 'block';
+  if (lb) lb.style.display = (isTouchDevice || isLocked()) ? 'none' : 'block';
 
   // ── crosshair + trajectory preview
   const aim = aimTarget();
@@ -2519,8 +2810,8 @@ function update(dt) {
     ch.classList.toggle('hot', onFoe);
     ch.classList.toggle('bank', !!(traj && traj.willHit && traj.bounces > 0));
     ch.classList.toggle('empty', !player.hasDisc);
-    const qHeld = !!keys.KeyQ && !keys.KeyE;
-    const eHeld = !!keys.KeyE && !keys.KeyQ;
+    const qHeld = (!!keys.KeyQ || touchCurveL) && !(!!keys.KeyE || touchCurveR);
+    const eHeld = (!!keys.KeyE || touchCurveR) && !(!!keys.KeyQ || touchCurveL);
     ch.classList.toggle('curve-l', qHeld);
     ch.classList.toggle('curve-r', eHeld);
     const range = document.getElementById('range');
@@ -2660,7 +2951,11 @@ window.__dbg = {
     return d;
   },
   spawnDeflectedMissDisc: () => {
-    const b = foes.find(f => f.isBoss) || foes[0];
+    let b = foes.find(f => f.isBoss) || foes[0];
+    if (!b) {
+      spawnDuelBoss(duelTier);
+      b = foes[0];
+    }
     const p = new THREE.Vector3(0, 1.5, 0);
     const d = spawnDisc(p, new THREE.Vector3(34, 0, 0), 'player', WHITE, 0);
     d.isDeflected = true;
@@ -2720,9 +3015,43 @@ window.__dbg = {
   playerJumps: () => player.jumps,
   playerHasDisc: () => player.hasDisc,
   setPlayerBlocking: (b) => { player.blocking = b; },
-  setPlayerPos: (x, z, y = 0) => { player.pos.x = x; player.pos.z = z; player.y = y; },
+  setPlayerPos: (x, z, y = 0) => {
+    player.pos.x = x; player.pos.z = z; player.y = y;
+    if (!player.alive || player.hp <= 0) { player.alive = true; player.hp = 100; }
+  },
   step: (dt = 0.016) => update(dt),
-  derezAudioHook: playDeRezSound
+  derezAudioHook: playDeRezSound,
+  isTouchDevice: () => isTouchDevice,
+  setTouchDevice: (val) => {
+    isTouchDevice = !!val;
+    if (isTouchDevice) document.body.classList.add('touch-device');
+    else document.body.classList.remove('touch-device');
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, isTouchDevice ? 1.5 : 2));
+    checkOrientation();
+  },
+  touchMove: () => ({ x: touchMove.x, y: touchMove.y }),
+  touchState: () => ({
+    moveTouchId,
+    lookTouchId,
+    touchJumpHeld,
+    touchDashRequested,
+    touchBlocking,
+    touchCurveL,
+    touchCurveR
+  }),
+  setTouchMove: (x, y) => { touchMove.x = x; touchMove.y = y; },
+  triggerTouchJump: (held = false) => {
+    touchJumpHeld = held;
+    player.jumpBuf = 0.15;
+  },
+  triggerTouchDash: () => { touchDashRequested = true; },
+  setTouchCurve: (l, r) => {
+    touchCurveL = !!l;
+    touchCurveR = !!r;
+    updateCurveButtons();
+  },
+  checkOrientation: () => checkOrientation(),
+  particleBurstCount: (n = 22) => isTouchDevice ? Math.max(1, Math.round(n * 0.5)) : n
 };
 
 window.__TRON__ = window.__dbg;
