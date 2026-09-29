@@ -1141,7 +1141,23 @@ function aimDir() {
 
 function spawnDisc(pos, vel, owner, color, curve = 0) {
   const obj = makeDisc(color); obj.position.copy(pos); scene.add(obj);
-  const d = { obj, pos: pos.clone(), vel: vel.clone(), owner, color, bounces: 0, t: 0, returning: false, spin: 0, curve, hitFoes: new Set() };
+  const d = {
+    obj,
+    pos: pos.clone(),
+    vel: vel.clone(),
+    owner,
+    originalOwner: owner,
+    color,
+    bounces: 0,
+    deflectBounces: 0,
+    deflectTime: 0,
+    isDeflected: false,
+    t: 0,
+    returning: false,
+    spin: 0,
+    curve,
+    hitFoes: new Set()
+  };
   discs.push(d);
   return d;
 }
@@ -1191,6 +1207,12 @@ function message(t) {
   if (t === 'SURFACE COLLAPSE — JUMP / DASH!') {
     msgEl.style.color = 'var(--orange)';
     msgEl.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
+  } else if (t === 'RIVAL CAUGHT DISC!' || t === 'RIVAL COUNTER-CATCH!') {
+    msgEl.style.color = 'var(--orange)';
+    msgEl.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
+  } else if (t === 'DEFLECTED!') {
+    msgEl.style.color = '#ffffff';
+    msgEl.style.textShadow = '0 0 24px var(--cyan), 0 0 8px #ffffff';
   } else {
     msgEl.style.color = 'var(--cyan)';
     msgEl.style.textShadow = '0 0 22px var(--cyan)';
@@ -1240,7 +1262,7 @@ let shakeAmt = 0;
 function shake(v) { shakeAmt = Math.min(shakeAmt + v, .8); }
 
 // ───────────────────────────── collision util ────────────────────────
-function resolveCircle(pos, radius) {
+function resolveCircle(pos, radius, y = 0) {
   const lim = ARENA - 1.4 - radius;
   pos.x = THREE.MathUtils.clamp(pos.x, -lim, lim);
   pos.z = THREE.MathUtils.clamp(pos.z, -lim, lim);
@@ -1250,6 +1272,49 @@ function resolveCircle(pos, radius) {
     if (dist < min && dist > 0.0001) {
       pos.x = p.x + dx / dist * min;
       pos.z = p.z + dz / dist * min;
+    }
+  }
+
+  // Vertical edge colliders for intact tiles when entity is in falling zone (y < -0.2m)
+  if (y < -0.2) {
+    const minIX = Math.max(0, Math.floor((pos.x - radius + ARENA) / TILE_W));
+    const maxIX = Math.min(TILE_N - 1, Math.floor((pos.x + radius + ARENA) / TILE_W));
+    const minIZ = Math.max(0, Math.floor((pos.z - radius + ARENA) / TILE_W));
+    const maxIZ = Math.min(TILE_N - 1, Math.floor((pos.z + radius + ARENA) / TILE_W));
+
+    for (let ix = minIX; ix <= maxIX; ix++) {
+      for (let iz = minIZ; iz <= maxIZ; iz++) {
+        const t = tiles.get(`${ix}_${iz}`);
+        if (!t || t.state === TILE_FALLEN || t.state === TILE_REBUILDING) continue;
+
+        const tMinX = -ARENA + ix * TILE_W;
+        const tMaxX = -ARENA + (ix + 1) * TILE_W;
+        const tMinZ = -ARENA + iz * TILE_W;
+        const tMaxZ = -ARENA + (iz + 1) * TILE_W;
+
+        const cx = Math.max(tMinX, Math.min(pos.x, tMaxX));
+        const cz = Math.max(tMinZ, Math.min(pos.z, tMaxZ));
+        const dx = pos.x - cx;
+        const dz = pos.z - cz;
+        const distSq = dx * dx + dz * dz;
+
+        if (distSq < radius * radius && distSq > 1e-6) {
+          const dist = Math.sqrt(distSq);
+          const push = radius - dist;
+          pos.x += (dx / dist) * push;
+          pos.z += (dz / dist) * push;
+        } else if (distSq <= 1e-6) {
+          const dL = pos.x - tMinX;
+          const dR = tMaxX - pos.x;
+          const dB = pos.z - tMinZ;
+          const dT = tMaxZ - pos.z;
+          const minD = Math.min(dL, dR, dB, dT);
+          if (minD === dL) pos.x = tMinX - radius;
+          else if (minD === dR) pos.x = tMaxX + radius;
+          else if (minD === dB) pos.z = tMinZ - radius;
+          else pos.z = tMaxZ + radius;
+        }
+      }
     }
   }
 }
@@ -1300,6 +1365,8 @@ function findBestCoverPillar(foePos, playerPos) {
 function updateDuelFoe(f, dt) {
   // 1. Vertical Kinematics & Gravity (Gfoe = 30)
   const GRAV_FOE = 30;
+  const prevY = f.y;
+  const wasGrounded = f.grounded;
   f.vy -= GRAV_FOE * dt;
   f.y += f.vy * dt;
 
@@ -1307,17 +1374,36 @@ function updateDuelFoe(f, dt) {
   const isFoeTileSolid = foeTile && foeTile.state !== TILE_FALLEN && foeTile.state !== TILE_REBUILDING;
 
   if (isFoeTileSolid) {
-    if (f.y <= 0) {
+    if (f.y <= 0 && prevY >= -0.15) {
       f.y = 0;
       f.vy = 0;
       f.grounded = true;
       f.jumps = 0;
       f.aerialThrow = false;
       f.didRecover = false;
+    } else if (f.y < -0.15) {
+      f.grounded = false;
     }
   } else {
     // Tile is FALLEN (Open Void)
+    if (wasGrounded) {
+      f.vy = Math.min(f.vy, -3.5);
+    }
     f.grounded = false;
+  }
+
+  // Failsafe Re-Arm Watchdog (Section 2.2)
+  if (!f.hasDisc && !discs.some(d => d.owner === f)) {
+    f.rearmTimer = (f.rearmTimer || 0) + dt;
+    if (f.rearmTimer > 2.5) {
+      f.hasDisc = true;
+      f.rearmTimer = 0;
+      if (f.obj && f.obj.userData && f.obj.userData.backDisc) {
+        f.obj.userData.backDisc.visible = true;
+      }
+    }
+  } else {
+    f.rearmTimer = 0;
   }
 
   // Bot Fall Recovery AI: Detect y < 0 and y > -3.0m
@@ -1358,6 +1444,24 @@ function updateDuelFoe(f, dt) {
   const see = lineOfSight(f.pos, player.pos) && player.alive;
 
   // 2. Threat Awareness & Ricochet Defense (Section 4)
+  let deflectThreat = null;
+  let deflectDist = Infinity;
+  for (let i = 0; i < discs.length; i++) {
+    const D = discs[i];
+    if (D.isDeflected && D.owner === 'player' && !D.returning) {
+      const dx = D.pos.x - f.pos.x;
+      const dz = D.pos.z - f.pos.z;
+      const dist = Math.hypot(dx, dz);
+      const toFoeX = f.pos.x - D.pos.x;
+      const toFoeZ = f.pos.z - D.pos.z;
+      const movingToward = (D.vel.x * toFoeX + D.vel.z * toFoeZ) > 0;
+      if (movingToward && dist < 35 && dist < deflectDist) {
+        deflectDist = dist;
+        deflectThreat = D;
+      }
+    }
+  }
+
   let panicDisc = null;
   let panicDist = Infinity;
   for (let i = 0; i < discs.length; i++) {
@@ -1389,7 +1493,21 @@ function updateDuelFoe(f, dt) {
     }
   }
 
-  if (panicDisc) {
+  if (deflectThreat) {
+    // Prioritize facing incoming deflected disc to prepare catch
+    const faceAngle = Math.atan2(deflectThreat.pos.x - f.pos.x, deflectThreat.pos.z - f.pos.z);
+    const faceDiff = ((faceAngle - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+    f.obj.rotation.y += THREE.MathUtils.clamp(faceDiff, -24 * dt, 24 * dt);
+
+    // Visual telegraph: orange flash around bot's hands/visor
+    f.telegraphT = (f.telegraphT || 0) + dt;
+    if (f.telegraphT > 0.1) {
+      f.telegraphT = 0;
+      burst(tmp.set(f.pos.x, 2.45 + f.y, f.pos.z), ORANGE, 4, 3);
+      burst(tmp.set(f.pos.x + 0.7, 1.6 + f.y, f.pos.z), ORANGE, 3, 2);
+      burst(tmp.set(f.pos.x - 0.7, 1.6 + f.y, f.pos.z), ORANGE, 3, 2);
+    }
+  } else if (panicDisc) {
     // Flag panic state: turn immediately to face incoming disc
     f.state = 'EVADE';
     const faceAngle = Math.atan2(panicDisc.pos.x - f.pos.x, panicDisc.pos.z - f.pos.z);
@@ -1620,10 +1738,11 @@ function updateDuelFoe(f, dt) {
   const moveSpeed = (f.state === 'SEEK_COVER')
     ? (f.speed || 10.5) * 1.35
     : (f.speed || 10.5);
-  const lerpRate = 1 - Math.pow(.001, dt);
+  const inVoid = !isFoeTileSolid && f.y < 0;
+  const lerpRate = inVoid ? 0 : (1 - Math.pow(.001, dt));
   f.vel.lerp(_duelWant.multiplyScalar(moveSpeed), lerpRate);
   f.pos.addScaledVector(f.vel, dt);
-  resolveCircle(f.pos, FOE_R);
+  resolveCircle(f.pos, FOE_R, f.y);
 
   // 9. Visual mesh updates
   f.obj.position.copy(f.pos);
@@ -1654,8 +1773,18 @@ function update(dt) {
     if (keys.KeyA) wish.sub(right);
     if (wish.lengthSq() > 0) wish.normalize();
 
+    const prevY = player.y;
+    const wasGrounded = player.grounded;
     const playerTile = getTileAt(player.pos.x, player.pos.z);
     const isTileSolid = playerTile && playerTile.state !== TILE_FALLEN && playerTile.state !== TILE_REBUILDING;
+
+    if (!isTileSolid) {
+      if (wasGrounded) {
+        // Step off solid edge without jump -> immediate downward plunge impulse
+        player.vy = Math.min(player.vy, -3.5);
+      }
+      player.grounded = false;
+    }
 
     const inRecoveryZone = player.y < 0 && player.y > -3.5;
     if (inRecoveryZone && player.vy <= 0) {
@@ -1688,9 +1817,12 @@ function update(dt) {
     player.y += player.vy * dt;
 
     if (isTileSolid) {
-      if (player.y <= 0) {
+      // Step-up prevention: cannot land from below unless falling from above floor plane (prevY >= -0.15m)
+      if (player.y <= 0 && prevY >= -0.15) {
         if (!player.grounded && player.vy < -6) { burst(player.pos.clone().setY(.15), CYAN, 10, 4); shake(.07); }
         player.y = 0; player.vy = 0; player.grounded = true; player.jumps = 0;
+      } else if (player.y < -0.15) {
+        player.grounded = false;
       }
     } else {
       player.grounded = false;
@@ -1721,12 +1853,15 @@ function update(dt) {
 
     const target = wish.multiplyScalar(speed);
     // Disallow floor friction damping so lateral momentum is preserved in void
-    const lerpRate = player.grounded
-      ? (1 - Math.pow(0.0009, dt))
-      : (player.y < 0 ? (1 - Math.pow(0.25, dt)) : (1 - Math.pow(0.005, dt)));
+    const inVoid = !isTileSolid && player.y < 0;
+    const lerpRate = inVoid
+      ? (wish.lengthSq() > 0 ? (1 - Math.pow(0.5, dt)) : 0)
+      : (player.grounded
+          ? (1 - Math.pow(0.0009, dt))
+          : (1 - Math.pow(0.005, dt)));
     player.vel.lerp(target, lerpRate);
     player.pos.addScaledVector(player.vel, dt);
-    resolveCircle(player.pos, PLAYER_R);
+    resolveCircle(player.pos, PLAYER_R, player.y);
 
     player.obj.position.copy(player.pos);
     player.obj.rotation.y = player.yaw;
@@ -1754,6 +1889,8 @@ function update(dt) {
     }
 
     if (f.y === undefined) { f.y = 0; f.vy = 0; f.grounded = true; f.didRecover = false; }
+    const prevY = f.y;
+    const wasGrounded = f.grounded;
     f.vy -= 30 * dt;
     f.y += f.vy * dt;
 
@@ -1761,14 +1898,33 @@ function update(dt) {
     const isSTileSolid = sTile && sTile.state !== TILE_FALLEN && sTile.state !== TILE_REBUILDING;
 
     if (isSTileSolid) {
-      if (f.y <= 0) {
+      if (f.y <= 0 && prevY >= -0.15) {
         f.y = 0;
         f.vy = 0;
         f.grounded = true;
         f.didRecover = false;
+      } else if (f.y < -0.15) {
+        f.grounded = false;
       }
     } else {
+      if (wasGrounded) {
+        f.vy = Math.min(f.vy, -3.5);
+      }
       f.grounded = false;
+    }
+
+    // Failsafe Re-Arm Watchdog (Section 2.2)
+    if (!f.hasDisc && !discs.some(d => d.owner === f)) {
+      f.rearmTimer = (f.rearmTimer || 0) + dt;
+      if (f.rearmTimer > 2.5) {
+        f.hasDisc = true;
+        f.rearmTimer = 0;
+        if (f.obj && f.obj.userData && f.obj.userData.backDisc) {
+          f.obj.userData.backDisc.visible = true;
+        }
+      }
+    } else {
+      f.rearmTimer = 0;
     }
 
     // Emergency recovery jump / dash for swarm foe
@@ -1822,17 +1978,43 @@ function update(dt) {
     if (want.lengthSq() > 0) want.normalize();
 
     const moveSpeed = 8.2 + wave * .25;
-    const lerpRate = 1 - Math.pow(.002, dt);
+    const inVoid = !isSTileSolid && f.y < 0;
+    const lerpRate = inVoid ? 0 : (1 - Math.pow(.002, dt));
     f.vel.lerp(want.multiplyScalar(moveSpeed), lerpRate);
     f.pos.addScaledVector(f.vel, dt);
-    resolveCircle(f.pos, FOE_R);
+    resolveCircle(f.pos, FOE_R, f.y);
 
     f.obj.position.copy(f.pos);
     f.obj.position.y = f.y + (f.grounded ? Math.sin(time * 11) * 0.05 * Math.min(f.vel.length() / 8, 1) : 0);
     f.obj.rotation.x = THREE.MathUtils.clamp(-f.vy * 0.018, -0.22, 0.22);
-    const face = Math.atan2(player.pos.x - f.pos.x, player.pos.z - f.pos.z);
-    const turnRate = 6 * dt;
-    f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
+
+    // Deflected disc threat response or normal facing
+    let deflectThreat = null;
+    for (let i = 0; i < discs.length; i++) {
+      const D = discs[i];
+      if (D.isDeflected && D.owner === 'player' && !D.returning) {
+        const toFoeX = f.pos.x - D.pos.x;
+        const toFoeZ = f.pos.z - D.pos.z;
+        if ((D.vel.x * toFoeX + D.vel.z * toFoeZ) > 0 && Math.hypot(toFoeX, toFoeZ) < 30) {
+          deflectThreat = D;
+          break;
+        }
+      }
+    }
+    if (deflectThreat) {
+      const faceAngle = Math.atan2(deflectThreat.pos.x - f.pos.x, deflectThreat.pos.z - f.pos.z);
+      const faceDiff = ((faceAngle - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+      f.obj.rotation.y += THREE.MathUtils.clamp(faceDiff, -18 * dt, 18 * dt);
+      f.telegraphT = (f.telegraphT || 0) + dt;
+      if (f.telegraphT > 0.12) {
+        f.telegraphT = 0;
+        burst(tmp.set(f.pos.x, 2.45 + (f.y || 0), f.pos.z), ORANGE, 4, 2);
+      }
+    } else {
+      const face = Math.atan2(player.pos.x - f.pos.x, player.pos.z - f.pos.z);
+      const turnRate = 6 * dt;
+      f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
+    }
     f.obj.userData.backDisc.visible = f.hasDisc;
     if (f.hurt > 0) { f.hurt -= dt; f.obj.position.x += Math.sin(time * 60) * .05; }
 
@@ -1863,6 +2045,24 @@ function update(dt) {
 
     if (!D.returning && (D.t > 1.5 || D.bounces >= 3)) D.returning = true;
 
+    // Deflection miss handling (Section 3.C)
+    if (D.isDeflected) {
+      D.deflectTime = (D.deflectTime || 0) + dt;
+      if ((D.deflectTime >= 1.5 || (D.deflectBounces || 0) >= 2) && !D.returning) {
+        D.isDeflected = false;
+        D.returning = true;
+        const targetFoe = (D.originalOwner && foes.includes(D.originalOwner)) ? D.originalOwner : (foes[0] || null);
+        if (targetFoe) {
+          D.owner = targetFoe;
+          D.color = ORANGE;
+          D.obj.traverse(o => {
+            if (o.material && o.material.color) o.material.color.setHex(ORANGE);
+            if (o.isPointLight) o.color.setHex(ORANGE);
+          });
+        }
+      }
+    }
+
     if (D.returning) {
       const home = holder.pos.clone().setY(1.7 + (holder.y || 0));
       const dir = home.sub(D.pos);
@@ -1870,7 +2070,14 @@ function update(dt) {
       dir.normalize();
       D.vel.lerp(dir.multiplyScalar(34), 1 - Math.pow(.0005, dt));
       if (L < 1.4) {
-        if (D.owner === 'player') player.hasDisc = true; else D.owner.hasDisc = true;
+        if (D.owner === 'player') {
+          player.hasDisc = true;
+        } else if (D.owner) {
+          D.owner.hasDisc = true;
+          if (D.owner.obj && D.owner.obj.userData && D.owner.obj.userData.backDisc) {
+            D.owner.obj.userData.backDisc.visible = true;
+          }
+        }
         scene.remove(D.obj); discs.splice(i, 1); continue;
       }
     } else if (D.curve) {
@@ -1954,12 +2161,17 @@ function update(dt) {
         bounced = true;
       }
     }
-    if (bounced && !D.returning) {
-      D.bounces++;
-      if (D.hitFoes) D.hitFoes.clear();
-      D.curve = -D.curve * 0.5;
-      burst(D.pos.clone(), D.color, 10, 6);
-      shake(.06);
+    if (bounced) {
+      if (D.isDeflected) {
+        D.deflectBounces = (D.deflectBounces || 0) + 1;
+      }
+      if (!D.returning) {
+        D.bounces++;
+        if (D.hitFoes) D.hitFoes.clear();
+        D.curve = -D.curve * 0.5;
+        burst(D.pos.clone(), D.color, 10, 6);
+        shake(.06);
+      }
     }
 
     // hits
@@ -1967,9 +2179,111 @@ function update(dt) {
     if (D.owner === 'player') {
       for (const f of foes) {
         if (D.hitFoes && D.hitFoes.has(f)) continue;
-        if (D.pos.distanceTo(tmp.copy(f.pos).setY(1.5 + (f.y || 0))) < FOE_R + DISC_R + .35) {
+        const fCenter = tmp.copy(f.pos).setY(1.5 + (f.y || 0));
+        const dist = D.pos.distanceTo(fCenter);
+
+        // Section 3.B: AI Threat Detection & Catch Window for deflected discs
+        if (D.isDeflected && dist <= 2.2) {
+          const toFoe = fCenter.clone().sub(D.pos);
+          const movingToward = D.vel.dot(toFoe) > 0;
+          const fwd = new THREE.Vector3(
+            Math.sin(f.obj.rotation.y),
+            0,
+            Math.cos(f.obj.rotation.y)
+          ).normalize();
+          const toDisc = D.pos.clone().sub(f.pos).setY(0);
+          const toDiscLen = toDisc.length();
+          const facingDot = toDiscLen > 1e-4 ? fwd.dot(toDisc.normalize()) : 1;
+          const hasLos = lineOfSight(f.pos, D.pos);
+
+          if (movingToward && facingDot > 0.2 && hasLos) {
+            const catchChance = (gameMode === 'duel' && f.isBoss)
+              ? Math.min(0.85, 0.75 + (duelTier - 1) * 0.03)
+              : 0.35;
+            if (Math.random() < catchChance) {
+              // ON SUCCESS (AI Catch)
+              scene.remove(D.obj);
+              discs.splice(i, 1);
+              f.hasDisc = true;
+              if (f.obj && f.obj.userData && f.obj.userData.backDisc) {
+                f.obj.userData.backDisc.visible = true;
+              }
+              burst(f.pos.clone().setY(1.7 + (f.y || 0)), WHITE, 28, 11);
+              burst(f.pos.clone().setY(1.7 + (f.y || 0)), ORANGE, 14, 7);
+              shake(0.2);
+              message('RIVAL CAUGHT DISC!');
+              f.cd = 0.35 + Math.random() * 0.4;
+              if (f.isBoss) f.state = 'ATTACK';
+              discCaught = true;
+              break;
+            } else {
+              // ON FAILURE (Direct Hit to Rival)
+              if (!D.hitFoes) D.hitFoes = new Set();
+              D.hitFoes.add(f);
+              const critDmg = 85 + D.bounces * 20;
+              f.hp -= critDmg;
+              f.hurt = 0.8;
+              f.cd = Math.max(f.cd, 0.8);
+              score += 150;
+              message('DEFLECTION HIT!');
+              burst(D.pos.clone(), WHITE, 32, 12);
+              burst(D.pos.clone(), ORANGE, 20, 8);
+              shake(0.25);
+              if (f.hp <= 0) {
+                killFoe(f);
+              } else {
+                D.vel.multiplyScalar(-0.4);
+                D.vel.x += (Math.random() - 0.5) * 4;
+                D.vel.z += (Math.random() - 0.5) * 4;
+                D.vel.y = Math.random() * 2 + 1;
+                D.isDeflected = false;
+                D.color = ORANGE;
+                D.obj.traverse(o => {
+                  if (o.material && o.material.color) o.material.color.setHex(ORANGE);
+                  if (o.isPointLight) o.color.setHex(ORANGE);
+                });
+                D.owner = f;
+                D.returning = true;
+              }
+              discCaught = true;
+              break;
+            }
+          }
+        }
+
+        if (dist < FOE_R + DISC_R + .35) {
           if (!D.hitFoes) D.hitFoes = new Set();
           D.hitFoes.add(f);
+
+          if (D.isDeflected) {
+            const critDmg = 85 + D.bounces * 20;
+            f.hp -= critDmg;
+            f.hurt = 0.8;
+            f.cd = Math.max(f.cd, 0.8);
+            score += 150;
+            message('DEFLECTION HIT!');
+            burst(D.pos.clone(), WHITE, 32, 12);
+            burst(D.pos.clone(), ORANGE, 20, 8);
+            shake(0.25);
+            if (f.hp <= 0) {
+              killFoe(f);
+            } else {
+              D.vel.multiplyScalar(-0.4);
+              D.vel.x += (Math.random() - 0.5) * 4;
+              D.vel.z += (Math.random() - 0.5) * 4;
+              D.vel.y = Math.random() * 2 + 1;
+              D.isDeflected = false;
+              D.color = ORANGE;
+              D.obj.traverse(o => {
+                if (o.material && o.material.color) o.material.color.setHex(ORANGE);
+                if (o.isPointLight) o.color.setHex(ORANGE);
+              });
+              D.owner = f;
+              D.returning = true;
+            }
+            discCaught = true;
+            break;
+          }
 
           // Truthful foe forward vector (visor is at +Z in local space)
           const fwd = new THREE.Vector3(
@@ -2023,28 +2337,69 @@ function update(dt) {
         }
       }
     } else if (player.alive) {
-      const pc = tmp.copy(player.pos).setY(1.5);
+      const pc = tmp.copy(player.pos).setY(1.5 + player.y);
       if (D.pos.distanceTo(pc) < PLAYER_R + DISC_R + .35) {
         const toDisc = D.pos.clone().sub(pc).setY(0).normalize();
         const facing = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
         if (player.blocking && player.hasDisc && toDisc.dot(facing) > .35) {
-          // parry: reflect back, becomes player-owned
+          // parry: reflect back, becomes player-owned deflected threat
           burst(D.pos.clone(), WHITE, 30, 12);
           shake(.25); score += 50;
-          D.owner = 'player'; D.color = CYAN; D.returning = false; D.bounces = 1; D.t = 0; D.curve = 0;
+          D.originalOwner = (D.owner !== 'player') ? D.owner : (D.originalOwner || foes[0]);
+          D.owner = 'player';
+          D.color = WHITE;
+          D.isDeflected = true;
+          D.returning = false;
+          D.bounces = 0;
+          D.deflectBounces = 0;
+          D.deflectTime = 0;
+          D.t = 0;
+          D.curve = 0;
           if (D.hitFoes) D.hitFoes.clear();
-          D.obj.traverse(o => { if (o.material && o.material.color) o.material.color.setHex(CYAN); if (o.isPointLight) o.color.setHex(CYAN); });
-          D.vel.copy(facing).multiplyScalar(40).addScaledVector(toDisc, 6);
+          D.obj.traverse(o => {
+            if (o.material && o.material.color) o.material.color.setHex(WHITE);
+            if (o.isPointLight) o.color.setHex(WHITE);
+          });
+          const incomingSpd = D.vel.length();
+          const spd = Math.max(36, incomingSpd * 1.25);
+          const targetFoe = (D.originalOwner && foes.includes(D.originalOwner)) ? D.originalOwner : foes[0];
+          if (targetFoe) {
+            const dirToRival = targetFoe.pos.clone().setY(1.7 + (targetFoe.y || 0)).sub(D.pos).normalize();
+            D.vel.copy(dirToRival).multiplyScalar(spd);
+          } else {
+            D.vel.copy(facing).multiplyScalar(spd);
+          }
           D.pos.addScaledVector(toDisc, 1.2);
-          message('DEFLECT');
+          message('DEFLECTED!');
         } else {
+          // Elastic impact rebound: enemy disc hits player without being blocked (Section 2.1)
           const behind = toDisc.dot(facing) < -0.25;
           damagePlayer((16 + D.bounces * 6) * (behind && D.bounces > 0 ? 1.8 : 1));
           if (behind && D.bounces > 0) message('HIT FROM BEHIND');
+          burst(D.pos.clone(), ORANGE, 18, 7);
+          shake(0.18);
+
+          // Invert and damp velocity: v <- -v * 0.45 + random deflection
+          D.vel.multiplyScalar(-0.45);
+          D.vel.x += (Math.random() - 0.5) * 4;
+          D.vel.z += (Math.random() - 0.5) * 4;
+          D.vel.y = Math.random() * 2 + 1;
+          D.bounces = 0;
+          D.curve = 0;
+          D.isDeflected = false;
           D.returning = true;
+
           if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7 + (holder.y || 0))) < 1.4) {
-            if (D.owner === 'player') player.hasDisc = true; else D.owner.hasDisc = true;
-            scene.remove(D.obj); discs.splice(i, 1);
+            if (D.owner === 'player') {
+              player.hasDisc = true;
+            } else if (D.owner) {
+              D.owner.hasDisc = true;
+              if (D.owner.obj && D.owner.obj.userData && D.owner.obj.userData.backDisc) {
+                D.owner.obj.userData.backDisc.visible = true;
+              }
+            }
+            scene.remove(D.obj);
+            discs.splice(i, 1);
             discCaught = true;
           }
         }
@@ -2250,12 +2605,12 @@ window.__dbg = {
     const d = discs.find(x => x.owner === 'player');
     return d ? +(d.curve || 0).toFixed(3) : null;
   },
-  discs: () => discs.map(d => ({ pos: { x: +d.pos.x.toFixed(2), y: +d.pos.y.toFixed(2), z: +d.pos.z.toFixed(2) }, vel: { x: +d.vel.x.toFixed(2), y: +d.vel.y.toFixed(2), z: +d.vel.z.toFixed(2) }, bounces: d.bounces, returning: d.returning, owner: d.owner === 'player' ? 'player' : 'foe' })),
+  discs: () => discs.map(d => ({ pos: { x: +d.pos.x.toFixed(2), y: +d.pos.y.toFixed(2), z: +d.pos.z.toFixed(2) }, vel: { x: +d.vel.x.toFixed(2), y: +d.vel.y.toFixed(2), z: +d.vel.z.toFixed(2) }, bounces: d.bounces, returning: d.returning, isDeflected: !!d.isDeflected, owner: d.owner === 'player' ? 'player' : 'foe' })),
   lastMessage: () => msgEl.textContent,
   score: () => score,
   simulatePath: (origin, vel, maxBounces, tMax, step, curve) => simulatePath(origin, vel, maxBounces, tMax, step, curve),
   throwDisc: () => throwDisc(),
-  foesList: () => foes.map(f => ({ pos: { x: +f.pos.x.toFixed(2), z: +f.pos.z.toFixed(2) }, hp: f.hp, rotY: +f.obj.rotation.y.toFixed(3) })),
+  foesList: () => foes.map(f => ({ pos: { x: +f.pos.x.toFixed(2), z: +f.pos.z.toFixed(2) }, hp: f.hp, hasDisc: f.hasDisc, rotY: +f.obj.rotation.y.toFixed(3) })),
   duelBoss: () => {
     const b = foes.find(f => f.isBoss);
     return b ? {
@@ -2266,6 +2621,7 @@ window.__dbg = {
       state: b.state,
       dashCd: +b.dashCd.toFixed(2),
       hasDisc: b.hasDisc,
+      rearmTimer: +(b.rearmTimer || 0).toFixed(2),
       hp: b.hp,
       pos: { x: +b.pos.x.toFixed(2), z: +b.pos.z.toFixed(2) }
     } : null;
@@ -2276,6 +2632,40 @@ window.__dbg = {
     const p = new THREE.Vector3(b.pos.x, 1.7, b.pos.z + offsetZ);
     spawnDisc(p, new THREE.Vector3(0, 0, -32), 'player', CYAN, 0);
     return { x: +p.x.toFixed(2), z: +p.z.toFixed(2) };
+  },
+  spawnDeflectedTestDisc: (offsetZ = 6) => {
+    const b = foes.find(f => f.isBoss);
+    if (!b) return null;
+    const p = new THREE.Vector3(b.pos.x, 1.7, b.pos.z + offsetZ);
+    const d = spawnDisc(p, new THREE.Vector3(0, 0, -36), 'player', WHITE, 0);
+    d.isDeflected = true;
+    d.originalOwner = b;
+    return { x: +p.x.toFixed(2), z: +p.z.toFixed(2) };
+  },
+  spawnEnemyHitDisc: () => {
+    const b = foes.find(f => f.isBoss) || foes[0];
+    if (!b) return null;
+    b.hasDisc = false;
+    const p = new THREE.Vector3(player.pos.x, 1.5, player.pos.z - 3);
+    const d = spawnDisc(p, new THREE.Vector3(0, 0, 24), b, ORANGE, 0);
+    return d;
+  },
+  spawnParryTestDisc: () => {
+    const b = foes.find(f => f.isBoss) || foes[0];
+    if (!b) return null;
+    b.hasDisc = false;
+    const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)).normalize();
+    const p = player.pos.clone().addScaledVector(fwd, 3.5).setY(1.5);
+    const d = spawnDisc(p, fwd.clone().multiplyScalar(-24), b, ORANGE, 0);
+    return d;
+  },
+  spawnDeflectedMissDisc: () => {
+    const b = foes.find(f => f.isBoss) || foes[0];
+    const p = new THREE.Vector3(0, 1.5, 0);
+    const d = spawnDisc(p, new THREE.Vector3(34, 0, 0), 'player', WHITE, 0);
+    d.isDeflected = true;
+    d.originalOwner = b;
+    return d;
   },
   triggerRearDisc: () => {
     const b = foes.find(f => f.isBoss);
@@ -2328,6 +2718,10 @@ window.__dbg = {
   playerY: () => +player.y.toFixed(2),
   playerGrounded: () => player.grounded,
   playerJumps: () => player.jumps,
+  playerHasDisc: () => player.hasDisc,
+  setPlayerBlocking: (b) => { player.blocking = b; },
+  setPlayerPos: (x, z, y = 0) => { player.pos.x = x; player.pos.z = z; player.y = y; },
+  step: (dt = 0.016) => update(dt),
   derezAudioHook: playDeRezSound
 };
 
