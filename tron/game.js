@@ -1,4 +1,5 @@
 import * as THREE from './vendor/three.module.js';
+window.THREE = THREE;
 
 // ───────────────────────────── constants ─────────────────────────────
 const ARENA = 46;              // half-extent of the square grid
@@ -35,17 +36,17 @@ key.shadow.camera.left = -d; key.shadow.camera.right = d;
 key.shadow.camera.top = d; key.shadow.camera.bottom = -d;
 scene.add(key);
 
-// floor
+// floor - modular destructible grid tiles
 const floor = new THREE.Mesh(
   new THREE.PlaneGeometry(ARENA * 2, ARENA * 2),
   new THREE.MeshStandardMaterial({ color: 0x07202c, roughness: .28, metalness: .8 })
 );
-floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; floor.visible = false; scene.add(floor);
 
 const grid = new THREE.GridHelper(ARENA * 2, 46, CYAN, 0x1f9fb8);
 grid.material.transparent = true; grid.material.opacity = .8;
 grid.material.blending = THREE.AdditiveBlending; grid.material.depthWrite = false;
-grid.position.y = 0.03; grid.renderOrder = 1; scene.add(grid);
+grid.position.y = 0.03; grid.renderOrder = 1; grid.visible = false; scene.add(grid);
 
 // reflective-ish sheen ring at centre
 const ring = new THREE.Mesh(
@@ -53,6 +54,106 @@ const ring = new THREE.Mesh(
   new THREE.MeshBasicMaterial({ color: CYAN, side: THREE.DoubleSide, transparent: true, opacity: .5 })
 );
 ring.rotation.x = -Math.PI / 2; ring.position.y = .03; scene.add(ring);
+
+// ──────────────────────── modular destructible floor ─────────────────────
+const TILE_N = 24;
+const TILE_W = (ARENA * 2) / TILE_N;
+const TILE_WARN_DURATION = 0.75;
+const TILE_REGEN_DELAY = 12.0;
+
+const TILE_INTACT = 0;
+const TILE_WARNING = 1;
+const TILE_FALLEN = 2;
+const TILE_REBUILDING = 3;
+
+// Map: key `${ix}_${iz}` -> { mesh, slabMesh, edgeMesh, state, timer, origY, ix, iz, center, regenTimer, warningColor }
+const tiles = new Map();
+
+const tileGeo = new THREE.BoxGeometry(TILE_W - 0.08, 0.35, TILE_W - 0.08);
+const tileEdgeGeo = new THREE.EdgesGeometry(tileGeo);
+const tileMatIntact = new THREE.MeshStandardMaterial({ color: 0x07202c, roughness: .28, metalness: .8 });
+const tileEdgeMatIntact = new THREE.LineBasicMaterial({ color: 0x187588, transparent: true, opacity: .75, depthWrite: false });
+
+const tileGroup = new THREE.Group();
+scene.add(tileGroup);
+
+for (let ix = 0; ix < TILE_N; ix++) {
+  for (let iz = 0; iz < TILE_N; iz++) {
+    const cx = -ARENA + (ix + 0.5) * TILE_W;
+    const cz = -ARENA + (iz + 0.5) * TILE_W;
+    const mesh = new THREE.Group();
+    mesh.position.set(cx, 0, cz);
+
+    const slabMesh = new THREE.Mesh(tileGeo, tileMatIntact);
+    slabMesh.position.y = -0.175;
+    slabMesh.receiveShadow = true;
+
+    const edgeMesh = new THREE.LineSegments(tileEdgeGeo, tileEdgeMatIntact);
+    edgeMesh.position.y = -0.175;
+
+    mesh.add(slabMesh, edgeMesh);
+    tileGroup.add(mesh);
+
+    tiles.set(`${ix}_${iz}`, {
+      mesh,
+      slabMesh,
+      edgeMesh,
+      state: TILE_INTACT,
+      timer: 0,
+      origY: 0,
+      ix,
+      iz,
+      center: new THREE.Vector3(cx, 0, cz),
+      regenTimer: 0,
+      warningColor: CYAN
+    });
+  }
+}
+
+function worldToTile(x, z) {
+  const ix = Math.min(TILE_N - 1, Math.max(0, Math.floor((x + ARENA) / TILE_W)));
+  const iz = Math.min(TILE_N - 1, Math.max(0, Math.floor((z + ARENA) / TILE_W)));
+  return { ix, iz };
+}
+
+function tileToWorld(ix, iz) {
+  return {
+    x: -ARENA + (ix + 0.5) * TILE_W,
+    z: -ARENA + (iz + 0.5) * TILE_W
+  };
+}
+
+function getTileAt(x, z) {
+  if (Math.abs(x) > ARENA || Math.abs(z) > ARENA) return null;
+  const { ix, iz } = worldToTile(x, z);
+  return tiles.get(`${ix}_${iz}`) || null;
+}
+
+function findNearestIntactTile(x, z) {
+  const { ix: cix, iz: ciz } = worldToTile(x, z);
+  let best = null;
+  let bestDistSq = Infinity;
+  for (let r = 1; r <= 8; r++) {
+    for (let dx = -r; dx <= r; dx++) {
+      for (let dz = -r; dz <= r; dz++) {
+        if (Math.abs(dx) !== r && Math.abs(dz) !== r) continue;
+        const nx = cix + dx, nz = ciz + dz;
+        if (nx < 0 || nx >= TILE_N || nz < 0 || nz >= TILE_N) continue;
+        const t = tiles.get(`${nx}_${nz}`);
+        if (t && t.state === TILE_INTACT) {
+          const w = tileToWorld(nx, nz);
+          const d2 = (w.x - x) ** 2 + (w.z - z) ** 2;
+          if (d2 < bestDistSq) {
+            bestDistSq = d2;
+            best = w;
+          }
+        }
+      }
+    }
+    if (best) return best;
+  }
+  return { x: 0, z: 0 };
+}
 
 // walls: dark slab + glowing top edge
 const wallMat = new THREE.MeshStandardMaterial({ color: 0x04141c, roughness: .4, metalness: .9 });
@@ -171,6 +272,177 @@ function burst(pos, color, n = 22, power = 10) {
   scene.add(pts); sparks.push({ pts, v, life: 0.85, max: 0.85 });
 }
 
+function triggerTileWarning(tile, color = CYAN) {
+  if (!tile || tile.state !== TILE_INTACT) return;
+  tile.state = TILE_WARNING;
+  tile.timer = TILE_WARN_DURATION;
+  tile.warningColor = color;
+  tile.slabMesh.material = new THREE.MeshStandardMaterial({
+    color: 0x07202c,
+    roughness: .28,
+    metalness: .8,
+    emissive: color,
+    emissiveIntensity: 1.0,
+    transparent: true
+  });
+  tile.edgeMesh.material = new THREE.LineBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 1.0
+  });
+  playWarningSound();
+}
+
+function spawnTileDeRezSparks(cx, cz) {
+  const hw = (TILE_W - 0.08) * 0.5;
+  const pts = [
+    new THREE.Vector3(cx - hw, 0.1, cz - hw),
+    new THREE.Vector3(cx + hw, 0.1, cz - hw),
+    new THREE.Vector3(cx + hw, 0.1, cz + hw),
+    new THREE.Vector3(cx - hw, 0.1, cz + hw),
+    new THREE.Vector3(cx, 0.1, cz)
+  ];
+  for (const p of pts) burst(p, CYAN, 12, 8);
+  playTileDropSound();
+  shake(0.12);
+}
+
+function updateTiles(dt) {
+  for (const tile of tiles.values()) {
+    if (tile.state === TILE_INTACT) continue;
+
+    if (tile.state === TILE_WARNING) {
+      tile.timer -= dt;
+      const strobe = 0.5 + 0.5 * Math.sin(time * 40);
+      const isWhite = Math.sin(time * 40) > 0;
+      const col = isWhite ? 0xffffff : (tile.warningColor || CYAN);
+
+      tile.slabMesh.material.emissive.setHex(col);
+      tile.slabMesh.material.emissiveIntensity = 0.5 + strobe * 1.5;
+      tile.edgeMesh.material.color.setHex(col);
+      tile.edgeMesh.material.opacity = strobe;
+
+      // Shake tile vertically by +-0.05m
+      tile.mesh.position.y = tile.origY + Math.sin(time * 60) * 0.05;
+
+      if (tile.timer <= 0) {
+        tile.state = TILE_FALLEN;
+        tile.regenTimer = 0;
+        tile.mesh.position.y = tile.origY;
+        spawnTileDeRezSparks(tile.center.x, tile.center.z);
+      }
+    } else if (tile.state === TILE_FALLEN) {
+      // Animate falling downward: y_tile <- y_tile - 25 * dt
+      tile.mesh.position.y -= 25 * dt;
+
+      // After falling 15m, set mesh.visible = false
+      if (tile.mesh.position.y <= tile.origY - 15) {
+        tile.mesh.visible = false;
+      }
+
+      // Tile Regeneration after delay
+      tile.regenTimer = (tile.regenTimer || 0) + dt;
+      if (tile.regenTimer >= TILE_REGEN_DELAY) {
+        tile.state = TILE_REBUILDING;
+        tile.mesh.visible = true;
+        tile.mesh.position.y = tile.origY - 15;
+        tile.slabMesh.material.emissive.setHex(CYAN);
+        tile.slabMesh.material.emissiveIntensity = 0.5;
+        tile.edgeMesh.material.color.setHex(CYAN);
+        playWarningSound();
+      }
+    } else if (tile.state === TILE_REBUILDING) {
+      // Slowly re-compile from bottom upward with glowing hologram outline
+      tile.mesh.position.y += 8.0 * dt;
+      const holoPulse = 0.5 + 0.5 * Math.sin(time * 12);
+      tile.slabMesh.material.emissiveIntensity = holoPulse;
+      tile.edgeMesh.material.opacity = holoPulse;
+
+      if (tile.mesh.position.y >= tile.origY) {
+        tile.mesh.position.y = tile.origY;
+        tile.state = TILE_INTACT;
+        tile.timer = 0;
+        tile.regenTimer = 0;
+        if (tile.slabMesh.material !== tileMatIntact) {
+          tile.slabMesh.material.dispose();
+          tile.edgeMesh.material.dispose();
+          tile.slabMesh.material = tileMatIntact;
+          tile.edgeMesh.material = tileEdgeMatIntact;
+        }
+        burst(new THREE.Vector3(tile.center.x, 0.1, tile.center.z), CYAN, 16, 6);
+      }
+    }
+  }
+}
+
+// ───────────────────────────── Web Audio synth ───────────────────────────
+let audioCtx = null;
+function getAudioCtx() {
+  if (!audioCtx && (window.AudioContext || window.webkitAudioContext)) {
+    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+  }
+  if (audioCtx && audioCtx.state === 'suspended') {
+    audioCtx.resume().catch(() => {});
+  }
+  return audioCtx;
+}
+
+function playDeRezSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(440, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 0.85);
+    gain.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.85);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.85);
+  } catch (_) {}
+}
+
+function playWarningSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1174, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.22);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.22);
+  } catch (_) {}
+}
+
+function playTileDropSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(180, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(35, ctx.currentTime + 0.55);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.55);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.55);
+  } catch (_) {}
+}
+
+window.derezAudioHook = playDeRezSound;
+
 
 // ───────────────────────── trajectory preview ────────────────────────
 // Runs the EXACT same integration the live disc uses, so the dotted arc is a
@@ -212,20 +484,27 @@ function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, cu
       p.y += (1.7 - p.y) * Math.min(1, step * 2.2);        // same hover easing
     }
 
-    // floor collision
+    // floor collision & void check
     const yFloor = DISC_R;
     if (p.y <= yFloor) {
-      p.y = yFloor;
-      if (v.y < 0) {
-        const sig = Math.abs(v.y) >= 1.0;
-        v.y = -v.y * 0.65;
-        v.x *= 0.95;
-        v.z *= 0.95;
-        if (Math.abs(v.y) < 1.0) v.y = 0;
-        if (sig) {
-          bounces++;
-          bounceAt.push(p.clone());
+      const tile = getTileAt(p.x, p.z);
+      const isSolid = tile && tile.state !== TILE_FALLEN && tile.state !== TILE_REBUILDING;
+      if (isSolid) {
+        p.y = yFloor;
+        if (v.y < 0) {
+          const sig = Math.abs(v.y) >= 1.0;
+          v.y = -v.y * 0.65;
+          v.x *= 0.95;
+          v.z *= 0.95;
+          if (Math.abs(v.y) < 1.0) v.y = 0;
+          if (sig) {
+            bounces++;
+            bounceAt.push(p.clone());
+          }
         }
+      } else {
+        // Tile is FALLEN: do not reflect vertically; allow path to trace into void
+        v.y -= 25 * step;
       }
     }
 
@@ -713,6 +992,21 @@ function resetGame() {
   player.yaw = Math.PI; player.pitch = -.12;
   score = 0; gameOverT = 0; running = true;
   spawnTimer = 0;
+  gameOverReason = '';
+
+  for (const tile of tiles.values()) {
+    tile.state = TILE_INTACT;
+    tile.timer = 0;
+    tile.regenTimer = 0;
+    tile.mesh.position.y = tile.origY;
+    tile.mesh.visible = true;
+    if (tile.slabMesh.material !== tileMatIntact) {
+      tile.slabMesh.material.dispose();
+      tile.edgeMesh.material.dispose();
+      tile.slabMesh.material = tileMatIntact;
+      tile.edgeMesh.material = tileEdgeMatIntact;
+    }
+  }
 
   if (gameMode === 'duel') {
     duelTier = 1;
@@ -756,6 +1050,7 @@ function spawnDuelBoss(tier = 1) {
     grounded: true,
     jumps: 0,
     dashCd: 0,
+    didRecover: false,
     coverTarget: new THREE.Vector3(),
     coverPillar: null,
     state: 'ATTACK',
@@ -774,7 +1069,8 @@ function spawnWave() {
       obj, pos: new THREE.Vector3(Math.cos(a) * r, 0, Math.sin(a) * r),
       vel: new THREE.Vector3(), hp: 100 + wave * 12, hasDisc: true,
       cd: 1.4 + Math.random() * 2.2, strafe: Math.random() < .5 ? 1 : -1,
-      strafeT: 1 + Math.random() * 2, hurt: 0, skill: Math.min(.3 + wave * .08, .95)
+      strafeT: 1 + Math.random() * 2, hurt: 0, skill: Math.min(.3 + wave * .08, .95),
+      y: 0, vy: 0, grounded: true, jumps: 0, dashCd: 0, didRecover: false
     });
   }
 }
@@ -850,14 +1146,16 @@ function spawnDisc(pos, vel, owner, color, curve = 0) {
   return d;
 }
 
+let gameOverReason = '';
+
 function damagePlayer(amount, from) {
   if (!player.alive) return;
   player.hp -= amount; player.hurtFlash = 1;
-  burst(player.pos.clone().setY(1.6), CYAN, 18, 8);
+  burst(player.pos.clone().setY(player.y + 1.6), CYAN, 18, 8);
   shake(0.35);
   if (player.hp <= 0) {
     player.hp = 0; player.alive = false; running = false; gameOverT = 0;
-    burst(player.pos.clone().setY(1.4), CYAN, 90, 16);
+    burst(player.pos.clone().setY(player.y + 1.4), CYAN, 90, 16);
     player.obj.visible = false;
     setTimeout(showGameOver, 900);
   }
@@ -886,17 +1184,29 @@ function killFoe(f) {
 const el = id => document.getElementById(id);
 const msgEl = el('msg');
 let msgT = 0;
-function message(t) { msgEl.textContent = t; msgEl.style.opacity = 1; msgT = 2; }
+function message(t) {
+  msgEl.textContent = t;
+  msgEl.style.opacity = 1;
+  msgT = 2;
+  if (t === 'SURFACE COLLAPSE — JUMP / DASH!') {
+    msgEl.style.color = 'var(--orange)';
+    msgEl.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
+  } else {
+    msgEl.style.color = 'var(--cyan)';
+    msgEl.style.textShadow = '0 0 22px var(--cyan)';
+  }
+}
 
 function showGameOver() {
   overlay.style.display = 'flex';
   const title = gameMode === 'duel' ? 'DUEL ELIMINATED' : 'DEREZZED';
+  const subtitle = gameOverReason || 'YOUR DISC WAS CLAIMED';
   const stats = gameMode === 'duel'
     ? `TIERS CLEARED <b style="color:#fff">${duelTier - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b>`
     : `CYCLES SURVIVED <b style="color:#fff">${wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b>`;
   overlay.innerHTML = `<div class="card dead">
     <h1>${title}</h1>
-    <h2>YOUR DISC WAS CLAIMED</h2>
+    <h2>${subtitle}</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
       ${stats}
     </div>
@@ -992,13 +1302,54 @@ function updateDuelFoe(f, dt) {
   const GRAV_FOE = 30;
   f.vy -= GRAV_FOE * dt;
   f.y += f.vy * dt;
-  if (f.y <= 0) {
-    f.y = 0;
-    f.vy = 0;
-    f.grounded = true;
-    f.jumps = 0;
-    f.aerialThrow = false;
+
+  const foeTile = getTileAt(f.pos.x, f.pos.z);
+  const isFoeTileSolid = foeTile && foeTile.state !== TILE_FALLEN && foeTile.state !== TILE_REBUILDING;
+
+  if (isFoeTileSolid) {
+    if (f.y <= 0) {
+      f.y = 0;
+      f.vy = 0;
+      f.grounded = true;
+      f.jumps = 0;
+      f.aerialThrow = false;
+      f.didRecover = false;
+    }
+  } else {
+    // Tile is FALLEN (Open Void)
+    f.grounded = false;
   }
+
+  // Bot Fall Recovery AI: Detect y < 0 and y > -3.0m
+  if (f.y < 0 && f.y > -3.0 && !f.didRecover) {
+    f.vy = 12.0;
+    f.didRecover = true;
+    f.grounded = false;
+    f.jumps = 1;
+    const safeTarget = findNearestIntactTile(f.pos.x, f.pos.z);
+    if (safeTarget) {
+      const dx = safeTarget.x - f.pos.x;
+      const dz = safeTarget.z - f.pos.z;
+      const dLen = Math.hypot(dx, dz);
+      if (dLen > 0.01) {
+        f.vel.x += (dx / dLen) * 32.0;
+        f.vel.z += (dz / dLen) * 32.0;
+      }
+    }
+    f.dashCd = 1.2;
+    burst(tmp.copy(f.pos).setY(f.y + 0.3), ORANGE, 18, 6);
+    shake(0.12);
+  }
+
+  // Void Death Threshold
+  if (f.y < -18) {
+    burst(f.pos.clone().setY(-18), ORANGE, 80, 16);
+    score += 500;
+    message('PIT ELIMINATION +500');
+    killFoe(f);
+    return;
+  }
+
   f.dashCd -= dt;
 
   const toPx = player.pos.x - f.pos.x;
@@ -1288,6 +1639,10 @@ let time = 0;
 
 function update(dt) {
   time += dt;
+
+  // ── update destructible tiles
+  updateTiles(dt);
+
   // ── player movement
   if (player.alive) {
     const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -1299,6 +1654,15 @@ function update(dt) {
     if (keys.KeyA) wish.sub(right);
     if (wish.lengthSq() > 0) wish.normalize();
 
+    const playerTile = getTileAt(player.pos.x, player.pos.z);
+    const isTileSolid = playerTile && playerTile.state !== TILE_FALLEN && playerTile.state !== TILE_REBUILDING;
+
+    const inRecoveryZone = player.y < 0 && player.y > -3.5;
+    if (inRecoveryZone && player.vy <= 0) {
+      message('SURFACE COLLAPSE — JUMP / DASH!');
+      msgT = Math.max(msgT, 0.4);
+    }
+
     // ── vertical: jump / double-jump / gravity
     const GRAV = 30, JUMP_V = 11.5;
     if (keys.Space && !player.jumpHeld) player.jumpBuf = 0.15;     // buffer the press
@@ -1307,33 +1671,60 @@ function update(dt) {
     const canJump = player.jumps < 2 || player.coyote > 0;
     if (player.jumpBuf > 0 && canJump && player.jumps < 2) {
       player.jumpBuf = 0;
-      player.vy = player.jumps === 0 ? JUMP_V : JUMP_V * 0.88;
+      if (inRecoveryZone) {
+        player.vy = 12.0; // recovery jump upward velocity
+        message('RECOVERY JUMP');
+      } else {
+        player.vy = player.jumps === 0 ? JUMP_V : JUMP_V * 0.88;
+        if (player.jumps === 1) message('AIR JUMP');
+      }
       player.jumps++; player.grounded = false;
       burst(player.pos.clone().setY(player.y + .2), CYAN, player.jumps === 1 ? 12 : 18, 5);
       shake(.08);
-      if (player.jumps === 2) message('AIR JUMP');
     }
     player.jumpHeld = !!keys.Space;
     if (keys.Space && player.vy > 0) player.vy -= GRAV * 0.55 * dt;   // hold for higher jump
     else player.vy -= GRAV * dt;
     player.y += player.vy * dt;
-    if (player.y <= 0) {
-      if (!player.grounded && player.vy < -6) { burst(player.pos.clone().setY(.15), CYAN, 10, 4); shake(.07); }
-      player.y = 0; player.vy = 0; player.grounded = true; player.jumps = 0;
+
+    if (isTileSolid) {
+      if (player.y <= 0) {
+        if (!player.grounded && player.vy < -6) { burst(player.pos.clone().setY(.15), CYAN, 10, 4); shake(.07); }
+        player.y = 0; player.vy = 0; player.grounded = true; player.jumps = 0;
+      }
+    } else {
+      player.grounded = false;
+    }
+
+    // Void Death Threshold
+    if (player.y < -18 && player.alive) {
+      gameOverReason = 'FALLEN INTO THE VOID';
+      playDeRezSound();
+      shake(0.6);
+      damagePlayer(999);
     }
 
     let speed = player.blocking ? 5.5 : 12;
     if (!player.grounded) speed *= 0.82;                  // reduced air control
     player.dashCd -= dt;
     if ((keys.ShiftLeft || keys.ShiftRight) && player.energy > 25 && wish.lengthSq() > 0 && player.dashCd <= 0) {
-      player.vel.add(wish.clone().multiplyScalar(34));
+      const dashImpulse = inRecoveryZone ? 38 : 34;
+      player.vel.add(wish.clone().multiplyScalar(dashImpulse));
+      if (inRecoveryZone && player.vy < 0) {
+        player.vy = Math.max(player.vy, 4.0); // upward recovery pop
+      }
       player.energy -= 25; player.dashCd = .45; shake(.18);
-      burst(player.pos.clone().setY(.4), CYAN, 14, 5);
+      burst(player.pos.clone().setY(player.y + .4), CYAN, 14, 5);
+      if (inRecoveryZone) message('RECOVERY DASH');
     }
     player.energy = Math.min(100, player.energy + dt * 14);
 
     const target = wish.multiplyScalar(speed);
-    player.vel.lerp(target, 1 - Math.pow(0.0009, dt));
+    // Disallow floor friction damping so lateral momentum is preserved in void
+    const lerpRate = player.grounded
+      ? (1 - Math.pow(0.0009, dt))
+      : (player.y < 0 ? (1 - Math.pow(0.25, dt)) : (1 - Math.pow(0.005, dt)));
+    player.vel.lerp(target, lerpRate);
     player.pos.addScaledVector(player.vel, dt);
     resolveCircle(player.pos, PLAYER_R);
 
@@ -1355,9 +1746,55 @@ function update(dt) {
   player.hurtFlash = Math.max(0, player.hurtFlash - dt * 2);
 
   // ── foes
-  for (const f of foes) {
+  for (let fi = foes.length - 1; fi >= 0; fi--) {
+    const f = foes[fi];
     if (gameMode === 'duel' && f.isBoss) {
       updateDuelFoe(f, dt);
+      continue;
+    }
+
+    if (f.y === undefined) { f.y = 0; f.vy = 0; f.grounded = true; f.didRecover = false; }
+    f.vy -= 30 * dt;
+    f.y += f.vy * dt;
+
+    const sTile = getTileAt(f.pos.x, f.pos.z);
+    const isSTileSolid = sTile && sTile.state !== TILE_FALLEN && sTile.state !== TILE_REBUILDING;
+
+    if (isSTileSolid) {
+      if (f.y <= 0) {
+        f.y = 0;
+        f.vy = 0;
+        f.grounded = true;
+        f.didRecover = false;
+      }
+    } else {
+      f.grounded = false;
+    }
+
+    // Emergency recovery jump / dash for swarm foe
+    if (f.y < 0 && f.y > -3.0 && !f.didRecover) {
+      f.vy = 12.0;
+      f.didRecover = true;
+      f.grounded = false;
+      const safeTarget = findNearestIntactTile(f.pos.x, f.pos.z);
+      if (safeTarget) {
+        const dx = safeTarget.x - f.pos.x;
+        const dz = safeTarget.z - f.pos.z;
+        const dLen = Math.hypot(dx, dz);
+        if (dLen > 0.01) {
+          f.vel.x += (dx / dLen) * 28.0;
+          f.vel.z += (dz / dLen) * 28.0;
+        }
+      }
+      burst(tmp.copy(f.pos).setY(f.y + 0.3), ORANGE, 14, 5);
+    }
+
+    // Void Death Threshold
+    if (f.y < -18) {
+      burst(f.pos.clone().setY(-18), ORANGE, 70, 16);
+      score += 200;
+      message('PIT ELIMINATION +200');
+      killFoe(f);
       continue;
     }
 
@@ -1391,6 +1828,8 @@ function update(dt) {
     resolveCircle(f.pos, FOE_R);
 
     f.obj.position.copy(f.pos);
+    f.obj.position.y = f.y + (f.grounded ? Math.sin(time * 11) * 0.05 * Math.min(f.vel.length() / 8, 1) : 0);
+    f.obj.rotation.x = THREE.MathUtils.clamp(-f.vy * 0.018, -0.22, 0.22);
     const face = Math.atan2(player.pos.x - f.pos.x, player.pos.z - f.pos.z);
     const turnRate = 6 * dt;
     f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
@@ -1407,7 +1846,7 @@ function update(dt) {
       dir.x += (Math.random() - .5) * (1 - f.skill) * .45;
       dir.z += (Math.random() - .5) * (1 - f.skill) * .45;
       dir.normalize();
-      const origin = f.pos.clone().setY(1.7).addScaledVector(dir, 1.2);
+      const origin = f.pos.clone().setY(1.7 + (f.y || 0)).addScaledVector(dir, 1.2);
       spawnDisc(origin, dir.multiplyScalar(26 + wave), f, ORANGE);
     }
   }
@@ -1462,21 +1901,36 @@ function update(dt) {
       D.pos.y += (1.7 - D.pos.y) * Math.min(1, dt * 2.2);
     }
 
-    // floor collision
+    // floor collision & void check
     const yFloor = DISC_R;
+    const tile = getTileAt(D.pos.x, D.pos.z);
+    const isSolid = tile && tile.state !== TILE_FALLEN && tile.state !== TILE_REBUILDING;
+
     if (D.pos.y <= yFloor) {
-      D.pos.y = yFloor;
-      if (D.vel.y < 0) {
-        const significant = Math.abs(D.vel.y) >= 1.0;
-        D.vel.y = -D.vel.y * 0.65;
-        D.vel.x *= 0.95;
-        D.vel.z *= 0.95;
-        if (Math.abs(D.vel.y) < 1.0) D.vel.y = 0;
-        if (significant && !D.returning) {
-          D.bounces++;
-          if (D.hitFoes) D.hitFoes.clear();
-          burst(D.pos.clone(), D.color, 10, 6);
-          shake(.06);
+      if (isSolid) {
+        if (tile && tile.state === TILE_INTACT) {
+          triggerTileWarning(tile, D.color);
+        }
+        D.pos.y = yFloor;
+        if (D.vel.y < 0) {
+          const significant = Math.abs(D.vel.y) >= 1.0;
+          D.vel.y = -D.vel.y * 0.65;
+          D.vel.x *= 0.95;
+          D.vel.z *= 0.95;
+          if (Math.abs(D.vel.y) < 1.0) D.vel.y = 0;
+          if (significant && !D.returning) {
+            D.bounces++;
+            if (D.hitFoes) D.hitFoes.clear();
+            burst(D.pos.clone(), D.color, 10, 6);
+            shake(.06);
+          }
+        }
+      } else {
+        // Tile is FALLEN: plunge through into the void beneath the grid!
+        D.vel.y -= 25 * dt;
+        D.voidTime = (D.voidTime || 0) + dt;
+        if ((D.voidTime > 1.5 || D.pos.y < -12) && !D.returning) {
+          D.returning = true;
         }
       }
     }
@@ -1720,6 +2174,8 @@ function update(dt) {
 
   // ── grid pulse
   grid.material.opacity = .72 + Math.sin(time * 1.6) * .1 + player.hurtFlash * .3;
+  const cTile = getTileAt(0, 0);
+  ring.visible = !cTile || cTile.state !== TILE_FALLEN;
   ring.material.opacity = .35 + Math.sin(time * 2.2) * .15;
 
   // ── HUD
@@ -1829,5 +2285,51 @@ window.__dbg = {
     const d = spawnDisc(p, new THREE.Vector3(0, 0, (fwdZ >= 0 ? 30 : -30)), 'player', CYAN, 0);
     d.bounces = 1;
     return true;
-  }
+  },
+  tiles: () => tiles,
+  TILE_N,
+  TILE_W,
+  getTileAt: (x, z) => getTileAt(x, z),
+  worldToTile: (x, z) => worldToTile(x, z),
+  tileToWorld: (ix, iz) => tileToWorld(ix, iz),
+  dropTileAt: (x, z) => {
+    const t = getTileAt(x, z);
+    if (!t) return false;
+    t.state = TILE_FALLEN;
+    t.regenTimer = 0;
+    t.mesh.position.y = t.origY - 16;
+    t.mesh.visible = false;
+    return true;
+  },
+  triggerTileWarningAt: (x, z) => {
+    const t = getTileAt(x, z);
+    if (!t) return false;
+    triggerTileWarning(t);
+    return true;
+  },
+  resetTiles: () => {
+    for (const tile of tiles.values()) {
+      tile.state = TILE_INTACT;
+      tile.timer = 0;
+      tile.regenTimer = 0;
+      tile.mesh.position.y = tile.origY;
+      tile.mesh.visible = true;
+      if (tile.slabMesh.material !== tileMatIntact) {
+        tile.slabMesh.material.dispose();
+        tile.edgeMesh.material.dispose();
+        tile.slabMesh.material = tileMatIntact;
+        tile.edgeMesh.material = tileEdgeMatIntact;
+      }
+    }
+    return true;
+  },
+  fallenTilesCount: () => Array.from(tiles.values()).filter(t => t.state === TILE_FALLEN).length,
+  isPlayerInRecoveryZone: () => player.y < 0 && player.y > -3.5,
+  playerY: () => +player.y.toFixed(2),
+  playerGrounded: () => player.grounded,
+  playerJumps: () => player.jumps,
+  derezAudioHook: playDeRezSound
 };
+
+window.__TRON__ = window.__dbg;
+
