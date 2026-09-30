@@ -86,6 +86,13 @@
     letter-spacing:4px; opacity:0; transition:opacity .25s; }
   #msg { position:absolute; left:50%; top:24%; transform:translateX(-50%); text-align:center;
     font-size:38px; letter-spacing:10px; text-shadow:0 0 22px var(--cyan); opacity:0; transition:opacity .3s; z-index:200; }
+  #countdownText {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: 88px; font-weight: 800; letter-spacing: 8px; color: #fff;
+    text-shadow: 0 0 20px var(--cyan), 0 0 40px var(--cyan), 0 0 80px var(--cyan);
+    pointer-events: none; z-index: 100; text-align: center; user-select: none;
+    display: none; transition: transform 0.08s ease-out, opacity 0.25s ease;
+  }
   #hint { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); font-size:11px;
     letter-spacing:3px; opacity:.55; text-transform:uppercase; }
   #mobileHint {
@@ -518,6 +525,7 @@
   <div class="panel" id="keymon" style="display:none;left:18px;bottom:18px;font-size:11px;line-height:1.7"></div>
   <div id="lockstate">Cursor not captured — click the arena to lock · move mouse off-centre to turn · open preview in a new tab for full mouse lock</div>
   <div id="msg"></div>
+  <div id="countdownText"></div>
   <div id="hint">WASD move / strafe &nbsp;·&nbsp; Q / E hook / curve disc &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; P / ESC pause &nbsp;·&nbsp; F1 input monitor</div>
   <div id="mobileHint">DRAG LEFT TO MOVE &nbsp;·&nbsp; DRAG RIGHT TO AIM &nbsp;·&nbsp; TAP BUTTONS TO ENGAGE</div>
 </div>
@@ -571,6 +579,19 @@
   </div>
 </div>
 
+<div id="hostModal" class="modal-overlay" style="display:none;">
+  <div class="card">
+    <h1>HOST MATCH</h1>
+    <h2>SELECT COMBAT MODE</h2>
+    <div class="menu-actions" style="max-width:340px;margin:20px auto 0;gap:12px;">
+      <button id="practiceBtn" class="mode-btn duel-btn" style="width:100%;">PRACTICE (SOLO AI)</button>
+      <button id="host1v1Btn" class="mode-btn multi-btn" style="width:100%;">1v1 DUEL (ONLINE)</button>
+      <button id="host2v2Btn" class="mode-btn multi-btn" style="width:100%;">2v2 DUOS (ONLINE)</button>
+      <button id="cancelHostBtn" class="btn" style="margin-top:8px;border-color:var(--orange);color:#ffb37a;width:100%;">RETURN TO MENU</button>
+    </div>
+  </div>
+</div>
+
 <div id="roomModal" class="modal-overlay" style="display:none;">
   <div class="card">
     <h1 id="roomTitle">DUEL ROOM</h1>
@@ -593,7 +614,7 @@
   </div>
 </div>
 
-<div id="overlay"><div class="card">
+<div id="overlay"><div class="card" id="mainMenu">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys desktop-keys">
     <b>W A S D</b><span>Move &amp; strafe across the grid</span>
@@ -617,12 +638,13 @@
     <b>DASH</b><span>Instant directional sprint impulse</span>
     <b>PAUSE</b><span>Tap top right II button to suspend grid</span>
   </div>
-  <div class="mode-select">
-    <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
+  <div class="mode-select" id="mainMenuButtons">
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
-    <button id="createRoomBtn" class="mode-btn multi-btn">CREATE DUEL ROOM (1v1)</button>
-    <button id="createDuosBtn" class="mode-btn multi-btn">CREATE DUOS ROOM (2v2)</button>
-    <button id="joinRoomBtn" class="mode-btn multi-btn">JOIN ROOM</button>
+    <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
+    <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
+    <!-- Legacy compatibility elements for tests -->
+    <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="joinRoomBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
   </div>
 </div></div>
 

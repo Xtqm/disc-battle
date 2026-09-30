@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { state, player } from './state.js';
 import { config } from './config.js';
 import { initGraphics, renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
-import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
+import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound, SFX } from './audio.js';
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { initInput, EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
@@ -12,8 +12,101 @@ import { el, msgEl, message, showGameOver, shake, bindMenuButtons } from './ui.j
 export const clock = new THREE.Clock();
 state.time = 0;
 
+export function startCountdown(duration = 3.0, onComplete = null) {
+  state.countdownTimer = duration;
+  state.lastCountdownSec = Math.ceil(duration);
+  if (onComplete) state.onCountdownEnd = onComplete;
+  state.fightDisplayTimer = 0;
+
+  const cdEl = document.getElementById('countdownText');
+  if (cdEl) {
+    cdEl.style.display = 'block';
+    cdEl.style.opacity = '1';
+    cdEl.textContent = Math.max(1, Math.ceil(duration)).toString();
+    cdEl.style.color = '#fff';
+    cdEl.style.textShadow = '0 0 20px var(--cyan), 0 0 40px var(--cyan), 0 0 80px var(--cyan)';
+    cdEl.style.transform = 'translate(-50%, -50%) scale(1.15)';
+    setTimeout(() => { if (cdEl) cdEl.style.transform = 'translate(-50%, -50%) scale(1.0)'; }, 80);
+  }
+  if (duration > 0) {
+    SFX.countdownTick();
+  }
+}
+
 export function update(dt) {
   state.time += dt;
+
+  // ── Universal Countdown & Freeze
+  if (state.countdownTimer > 0) {
+    const prevSec = Math.ceil(state.countdownTimer);
+    state.countdownTimer -= dt;
+    const curSec = Math.ceil(state.countdownTimer);
+
+    // Freeze player velocity, buffer & dash
+    state.player.vel.set(0, 0, 0);
+    state.player.jumpBuf = 0;
+    state.touchDashRequested = false;
+
+    // Freeze AI velocity
+    for (const f of state.foes) {
+      f.vel.set(0, 0, 0);
+      f.vy = 0;
+    }
+
+    const cdEl = document.getElementById('countdownText');
+    if (state.countdownTimer > 0) {
+      if (curSec !== prevSec && curSec >= 1) {
+        SFX.countdownTick();
+        if (cdEl) {
+          cdEl.style.display = 'block';
+          cdEl.textContent = curSec.toString();
+          cdEl.style.opacity = '1';
+          cdEl.style.color = '#fff';
+          cdEl.style.textShadow = '0 0 20px var(--cyan), 0 0 40px var(--cyan), 0 0 80px var(--cyan)';
+          cdEl.style.transform = 'translate(-50%, -50%) scale(1.2)';
+          setTimeout(() => { if (cdEl) cdEl.style.transform = 'translate(-50%, -50%) scale(1.0)'; }, 80);
+        }
+      }
+    } else {
+      // Countdown reached 0 -> FIGHT!
+      state.countdownTimer = 0;
+      state.fightDisplayTimer = 0.8;
+      SFX.fight();
+      if (cdEl) {
+        cdEl.style.display = 'block';
+        cdEl.textContent = 'FIGHT!';
+        cdEl.style.opacity = '1';
+        cdEl.style.color = '#fff';
+        cdEl.style.textShadow = '0 0 30px var(--orange), 0 0 60px var(--orange), 0 0 90px var(--orange)';
+        cdEl.style.transform = 'translate(-50%, -50%) scale(1.35)';
+        setTimeout(() => { if (cdEl) cdEl.style.transform = 'translate(-50%, -50%) scale(1.0)'; }, 100);
+      }
+
+      // Spawning enemies now that countdown ended
+      if (state.onCountdownEnd) {
+        const cb = state.onCountdownEnd;
+        state.onCountdownEnd = null;
+        cb();
+      } else {
+        if (state.gameMode === 'duel_ai' || state.gameMode === 'duel') {
+          spawnDuelBoss(state.tier || state.duelTier || 1);
+        } else if (state.gameMode === 'swarm') {
+          spawnWave();
+        }
+      }
+    }
+  } else if (state.fightDisplayTimer > 0) {
+    state.fightDisplayTimer -= dt;
+    const cdEl = document.getElementById('countdownText');
+    if (cdEl) {
+      if (state.fightDisplayTimer <= 0) {
+        cdEl.style.display = 'none';
+        cdEl.style.opacity = '0';
+      } else if (state.fightDisplayTimer < 0.3) {
+        cdEl.style.opacity = (state.fightDisplayTimer / 0.3).toString();
+      }
+    }
+  }
 
   // ── update destructible tiles
   updateTiles(dt);
@@ -26,14 +119,16 @@ export function update(dt) {
     const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x);   // +X when yaw=0; A/D were inverted
     const wish = new THREE.Vector3();
-    if (state.keys.KeyW) wish.add(fwd);
-    if (state.keys.KeyS) wish.sub(fwd);
-    if (state.keys.KeyD) wish.add(right);
-    if (state.keys.KeyA) wish.sub(right);
+    if (state.countdownTimer <= 0) {
+      if (state.keys.KeyW) wish.add(fwd);
+      if (state.keys.KeyS) wish.sub(fwd);
+      if (state.keys.KeyD) wish.add(right);
+      if (state.keys.KeyA) wish.sub(right);
 
-    if (touchMove.x !== 0 || touchMove.y !== 0) {
-      wish.addScaledVector(fwd, -touchMove.y);
-      wish.addScaledVector(right, touchMove.x);
+      if (touchMove.x !== 0 || touchMove.y !== 0) {
+        wish.addScaledVector(fwd, -touchMove.y);
+        wish.addScaledVector(right, touchMove.x);
+      }
     }
 
     const stickDeflection = Math.hypot(touchMove.x, touchMove.y);
@@ -185,10 +280,10 @@ export function update(dt) {
   }
 
   // ── foes
-  if (state.gameMode !== 'duel_multi' && state.gameMode !== 'duos_multi') {
+  if (state.gameMode !== 'duel_multi' && state.gameMode !== 'duos_multi' && state.countdownTimer <= 0) {
     for (let fi = state.foes.length - 1; fi >= 0; fi--) {
     const f = state.foes[fi];
-    if (state.gameMode === 'duel' && f.isBoss) {
+    if ((state.gameMode === 'duel' || state.gameMode === 'duel_ai') && f.isBoss) {
       updateDuelFoe(f, dt);
       continue;
     }
@@ -512,8 +607,8 @@ export function update(dt) {
           const hasLos = lineOfSight(f.pos, D.pos);
 
           if (movingToward && facingDot > 0.2 && hasLos) {
-            const catchChance = (state.gameMode === 'duel' && f.isBoss)
-              ? Math.min(0.85, 0.75 + (state.duelTier - 1) * 0.03)
+            const catchChance = ((state.gameMode === 'duel' || state.gameMode === 'duel_ai') && f.isBoss)
+              ? Math.min(0.85, 0.75 + ((state.tier || state.duelTier) - 1) * 0.03)
               : 0.35;
             if (Math.random() < catchChance) {
               // ON SUCCESS (AI Catch)
@@ -742,6 +837,7 @@ export function update(dt) {
             scene.remove(D.obj);
             state.discs.splice(i, 1);
             discCaught = true;
+            SFX.catchDisc();
           }
         }
       }
@@ -778,9 +874,9 @@ export function update(dt) {
   if (state.spawnTimer > 0) {
     state.spawnTimer -= dt;
     if (state.spawnTimer <= 0) {
-      if (state.gameMode === 'duel') {
-        message('DUEL TIER ' + state.duelTier + ' — FIGHT!');
-        spawnDuelBoss(state.duelTier);
+      if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
+        message('TIER ' + (state.tier || state.duelTier) + ' — FIGHT!');
+        spawnDuelBoss(state.tier || state.duelTier);
       } else {
         spawnWave();
       }
@@ -935,7 +1031,22 @@ window.__dbg = {
   running: () => state.running,
   paused: () => state.paused,
   mode: () => state.gameMode,
-  duelTier: () => state.duelTier,
+  tier: () => state.tier || state.duelTier,
+  duelTier: () => state.tier || state.duelTier,
+  countdownTimer: () => +state.countdownTimer.toFixed(2),
+  startCountdown: (d, cb) => startCountdown(d, cb),
+  finishCountdown: () => {
+    state.countdownTimer = 0;
+    if (state.onCountdownEnd) {
+      const cb = state.onCountdownEnd;
+      state.onCountdownEnd = null;
+      cb();
+    } else if (state.gameMode === 'duel_ai' || state.gameMode === 'duel') {
+      spawnDuelBoss(state.tier || state.duelTier || 1);
+    } else if (state.gameMode === 'swarm') {
+      spawnWave();
+    }
+  },
   pauseGame: () => pauseGame(),
   resumeGame: () => resumeGame(),
   restartMatch: () => restartMatch(),
@@ -999,14 +1110,22 @@ window.__dbg = {
     } : null;
   },
   spawnTestDisc: (offsetZ = 8) => {
-    const b = state.foes.find(f => f.isBoss);
+    let b = state.foes.find(f => f.isBoss) || state.foes[0];
+    if (!b) {
+      spawnDuelBoss(state.tier || state.duelTier || 1);
+      b = state.foes[0];
+    }
     if (!b) return null;
     const p = new THREE.Vector3(b.pos.x, 1.7, b.pos.z + offsetZ);
     spawnDisc(p, new THREE.Vector3(0, 0, -32), 'player', config.CYAN, 0);
     return { x: +p.x.toFixed(2), z: +p.z.toFixed(2) };
   },
   spawnDeflectedTestDisc: (offsetZ = 6) => {
-    const b = state.foes.find(f => f.isBoss);
+    let b = state.foes.find(f => f.isBoss) || state.foes[0];
+    if (!b) {
+      spawnDuelBoss(state.tier || state.duelTier || 1);
+      b = state.foes[0];
+    }
     if (!b) return null;
     const p = new THREE.Vector3(b.pos.x, 1.7, b.pos.z + offsetZ);
     const d = spawnDisc(p, new THREE.Vector3(0, 0, -36), 'player', config.WHITE, 0);
@@ -1015,7 +1134,11 @@ window.__dbg = {
     return { x: +p.x.toFixed(2), z: +p.z.toFixed(2) };
   },
   spawnEnemyHitDisc: () => {
-    const b = state.foes.find(f => f.isBoss) || state.foes[0];
+    let b = state.foes.find(f => f.isBoss) || state.foes[0];
+    if (!b) {
+      spawnDuelBoss(state.tier || state.duelTier || 1);
+      b = state.foes[0];
+    }
     if (!b) return null;
     b.hasDisc = false;
     const p = new THREE.Vector3(state.player.pos.x, 1.5, state.player.pos.z - 3);
@@ -1023,7 +1146,11 @@ window.__dbg = {
     return d;
   },
   spawnParryTestDisc: (dist = 2.0) => {
-    const b = ((state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') && state.foes[0]) ? state.foes[0] : (state.foes.find(f => f.isBoss) || state.foes[0]);
+    let b = ((state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') && state.foes[0]) ? state.foes[0] : (state.foes.find(f => f.isBoss) || state.foes[0]);
+    if (!b) {
+      spawnDuelBoss(state.tier || state.duelTier || 1);
+      b = state.foes[0];
+    }
     if (!b) return null;
     b.hasDisc = false;
     const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw)).normalize();
@@ -1102,6 +1229,7 @@ window.__dbg = {
   setPlayerBlocking: (b) => { state.player.blocking = b; },
   setPlayerPos: (x, z, y = 0) => {
     state.player.pos.x = x; state.player.pos.z = z; state.player.y = y;
+    if (state.countdownTimer > 0) state.countdownTimer = 0;
     if (!state.player.alive || state.player.hp <= 0) { state.player.alive = true; state.player.hp = 100; }
   },
   step: (dt = 0.016) => update(dt),

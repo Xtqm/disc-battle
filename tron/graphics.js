@@ -711,7 +711,7 @@ export function updateDuelFoe(f, dt) {
     f.hasDisc = false;
     f.aerialThrow = false;
     f.state = 'SEEK_COVER';
-    f.cd = 0.8 + Math.random() * 0.6;
+    f.cd = (f.baseCd !== undefined ? f.baseCd : 0.8) + Math.random() * 0.4;
     f.coverPillar = null;
     f.peekDir = -f.peekDir;
   }
@@ -769,8 +769,8 @@ export function updateDuelFoe(f, dt) {
     } else {
       const normX = pDist > 0.1 ? toPx / pDist : 0;
       const normZ = pDist > 0.1 ? toPz / pDist : 1;
-      f.strafeT -= dt * 1.1;
-      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = 0.45 + Math.random() * 0.65; }
+      f.strafeT -= dt * (1.1 * (f.strafeRate || 1.0));
+      if (f.strafeT <= 0) { f.strafe *= -1; f.strafeT = (0.45 + Math.random() * 0.65) / (f.strafeRate || 1.0); }
       const sideX = -normZ * f.strafe;
       const sideZ = normX * f.strafe;
 
@@ -781,7 +781,7 @@ export function updateDuelFoe(f, dt) {
 
       f.cd -= dt;
       if (f.cd <= 0 && f.hasDisc && state.player.alive) {
-        if (f.grounded && Math.random() < 0.35 && pDist >= 9) {
+        if (f.grounded && Math.random() < (f.jumpChance || 0.35) && pDist >= 8) {
           // Leap throw
           f.vy = 11.5;
           f.grounded = false;
@@ -805,7 +805,7 @@ export function updateDuelFoe(f, dt) {
 
           f.hasDisc = false;
           f.state = 'SEEK_COVER';
-          f.cd = 0.8 + Math.random() * 0.6;
+          f.cd = (f.baseCd !== undefined ? f.baseCd : 0.8) + Math.random() * 0.4;
           f.coverPillar = null;
           f.peekDir = -f.peekDir;
         }

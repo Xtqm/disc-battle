@@ -74,5 +74,30 @@ export function playTileDropSound() {
   } catch (_) {}
 }
 
+export function playCatchDiscSound(pitch = 1.0) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    const baseFreq = 340 * pitch;
+    osc.frequency.setValueAtTime(baseFreq, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.4, ctx.currentTime + 0.08);
+    gain.gain.setValueAtTime(0.25, ctx.currentTime);
+    gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.08);
+  } catch (_) {}
+}
+
+export const SFX = {
+  catchDisc: (pitch = 1.0) => playCatchDiscSound(pitch),
+  countdownTick: () => playCatchDiscSound(0.65), // pitched down
+  fight: () => playCatchDiscSound(1.75) // higher pitch
+};
+
 window.derezAudioHook = playDeRezSound;
 

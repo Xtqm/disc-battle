@@ -2,12 +2,12 @@ import * as THREE from './vendor/three.module.js';
 import { state, player } from './state.js';
 import { config } from './config.js';
 import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
-import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
+import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound, SFX } from './audio.js';
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { el, msgEl, message, showGameOver, shake } from './ui.js';
-import { clock, update, loop } from './main.js';
+import { clock, update, loop, startCountdown } from './main.js';
 
 export function updateHUD() {
   const hpb = el('hpbar');
@@ -17,9 +17,9 @@ export function updateHUD() {
   const eb = el('energybar');
   if (eb && eb.firstElementChild) eb.firstElementChild.style.width = state.player.energy + '%';
 
-  if (state.gameMode === 'duel') {
+  if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
     const rl = el('roundLabel');
-    if (rl) rl.innerHTML = `DUEL TIER <span id="wave" class="big">${state.duelTier}</span>`;
+    if (rl) rl.innerHTML = `TIER: <span id="wave" class="big">${state.tier || state.duelTier || 1}</span>`;
     const boss = state.foes[0];
     const hpPct = boss ? Math.max(0, Math.round((boss.hp / boss.maxHp) * 100)) : 0;
     const sl = el('subLabel');
@@ -55,18 +55,7 @@ export function updateHUD() {
   if (sc) sc.textContent = state.score;
 }
 
-export function resetGame() {
-  for (const f of state.foes) scene.remove(f.obj);
-  for (const d of state.discs) scene.remove(d.obj);
-  state.foes = []; state.discs = [];
-  state.player.pos.set(0, 0, 14); state.player.vel.set(0, 0, 0);
-  state.player.y = 0; state.player.vy = 0; state.player.grounded = true; state.player.jumps = 0;
-  state.player.hp = 100; state.player.energy = 100; state.player.hasDisc = true; state.player.alive = true;
-  state.player.yaw = Math.PI; state.player.pitch = -.12;
-  state.score = 0; state.gameOverT = 0; state.running = true;
-  state.spawnTimer = 0;
-  state.gameOverReason = '';
-
+export function rebuildArenaTiles() {
   for (const tile of tiles.values()) {
     tile.state = config.TILE_INTACT;
     tile.timer = 0;
@@ -80,15 +69,71 @@ export function resetGame() {
       tile.edgeMesh.material = tileEdgeMatIntact;
     }
   }
+}
 
-  if (state.gameMode === 'duel') {
+export function resetRound(spawnX = 0, spawnZ = 14, yaw = Math.PI) {
+  // 1. Heal player to 100 HP
+  state.player.hp = 100;
+  state.player.energy = 100;
+  state.player.hasDisc = true;
+  state.player.alive = true;
+  state.player.blocking = false;
+  if (state.player.obj) {
+    state.player.obj.visible = true;
+    if (state.player.obj.userData && state.player.obj.userData.backDisc) {
+      state.player.obj.userData.backDisc.visible = true;
+    }
+  }
+
+  // 2. Snap player back to spawn point
+  state.player.pos.set(spawnX, 0, spawnZ);
+  state.player.vel.set(0, 0, 0);
+  state.player.yaw = yaw;
+  state.player.pitch = -0.12;
+  state.player.y = 0;
+  state.player.vy = 0;
+  state.player.grounded = true;
+  state.player.jumps = 0;
+  if (state.player.obj) {
+    state.player.obj.position.copy(state.player.pos);
+    state.player.obj.rotation.y = state.player.yaw;
+  }
+
+  // 3. Rebuild the arena
+  rebuildArenaTiles();
+
+  // Clear existing discs and enemies during countdown
+  for (const d of state.discs) scene.remove(d.obj);
+  state.discs = [];
+  for (const f of state.foes) scene.remove(f.obj);
+  state.foes = [];
+
+  // 4. Trigger countdown (enemies spawn only once countdown ends)
+  startCountdown(3.0);
+}
+
+export function resetGame() {
+  state.score = 0;
+  state.gameOverT = 0;
+  state.running = true;
+  state.spawnTimer = 0;
+  state.gameOverReason = '';
+
+  if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
+    state.tier = 1;
     state.duelTier = 1;
-    spawnDuelBoss(state.duelTier);
-    message('DUEL TIER 1 — FIGHT');
-  } else {
+    resetRound(0, 14, Math.PI);
+    state.onCountdownEnd = () => {
+      spawnDuelBoss(state.tier || state.duelTier || 1);
+    };
+  } else if (state.gameMode === 'swarm') {
     state.wave = 1;
-    spawnWave();
-    message('CYCLE 1 — FIGHT');
+    resetRound(0, 14, Math.PI);
+    state.onCountdownEnd = () => {
+      spawnWave();
+    };
+  } else {
+    resetRound(0, 14, Math.PI);
   }
   updateHUD();
 }
@@ -103,7 +148,12 @@ export function spawnDuelBoss(tier = 1) {
   obj.add(halo);
   scene.add(obj);
 
-  const maxHp = Math.min(250 + (tier - 1) * 35, 350);
+  const maxHp = tier === 1 ? 250 : (250 + tier * 50);
+  const baseCd = tier === 1 ? 1.4 : Math.max(0.6, 1.4 - tier * 0.15);
+  const speed = tier === 1 ? 10.5 : (10.5 + (tier - 1) * 0.85);
+  const jumpChance = tier === 1 ? 0.35 : Math.min(0.85, 0.35 + (tier - 1) * 0.12);
+  const strafeRate = tier === 1 ? 1.0 : (1.0 + (tier - 1) * 0.15);
+
   const boss = {
     obj,
     pos: new THREE.Vector3(0, 0, -28),
@@ -111,13 +161,17 @@ export function spawnDuelBoss(tier = 1) {
     hp: maxHp,
     maxHp: maxHp,
     hasDisc: true,
-    cd: 0.8 + Math.random() * 0.6,
+    cd: baseCd + Math.random() * 0.3,
+    baseCd: baseCd,
     strafe: Math.random() < 0.5 ? 1 : -1,
-    strafeT: 0.5 + Math.random() * 0.7,
+    strafeT: (0.5 + Math.random() * 0.7) / strafeRate,
+    strafeRate: strafeRate,
     hurt: 0,
     skill: Math.min(0.88 + (tier - 1) * 0.03, 0.98),
     isBoss: true,
-    speed: 10.5 + (tier - 1) * 0.5,
+    speed: speed,
+    jumpChance: jumpChance,
+    tier: tier,
     y: 0,
     vy: 0,
     grounded: true,
@@ -149,6 +203,7 @@ export function spawnWave() {
 }
 
 export function throwDisc() {
+  if (state.countdownTimer > 0) return;
   if (!state.player.hasDisc || !state.player.alive) return;
   state.player.hasDisc = false;
   state.player.obj.userData.backDisc.visible = false;
@@ -263,6 +318,7 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
 state.gameOverReason = '';
 
 export function damagePlayer(amount, from) {
+  if (state.countdownTimer > 0) return;
   if (!state.player.alive) return;
   state.player.hp -= amount; state.player.hurtFlash = 1;
   burst(state.player.pos.clone().setY(state.player.y + 1.6), config.CYAN, 18, 8);
@@ -318,12 +374,21 @@ export function killFoe(f) {
   state.foes = state.foes.filter(x => x !== f);
   state.score += 150;
 
-  // 1. Single-Player Solo Duel (AI)
-  if (state.gameMode === 'duel') {
-    message('RIVAL TERMINATED — VICTORY');
-    setTimeout(() => {
-      showGameOver('VICTORY', 'ELITE RIVAL DEFEATED');
-    }, 800);
+  // 1. Single-Player Practice Mode (Solo 1v1 AI) - Multi-Tier Escalation
+  if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
+    // 1. Do not show the Victory/Game Over screen immediately
+    // 2. Increment a global tier variable (starts at 1)
+    state.tier = (state.tier || state.duelTier || 1) + 1;
+    state.duelTier = state.tier;
+    // 3. Display a message: 'TIER ' + tier + ' REACHED'
+    message('TIER ' + state.tier + ' REACHED');
+    // 4. Trigger Round Reset (heal player, restore tiles, move to spawn) & 5. Trigger 3-second countdown
+    resetRound(0, 14, Math.PI);
+    // 6. Once countdown ends, spawn a new, harder Duel Boss
+    state.onCountdownEnd = () => {
+      spawnDuelBoss(state.tier);
+    };
+    updateHUD();
     return;
   }
 
@@ -345,20 +410,28 @@ export function killFoe(f) {
     return;
   }
 
-  // 3. Solo Swarm Mode ONLY
+  // 3. Solo Swarm Mode ONLY - Wave Progression with 3-second countdown
   if (state.gameMode === 'swarm') {
     state.score += 100 + state.wave * 10;
     if (state.foes.length === 0) {
       state.wave++;
       message('CYCLE ' + state.wave);
-      state.spawnTimer = 2.2;
+      resetRound(0, 14, Math.PI);
+      state.onCountdownEnd = () => {
+        spawnWave();
+      };
+      updateHUD();
     }
   } else {
     // Fallback for any other custom modes
     if (state.foes.length === 0) {
       state.wave++;
       message('CYCLE ' + state.wave);
-      state.spawnTimer = 2.2;
+      resetRound(0, 14, Math.PI);
+      state.onCountdownEnd = () => {
+        spawnWave();
+      };
+      updateHUD();
     }
   }
 }

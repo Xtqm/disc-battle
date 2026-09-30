@@ -71,9 +71,13 @@ export let overlay = null;
 export const keys = state.keys;
 
 export function startMode(mode) {
-  state.gameMode = mode;
+  state.gameMode = (mode === 'duel' || mode === 'duel_ai') ? 'duel_ai' : mode;
   if (!overlay) overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'none';
+  const hm = document.getElementById('hostModal');
+  if (hm) hm.style.display = 'none';
+  const rm = document.getElementById('roomModal');
+  if (rm) rm.style.display = 'none';
   resetGame();
   state.paused = false;
   state.justResumed = true;
@@ -123,6 +127,10 @@ export function restartMatch() {
 export function showModeSelect() {
   const pm = document.getElementById('pauseMenu');
   if (pm) pm.style.display = 'none';
+  const hm = document.getElementById('hostModal');
+  if (hm) hm.style.display = 'none';
+  const rm = document.getElementById('roomModal');
+  if (rm) rm.style.display = 'none';
   state.paused = false;
   state.running = false;
   teardownMultiplayer();
@@ -134,7 +142,7 @@ export function showModeSelect() {
 }
 
 export function getMainMenuHtml() {
-  return `<div class="card">
+  return `<div class="card" id="mainMenu">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys desktop-keys">
     <b>W A S D</b><span>Move &amp; strafe across the grid</span>
@@ -158,17 +166,21 @@ export function getMainMenuHtml() {
     <b>DASH</b><span>Instant directional sprint impulse</span>
     <b>PAUSE</b><span>Tap top right II button to suspend grid</span>
   </div>
-  <div class="mode-select">
-    <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
+  <div class="mode-select" id="mainMenuButtons">
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
-    <button id="createRoomBtn" class="mode-btn multi-btn">CREATE DUEL ROOM (1v1)</button>
-    <button id="createDuosBtn" class="mode-btn multi-btn">CREATE DUOS ROOM (2v2)</button>
-    <button id="joinRoomBtn" class="mode-btn multi-btn">JOIN ROOM</button>
+    <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
+    <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
+    <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="joinRoomBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
   </div>
 </div>`;
 }
 
 export function showModeSelectMenu() {
+  const hm = document.getElementById('hostModal');
+  if (hm) hm.style.display = 'none';
+  const rm = document.getElementById('roomModal');
+  if (rm) rm.style.display = 'none';
   if (!overlay) overlay = document.getElementById('overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
@@ -187,17 +199,25 @@ export function bindMainMenuEvents() {
     }
   };
 
-  const startDuel = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('duel'); };
   const startSwarm = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('swarm'); };
-  const createRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); onClickCreateRoom(e, '1v1'); };
-  const createDuosRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); onClickCreateRoom(e, '2v2'); };
-  const joinRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showJoinInputModal(); };
+  const openHostModal = (e) => {
+    e.stopPropagation(); if (e.cancelable) e.preventDefault();
+    if (overlay) overlay.style.display = 'none';
+    const hm = document.getElementById('hostModal');
+    if (hm) hm.style.display = 'flex';
+  };
+  const openJoinModal = (e) => {
+    e.stopPropagation(); if (e.cancelable) e.preventDefault();
+    if (overlay) overlay.style.display = 'none';
+    showJoinInputModal();
+  };
+  const startDuelAi = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('duel_ai'); };
 
-  bind('duelBtn', startDuel);
   bind('swarmBtn', startSwarm);
-  bind('createRoomBtn', createRoom);
-  bind('createDuosBtn', createDuosRoom);
-  bind('joinRoomBtn', joinRoom);
+  bind('hostMatchBtn', openHostModal);
+  bind('joinOnlineBtn', openJoinModal);
+  bind('duelBtn', startDuelAi);
+  bind('joinRoomBtn', openJoinModal);
 }
 
 // Bind pause menu & HUD buttons
@@ -263,8 +283,56 @@ export function bindPauseAndModalEvents() {
       teardownMultiplayer();
       const rm = document.getElementById('roomModal');
       if (rm) rm.style.display = 'none';
+      const hm = document.getElementById('hostModal');
+      if (hm) hm.style.display = 'none';
       showModeSelectMenu();
     };
+  }
+
+  // Host setup modal bindings
+  const hm = document.getElementById('hostModal');
+  const practiceBtn = document.getElementById('practiceBtn');
+  if (practiceBtn) {
+    const onPractice = (e) => {
+      e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (hm) hm.style.display = 'none';
+      startMode('duel_ai');
+    };
+    practiceBtn.onclick = onPractice;
+    practiceBtn.ontouchstart = onPractice;
+  }
+
+  const host1v1Btn = document.getElementById('host1v1Btn');
+  if (host1v1Btn) {
+    const onHost1v1 = (e) => {
+      e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (hm) hm.style.display = 'none';
+      onClickCreateRoom(e, '1v1');
+    };
+    host1v1Btn.onclick = onHost1v1;
+    host1v1Btn.ontouchstart = onHost1v1;
+  }
+
+  const host2v2Btn = document.getElementById('host2v2Btn');
+  if (host2v2Btn) {
+    const onHost2v2 = (e) => {
+      e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (hm) hm.style.display = 'none';
+      onClickCreateRoom(e, '2v2');
+    };
+    host2v2Btn.onclick = onHost2v2;
+    host2v2Btn.ontouchstart = onHost2v2;
+  }
+
+  const cancelHostBtn = document.getElementById('cancelHostBtn');
+  if (cancelHostBtn) {
+    const onCancelHost = (e) => {
+      e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (hm) hm.style.display = 'none';
+      showModeSelectMenu();
+    };
+    cancelHostBtn.onclick = onCancelHost;
+    cancelHostBtn.ontouchstart = onCancelHost;
   }
 
   joinRoomInput = document.getElementById('joinRoomInput');
