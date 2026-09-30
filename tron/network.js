@@ -183,7 +183,8 @@ export async function initNetwork() {
     state.currentUser = state.auth.currentUser;
   } catch (err) {
     console.warn("Firebase initialization error:", err);
-    if (window.__useMockNetwork !== false && typeof BroadcastChannel !== 'undefined') {
+    state.db = null;
+    if (window.__useMockNetwork !== false) {
       initMockNetwork();
     }
   }
@@ -191,7 +192,7 @@ export async function initNetwork() {
 
 export function getRoomRef(roomCode) {
   if (state.db && state.db.isMock) {
-    return mockDocRef(`artifacts/${appId}/public/data/rooms/${roomCode}`, roomCode);
+    return mockDocRef(`artifacts/${config.appId}/public/data/rooms/${roomCode}`, roomCode);
   }
   return doc(state.db, 'artifacts', config.appId, 'public', 'data', 'rooms', roomCode);
 }

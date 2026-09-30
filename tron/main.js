@@ -1,13 +1,13 @@
 import * as THREE from './vendor/three.module.js';
 import { state, player } from './state.js';
 import { config } from './config.js';
-import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
+import { initGraphics, renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
 import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { initInput, EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { el, msgEl, message, showGameOver, shake } from './ui.js';
+import { el, msgEl, message, showGameOver, shake, bindMenuButtons } from './ui.js';
 
 export const clock = new THREE.Clock();
 state.time = 0;
@@ -896,15 +896,38 @@ export function loop() {
   }
   renderer.render(scene, camera);
 }
-document.addEventListener('DOMContentLoaded', () => {
+
+export const animate = loop;
+
+function initApp() {
   try {
-    initInput(renderer);
-    bindMainMenuEvents();
-    loop();
+    // 1. Initialize renderer and scene
+    initGraphics();
+
+    // 2. Safely initialize inputs using the mounted canvas
+    const canvas = renderer?.domElement || document.querySelector('canvas');
+    initInput(canvas);
+
+    // 3. Bind UI buttons safely
+    bindMenuButtons();
+
+    if (state.isTouchDevice && typeof document !== 'undefined' && document.body) {
+      document.body.classList.add('touch-device');
+      checkOrientation();
+    }
+
+    // 4. Start render loop
+    requestAnimationFrame(animate);
   } catch (err) {
-    console.error("Initialization Error:", err);
+    console.error("Initialization failed:", err);
   }
-});
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initApp);
+} else {
+  initApp();
+}
 
 
 // debug hooks (headless test harness)
@@ -1146,13 +1169,3 @@ window.__dbg = {
 
 window.__TRON__ = window.__dbg;
 
-const leaveMatchBtn = document.getElementById('leaveMatchBtn');
-if (leaveMatchBtn) {
-  leaveMatchBtn.onclick = (e) => {
-    e.stopPropagation();
-    const um = document.getElementById('unlockedMenu');
-    if (um) um.style.display = 'none';
-    teardownMultiplayer();
-    showModeSelectMenu();
-  };
-}

@@ -65,12 +65,13 @@ export function onDown(e) {
 export function onUp(e) { const c = codeOf(e); if (c) state.keys[c] = false; }
 // Capture phase on window intercepts all keyboard events across the whole document
 
-export let canvas;
-canvas.tabIndex = 0;                       // canvas can hold keyboard focus
-export const overlay = document.getElementById('overlay');
+export let canvas = null;
+export let overlay = null;
+export const keys = state.keys;
 
 export function startMode(mode) {
   state.gameMode = mode;
+  if (!overlay) overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'none';
   resetGame();
   state.paused = false;
@@ -167,6 +168,7 @@ export function getMainMenuHtml() {
 }
 
 export function showModeSelectMenu() {
+  if (!overlay) overlay = document.getElementById('overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
   overlay.innerHTML = getMainMenuHtml();
@@ -198,67 +200,99 @@ export function bindMainMenuEvents() {
 }
 
 // Bind pause menu & HUD buttons
-export const pauseBtn = document.getElementById('pauseBtn');
+export let pauseBtn = null;
 export const onPauseClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); pauseGame(); };
-if (pauseBtn) { pauseBtn.onclick = onPauseClick; pauseBtn.ontouchstart = onPauseClick; }
 
-export const resumeBtn = document.getElementById('resumeBtn');
+export let resumeBtn = null;
 export const onResumeClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); resumeGame(); };
-if (resumeBtn) { resumeBtn.onclick = onResumeClick; resumeBtn.ontouchstart = onResumeClick; }
 
-export const restartBtn = document.getElementById('restartBtn');
+export let restartBtn = null;
 export const onRestartClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); restartMatch(); };
-if (restartBtn) { restartBtn.onclick = onRestartClick; restartBtn.ontouchstart = onRestartClick; }
 
-export const modeSelectBtn = document.getElementById('modeSelectBtn');
+export let modeSelectBtn = null;
 export const onModeSelectClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showModeSelect(); };
-if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; modeSelectBtn.ontouchstart = onModeSelectClick; }
 
 // Bind room modal buttons
-export const btnCopyCode = document.getElementById('btnCopyCode');
-if (btnCopyCode) {
-  btnCopyCode.onclick = (e) => {
-    e.stopPropagation();
-    if (state.currentRoomId) copyRoomCode(state.currentRoomId);
-  };
-}
+export let btnCopyCode = null;
+export let btnConfirmJoin = null;
+export let btnCancelRoom = null;
+export let joinRoomInput = null;
 
-export const btnConfirmJoin = document.getElementById('btnConfirmJoin');
-if (btnConfirmJoin) {
-  btnConfirmJoin.onclick = (e) => {
-    e.stopPropagation();
-    onClickConfirmJoin(e);
-  };
-}
+export function bindPauseAndModalEvents() {
+  pauseBtn = document.getElementById('pauseBtn');
+  if (pauseBtn) { pauseBtn.onclick = onPauseClick; pauseBtn.ontouchstart = onPauseClick; }
 
-export const btnCancelRoom = document.getElementById('btnCancelRoom');
-if (btnCancelRoom) {
-  btnCancelRoom.onclick = (e) => {
-    e.stopPropagation();
-    teardownMultiplayer();
-    const rm = document.getElementById('roomModal');
-    if (rm) rm.style.display = 'none';
-    showModeSelectMenu();
-  };
-}
+  resumeBtn = document.getElementById('resumeBtn');
+  if (resumeBtn) { resumeBtn.onclick = onResumeClick; resumeBtn.ontouchstart = onResumeClick; }
 
-export const joinRoomInput = document.getElementById('joinRoomInput');
-if (joinRoomInput) {
-  joinRoomInput.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
+  restartBtn = document.getElementById('restartBtn');
+  if (restartBtn) { restartBtn.onclick = onRestartClick; restartBtn.ontouchstart = onRestartClick; }
+
+  modeSelectBtn = document.getElementById('modeSelectBtn');
+  if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; modeSelectBtn.ontouchstart = onModeSelectClick; }
+
+  btnCopyCode = document.getElementById('btnCopyCode');
+  if (btnCopyCode) {
+    btnCopyCode.onclick = (e) => {
+      e.stopPropagation();
+      if (state.currentRoomId) copyRoomCode(state.currentRoomId);
+    };
+  }
+
+  btnConfirmJoin = document.getElementById('btnConfirmJoin');
+  if (btnConfirmJoin) {
+    btnConfirmJoin.onclick = (e) => {
+      e.stopPropagation();
       onClickConfirmJoin(e);
-    }
-  });
-  joinRoomInput.addEventListener('input', () => {
-    joinRoomInput.value = joinRoomInput.value.toUpperCase();
-  });
+    };
+  }
+
+  btnCancelRoom = document.getElementById('btnCancelRoom');
+  if (btnCancelRoom) {
+    btnCancelRoom.onclick = (e) => {
+      e.stopPropagation();
+      teardownMultiplayer();
+      const rm = document.getElementById('roomModal');
+      if (rm) rm.style.display = 'none';
+      showModeSelectMenu();
+    };
+  }
+
+  joinRoomInput = document.getElementById('joinRoomInput');
+  if (joinRoomInput) {
+    joinRoomInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        onClickConfirmJoin(e);
+      }
+    });
+    joinRoomInput.addEventListener('input', () => {
+      joinRoomInput.value = joinRoomInput.value.toUpperCase();
+    });
+  }
+
+  const leaveMatchBtn = document.getElementById('leaveMatchBtn');
+  if (leaveMatchBtn) {
+    leaveMatchBtn.onclick = (e) => {
+      e.stopPropagation();
+      const um = document.getElementById('unlockedMenu');
+      if (um) um.style.display = 'none';
+      teardownMultiplayer();
+      showModeSelectMenu();
+    };
+  }
+}
+
+export function bindMenuButtons() {
+  bindMainMenuEvents();
+  bindPauseAndModalEvents();
 }
 
 // Pointer lock can throw synchronously (SecurityError) inside sandboxed/permission-less
 // iframes, and can also fail async. Both paths just enable the cursor-steering fallback.
 export function tryLock() {
   if (state.isTouchDevice) return;
+  if (!canvas) return;
   try {
     const p = canvas.requestPointerLock();
     if (p && p.catch) p.catch(() => { lockFailed = true; });
@@ -276,20 +310,20 @@ export function setCursor() {
     document.body.style.cursor = 'default';
     return;
   }
-  const locked = document.pointerLockElement === canvas;
+  const locked = !!(canvas && document.pointerLockElement === canvas);
   document.body.style.cursor = (state.running && !state.paused && locked) ? 'none' : 'default';
 }
 
 export function focusGame() {
   try { window.focus(); } catch (e) {}
-  canvas.focus();
+  if (canvas) canvas.focus();
 }
 
 
 state.sens = 0.0023, state.invertY = false;
 state.steerX = 0, state.steerY = 0;                 // joystick steering (unlocked mode)
 state.cursorX = innerWidth / 2, state.cursorY = innerHeight / 2;
-export const isLocked = () => document.pointerLockElement === canvas;
+export const isLocked = () => !!(canvas && document.pointerLockElement === canvas);
 
 export function look(dx, dy) {
   state.player.yaw   -= dx * state.sens;
@@ -322,11 +356,13 @@ state.touchBlocking = false;
 state.touchCurveL = false;
 state.touchCurveR = false;
 
-export const joyBase = document.getElementById('joystickBase');
-export const joyThumb = document.getElementById('joystickThumb');
+export let joyBase = null;
+export let joyThumb = null;
 export const R_STICK = 52; // radius in px
 
 export function showJoystick(x, y) {
+  if (!joyBase) joyBase = document.getElementById('joystickBase');
+  if (!joyThumb) joyThumb = document.getElementById('joystickThumb');
   if (!joyBase) return;
   joyBase.style.left = `${x}px`;
   joyBase.style.top = `${y}px`;
@@ -336,6 +372,7 @@ export function showJoystick(x, y) {
 }
 
 export function updateJoystick(x, y) {
+  if (!joyThumb) joyThumb = document.getElementById('joystickThumb');
   const dx = x - moveStartPos.x;
   const dy = y - moveStartPos.y;
   const dist = Math.hypot(dx, dy);
@@ -352,6 +389,8 @@ export function updateJoystick(x, y) {
 }
 
 export function hideJoystick() {
+  if (!joyBase) joyBase = document.getElementById('joystickBase');
+  if (!joyThumb) joyThumb = document.getElementById('joystickThumb');
   if (joyBase) {
     joyBase.style.opacity = '0';
     joyBase.style.transform = 'scale(0.85)';
@@ -522,12 +561,30 @@ export function bindMobileButtons() {
 
 
 
-export function initInput(renderer) {
-  canvas = renderer.domElement;
-  addEventListener('keydown', onDown, { passive: false, capture: true });
-  addEventListener('keyup', onUp, { capture: true });
-  addEventListener('blur', () => { for (const k in state.keys) state.keys[k] = false; if (!state.touchBlocking) state.player.blocking = false; });  // no stuck keys
+export function initTouchControls(canvas) {
+  joyBase = document.getElementById('joystickBase');
+  joyThumb = document.getElementById('joystickThumb');
+  window.addEventListener('touchstart', onTouchStart, { passive: false });
+  window.addEventListener('touchmove', onTouchMove, { passive: false });
+  window.addEventListener('touchend', onTouchEnd, { passive: false });
+  window.addEventListener('touchcancel', onTouchEnd, { passive: false });
+  bindMobileButtons();
+}
+
+export function initInput(canvasOrRenderer) {
+  const c = canvasOrRenderer?.domElement || canvasOrRenderer;
+  if (!c) {
+    console.error("initInput error: canvas element is undefined");
+    return;
+  }
+  canvas = c;
+  overlay = document.getElementById('overlay');
+
+  // 1. Setup Canvas Focus
+  canvas.tabIndex = 0;
   canvas.style.outline = 'none';
+
+  // 2. Attach Canvas-Specific Listeners
   canvas.addEventListener('mousedown', () => { 
     if (!state.isTouchDevice) { 
       focusGame(); 
@@ -538,6 +595,13 @@ export function initInput(renderer) {
       } 
     } 
   });
+  canvas.addEventListener('click', () => { if (!state.isTouchDevice && state.running && !isLocked()) tryLock(); });
+
+  // 3. Attach Window / Document Listeners
+  window.addEventListener('keydown', onDown, { passive: false, capture: true });
+  window.addEventListener('keyup', onUp, { capture: true });
+  window.addEventListener('blur', () => { for (const k in state.keys) state.keys[k] = false; if (!state.touchBlocking) state.player.blocking = false; });  // no stuck keys
+
   document.addEventListener('pointerlockerror', () => { if (!state.isTouchDevice) lockFailed = true; });
   document.addEventListener('pointerlockchange', () => {
     if (state.isTouchDevice) return;
@@ -548,7 +612,7 @@ export function initInput(renderer) {
     }
     setCursor();
   });
-  addEventListener('mousemove', e => {
+  window.addEventListener('mousemove', e => {
     if (state.isTouchDevice) return;
     state.cursorX = e.clientX; state.cursorY = e.clientY;
     if (!state.running || state.paused) return;
@@ -566,25 +630,22 @@ export function initInput(renderer) {
       state.player.pitch = THREE.MathUtils.clamp(-ny * 0.5, -0.6, 0.55);
     }
   });
-  canvas.addEventListener('click', () => { if (!state.isTouchDevice && state.running && !isLocked()) tryLock(); });
-  addEventListener('wheel', e => {
+  window.addEventListener('wheel', e => {
     if (!state.running) return;
     state.sens = THREE.MathUtils.clamp(state.sens * (e.deltaY > 0 ? 0.9 : 1.1), 0.0006, 0.012);
     showSens();
   }, { passive: true });
-  addEventListener('mousedown', e => {
+  window.addEventListener('mousedown', e => {
     if (state.isTouchDevice || !state.running || state.paused) return;
     if (e.button === 0) throwDisc();
     if (e.button === 2) state.player.blocking = true;
   });
-  addEventListener('mouseup', e => {
+  window.addEventListener('mouseup', e => {
     if (state.isTouchDevice) return;
     if (e.button === 2 && !state.touchBlocking) state.player.blocking = false;
   });
-  addEventListener('contextmenu', e => e.preventDefault());
-  window.addEventListener('touchstart', onTouchStart, { passive: false });
-  window.addEventListener('touchmove', onTouchMove, { passive: false });
-  window.addEventListener('touchend', onTouchEnd, { passive: false });
-  window.addEventListener('touchcancel', onTouchEnd, { passive: false });
-  bindMobileButtons();
+  window.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Setup touch listeners if mobile
+  initTouchControls(canvas);
 }

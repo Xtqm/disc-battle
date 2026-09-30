@@ -10,33 +10,37 @@ import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarg
 export const el = id => document.getElementById(id);
 export const msgEl = el('msg');
 state.msgT = 0;
+export { bindMenuButtons } from './input.js';
 export function message(t) {
-  msgEl.textContent = t;
-  msgEl.style.opacity = 1;
+  const msg = msgEl || el('msg');
+  if (!msg) return;
+  msg.textContent = t;
+  msg.style.opacity = 1;
   state.msgT = 2;
   if (t === 'SURFACE COLLAPSE — JUMP / DASH!') {
-    msgEl.style.color = 'var(--orange)';
-    msgEl.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
+    msg.style.color = 'var(--orange)';
+    msg.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
   } else if (t === 'RIVAL CAUGHT DISC!' || t === 'RIVAL COUNTER-CATCH!') {
-    msgEl.style.color = 'var(--orange)';
-    msgEl.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
+    msg.style.color = 'var(--orange)';
+    msg.style.textShadow = '0 0 28px var(--orange), 0 0 10px #ffffff';
   } else if (t === 'DEFLECTED!') {
-    msgEl.style.color = '#ffffff';
-    msgEl.style.textShadow = '0 0 24px var(--cyan), 0 0 8px #ffffff';
+    msg.style.color = '#ffffff';
+    msg.style.textShadow = '0 0 24px var(--cyan), 0 0 8px #ffffff';
   } else {
-    msgEl.style.color = 'var(--cyan)';
-    msgEl.style.textShadow = '0 0 22px var(--cyan)';
+    msg.style.color = 'var(--cyan)';
+    msg.style.textShadow = '0 0 22px var(--cyan)';
   }
 }
 
 export function showGameOver() {
-  overlay.style.display = 'flex';
+  const overlayEl = overlay || document.getElementById('overlay');
+  if (overlayEl) overlayEl.style.display = 'flex';
   const title = state.gameMode === 'duel' ? 'DUEL ELIMINATED' : 'DEREZZED';
   const subtitle = state.gameOverReason || 'YOUR DISC WAS CLAIMED';
   const stats = state.gameMode === 'duel'
     ? `TIERS CLEARED <b style="color:#fff">${state.duelTier - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`
     : `CYCLES SURVIVED <b style="color:#fff">${state.wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`;
-  overlay.innerHTML = `<div class="card dead">
+  overlayEl.innerHTML = `<div class="card dead">
     <h1>${title}</h1>
     <h2>${subtitle}</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
@@ -51,7 +55,7 @@ export function showGameOver() {
   if (rc) rc.onclick = (e) => {
     e.stopPropagation();
     state.player.obj.visible = true;
-    overlay.style.display = 'none';
+    overlayEl.style.display = 'none';
     resetGame();
     state.paused = false;
     state.justResumed = true;

@@ -114,7 +114,7 @@ export const trajLine = new THREE.Line(
   new THREE.LineDashedMaterial({ color: config.CYAN, dashSize: .45, gapSize: .35, transparent: true, opacity: .55,
                                  blending: THREE.AdditiveBlending, depthWrite: false })
 );
-trajLine.frustumCulled = false; scene.add(trajLine);
+trajLine.frustumCulled = false;
 
 export const bouncePips = [];
 for (let i = 0; i < 4; i++) {
@@ -123,14 +123,14 @@ for (let i = 0; i < 4; i++) {
     new THREE.MeshBasicMaterial({ color: config.CYAN, transparent: true, opacity: .8, side: THREE.DoubleSide,
                                   blending: THREE.AdditiveBlending, depthWrite: false })
   );
-  m.visible = false; scene.add(m); bouncePips.push(m);
+  m.visible = false; bouncePips.push(m);
 }
 export const impactMark = new THREE.Mesh(
   new THREE.RingGeometry(.55, .75, 24),
   new THREE.MeshBasicMaterial({ color: config.WHITE, transparent: true, opacity: .9, side: THREE.DoubleSide,
                                 blending: THREE.AdditiveBlending, depthWrite: false })
 );
-impactMark.visible = false; scene.add(impactMark);
+impactMark.visible = false;
 
 // Incoming enemy discs get a faint predicted path too, so a ricochet coming at
 // your back is readable and parryable instead of a cheap shot.
@@ -141,9 +141,19 @@ for (let i = 0; i < 6; i++) {
     new THREE.LineDashedMaterial({ color: config.ORANGE, dashSize: .3, gapSize: .5, transparent: true, opacity: .3,
                                    blending: THREE.AdditiveBlending, depthWrite: false })
   );
-  l.frustumCulled = false; l.visible = false; scene.add(l); threatLines.push(l);
+  l.frustumCulled = false; l.visible = false; threatLines.push(l);
 }
+
+export function initPhysicsVisuals(targetScene = scene) {
+  if (!targetScene) return;
+  if (!trajLine.parent) targetScene.add(trajLine);
+  bouncePips.forEach(m => { if (!m.parent) targetScene.add(m); });
+  if (!impactMark.parent) targetScene.add(impactMark);
+  threatLines.forEach(l => { if (!l.parent) targetScene.add(l); });
+}
+
 export function updateThreatPaths() {
+  if (!trajLine.parent && scene) initPhysicsVisuals(scene);
   let n = 0;
   for (const D of state.discs) {
     if (D.owner === 'player' || D.returning || n >= threatLines.length) continue;
@@ -165,6 +175,7 @@ export function updateThreatPaths() {
 }
 
 export function updateTrajectory(aim, dt) {
+  if (!trajLine.parent && scene) initPhysicsVisuals(scene);
   const show = state.player.alive && state.player.hasDisc;
   trajLine.visible = show;
   impactMark.visible = false;

@@ -2,7 +2,7 @@ import * as THREE from './vendor/three.module.js';
 import { state, player } from './state.js';
 import { config } from './config.js';
 import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
-import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
+import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight, initPhysicsVisuals } from './physics.js';
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
@@ -14,7 +14,23 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, state.isTouchDevice ? 1
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-document.body.appendChild(renderer.domElement);
+if (typeof document !== 'undefined' && document.body && !renderer.domElement.parentElement) {
+  document.body.appendChild(renderer.domElement);
+}
+
+export function initGraphics() {
+  if (renderer && renderer.domElement && typeof document !== 'undefined' && document.body && !renderer.domElement.parentElement) {
+    document.body.appendChild(renderer.domElement);
+  }
+  if (!state.player.obj && typeof makeProgram === 'function') {
+    state.player.obj = makeProgram(config.CYAN);
+    scene.add(state.player.obj);
+  }
+  if (typeof initPhysicsVisuals === 'function') {
+    initPhysicsVisuals(scene);
+  }
+  return renderer;
+}
 
 export const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x01060a);

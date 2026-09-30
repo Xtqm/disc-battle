@@ -12,14 +12,14 @@ import { clock, update, loop } from './main.js';
 export function updateHUD() {
   const hpb = el('hpbar');
   if (hpb && hpb.firstElementChild) hpb.firstElementChild.style.width = state.player.hp + '%';
-  state.db = el('discbar');
-  if (state.db && state.db.firstElementChild) state.db.firstElementChild.style.width = (state.player.hasDisc ? 100 : 0) + '%';
+  const db = el('discbar');
+  if (db && db.firstElementChild) db.firstElementChild.style.width = (state.player.hasDisc ? 100 : 0) + '%';
   const eb = el('energybar');
   if (eb && eb.firstElementChild) eb.firstElementChild.style.width = state.player.energy + '%';
 
   if (state.gameMode === 'duel') {
     const rl = el('roundLabel');
-    if (rl) rl.innerHTML = `DUEL TIER <span id="wave" class="big">${duelTier}</span>`;
+    if (rl) rl.innerHTML = `DUEL TIER <span id="wave" class="big">${state.duelTier}</span>`;
     const boss = state.foes[0];
     const hpPct = boss ? Math.max(0, Math.round((boss.hp / boss.maxHp) * 100)) : 0;
     const sl = el('subLabel');
@@ -30,7 +30,7 @@ export function updateHUD() {
     if (bb && bb.firstElementChild) bb.firstElementChild.style.width = hpPct + '%';
   } else if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
     const rl = el('roundLabel');
-    if (rl) rl.innerHTML = `ROOM <span id="wave" class="big">${currentRoomId || '----'}</span>`;
+    if (rl) rl.innerHTML = `ROOM <span id="wave" class="big">${state.currentRoomId || '----'}</span>`;
     let oppHp = 0;
     for (const f of state.foes) {
       if (f.alive) oppHp += Math.max(0, Math.ceil(f.hp));
@@ -44,9 +44,9 @@ export function updateHUD() {
     if (bb && bb.firstElementChild) bb.firstElementChild.style.width = (oppHp / maxHp * 100) + '%';
   } else {
     const rl = el('roundLabel');
-    if (rl) rl.innerHTML = `CYCLE <span id="wave" class="big">${wave}</span>`;
+    if (rl) rl.innerHTML = `CYCLE <span id="wave" class="big">${state.wave}</span>`;
     const sl = el('subLabel');
-    if (sl) sl.innerHTML = `HOSTILES <span id="foes">${foes.length}</span>`;
+    if (sl) sl.innerHTML = `HOSTILES <span id="foes">${state.foes.length}</span>`;
     const bbw = el('bossBarWrap');
     if (bbw) bbw.style.display = 'none';
   }
