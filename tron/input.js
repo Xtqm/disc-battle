@@ -45,12 +45,13 @@ export function onDown(e) {
       if (now - state.lastPauseToggle > 180) {
         state.lastPauseToggle = now;
         if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
+          // Multiplayer: only release pointer lock — the pointerlockchange
+          // handler is the single source of truth for showing the overlay.
+          // Never open the offline pause menu in multiplayer.
+          e.preventDefault();
           if (document.pointerLockElement) {
             document.exitPointerLock();
           }
-          const um = document.getElementById('unlockedMenu');
-          if (um) um.style.display = 'flex';
-          setCursor();
         } else {
           if (state.paused) {
             resumeGame();
@@ -201,7 +202,15 @@ export function bindMainMenuEvents() {
 
 // Bind pause menu & HUD buttons
 export let pauseBtn = null;
-export const onPauseClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); pauseGame(); };
+export const onPauseClick = (e) => {
+  e.stopPropagation(); if (e.cancelable) e.preventDefault();
+  if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
+    // In multiplayer: only release pointer lock, don't pause
+    if (document.pointerLockElement) document.exitPointerLock();
+  } else {
+    pauseGame();
+  }
+};
 
 export let resumeBtn = null;
 export const onResumeClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); resumeGame(); };
@@ -277,9 +286,27 @@ export function bindPauseAndModalEvents() {
       e.stopPropagation();
       const um = document.getElementById('unlockedMenu');
       if (um) um.style.display = 'none';
+      state.running = false;
+      state.paused = false;
       teardownMultiplayer();
       showModeSelectMenu();
     };
+  }
+
+  // Clicking the unlocked overlay (anywhere except Leave button) re-locks the pointer.
+  // The pointerlockchange handler will then hide the overlay automatically.
+  const unlockedMenu = document.getElementById('unlockedMenu');
+  if (unlockedMenu) {
+    unlockedMenu.addEventListener('click', (e) => {
+      // Don't re-lock if clicking the Leave button
+      if (e.target === leaveMatchBtn || (e.target && e.target.closest && e.target.closest('#leaveMatchBtn'))) {
+        return;
+      }
+      // Re-request pointer lock on the canvas
+      if (canvas && state.running) {
+        tryLock();
+      }
+    });
   }
 }
 
@@ -589,8 +616,6 @@ export function initInput(canvasOrRenderer) {
     if (!state.isTouchDevice) { 
       focusGame(); 
       if (lockFailed === false && document.pointerLockElement !== canvas && state.running && !state.paused) {
-        const um = document.getElementById('unlockedMenu');
-        if (um) um.style.display = 'none';
         tryLock();
       } 
     } 
@@ -605,8 +630,20 @@ export function initInput(canvasOrRenderer) {
   document.addEventListener('pointerlockerror', () => { if (!state.isTouchDevice) lockFailed = true; });
   document.addEventListener('pointerlockchange', () => {
     if (state.isTouchDevice) return;
-    if (document.pointerLockElement !== canvas && state.running) {
-      if (!state.paused && !lockFailed) {
+    const locked = document.pointerLockElement === canvas;
+    if (locked) {
+      // Pointer lock acquired — always hide the multiplayer unlock overlay
+      const um = document.getElementById('unlockedMenu');
+      if (um) um.style.display = 'none';
+    } else if (state.running && !state.paused && !lockFailed) {
+      // Pointer lock lost while game is active
+      const isMultiplayer = (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi');
+      if (isMultiplayer) {
+        // Multiplayer: show lightweight overlay, keep simulation running
+        const um = document.getElementById('unlockedMenu');
+        if (um) um.style.display = 'flex';
+      } else {
+        // Solo: open the full pause menu
         pauseGame();
       }
     }
