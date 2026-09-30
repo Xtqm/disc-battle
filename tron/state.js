@@ -1,0 +1,75 @@
+export const state = {
+  isTouchDevice: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
+  orientationPaused: false,
+  gameMode: 'swarm',
+  duelTier: 1,
+  foes: [],
+  discs: [],
+  wave: 1,
+  score: 0,
+  running: false,
+  spawnTimer: 0,
+  gameOverT: 0,
+  db: null,
+  auth: null,
+  currentUser: null,
+  currentRoomId: null,
+  playerRole: null,
+  roomUnsubscribe: null,
+  duelOpponent: null,
+  lastProcessedThrowId: null,
+  roomFallenTiles: [],
+  netSyncTimer: 0,
+  mockChannel: null,
+  multiPlayers: {},
+  teammates: [],
+  paused: false,
+  lastPauseToggle: 0,
+  justResumed: false,
+  sens: 0.0023,
+  invertY: false,
+  steerX: 0,
+  steerY: 0,
+  cursorX: innerWidth / 2,
+  cursorY: innerHeight / 2,
+  moveTouchId: null,
+  lookTouchId: null,
+  touchJumpHeld: false,
+  touchDashRequested: false,
+  touchBlocking: false,
+  touchCurveL: false,
+  touchCurveR: false,
+  gameOverReason: '',
+  msgT: 0,
+  shakeAmt: 0,
+  time: 0,
+  keys: {},
+  joystick: { active: false, x: 0, y: 0, baseX: 0, baseY: 0, curX: 0, curY: 0 }
+};
+
+// We will keep player inside state as well, but in game.js it was created with THREE objects.
+// Wait, player needs THREE. So we can't initialize it purely here unless we import THREE.
+import * as THREE from './vendor/three.module.js';
+
+export const player = {
+  obj: null, // Will be initialized in graphics.js or main.js
+  pos: new THREE.Vector3(0, 0, 14), 
+  vel: new THREE.Vector3(),
+  yaw: Math.PI, 
+  pitch: -0.12, 
+  hp: 100, 
+  energy: 100, 
+  hasDisc: true, 
+  blocking: false,
+  discCharge: 1, 
+  dashCd: 0, 
+  hurtFlash: 0, 
+  alive: true,
+  y: 0, 
+  vy: 0, 
+  grounded: true, 
+  jumps: 0, 
+  jumpHeld: false
+};
+
+state.player = player;
