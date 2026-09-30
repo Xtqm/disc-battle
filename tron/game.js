@@ -983,7 +983,10 @@ function showJoinInputModal() {
   const rt = document.getElementById('roomTitle');
   if (rt) rt.textContent = 'JOIN DUEL';
   const rs = document.getElementById('roomSubtitle');
-  if (rs) rs.textContent = 'ENTER 4-CHARACTER ROOM CODE';
+  if (rs) {
+    rs.textContent = 'ENTER 4-DIGIT CODE';
+    rs.style.color = '#a5f0fa';
+  }
   const rcd = document.getElementById('roomCodeDisplay');
   if (rcd) rcd.style.display = 'none';
   const hwb = document.getElementById('hostWaitBlock');
@@ -1058,22 +1061,28 @@ async function onClickConfirmJoin(e) {
     message('ENTER 4-CHAR CODE');
     return;
   }
+
+  const btn = document.getElementById('btnConfirmJoin');
+  const originalText = btn ? btn.textContent : '';
+  if (btn) {
+    btn.textContent = 'CONNECTING...';
+    btn.disabled = true;
+  }
+  if (inp) inp.disabled = true;
+
   try {
     await initNetwork();
     if (!currentUser) {
-      message('MULTIPLAYER OFFLINE');
-      return;
+      throw new Error('OFFLINE - MULTIPLAYER REQUIRES DATA CONNECTION');
     }
     const roomRef = getRoomRef(code);
     const snap = await roomGetDoc(roomRef);
     if (!snap.exists()) {
-      message('ROOM NOT FOUND');
-      return;
+      throw new Error('ROOM CODE NOT FOUND');
     }
     const data = snap.data();
     if (data.status !== 'waiting') {
-      message('ROOM IN SESSION OR FULL');
-      return;
+      throw new Error('ROOM IN SESSION OR FULL');
     }
     currentRoomId = code;
     playerRole = 'p2';
@@ -1100,6 +1109,17 @@ async function onClickConfirmJoin(e) {
   } catch (err) {
     console.error("Join room error:", err);
     message('COULD NOT CONNECT');
+    const rs = document.getElementById('roomSubtitle');
+    if (rs) {
+      rs.textContent = err.message || "CONNECTION FAILED";
+      rs.style.color = '#ff3838';
+    }
+  } finally {
+    if (btn) {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }
+    if (inp) inp.disabled = false;
   }
 }
 
