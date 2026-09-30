@@ -64,23 +64,9 @@ export function onDown(e) {
 }
 export function onUp(e) { const c = codeOf(e); if (c) state.keys[c] = false; }
 // Capture phase on window intercepts all keyboard events across the whole document
-addEventListener('keydown', onDown, { passive: false, capture: true });
-addEventListener('keyup', onUp, { capture: true });
-addEventListener('blur', () => { for (const k in state.keys) state.keys[k] = false; if (!state.touchBlocking) state.player.blocking = false; });  // no stuck keys
 
-export const canvas = renderer.domElement;
+export let canvas;
 canvas.tabIndex = 0;                       // canvas can hold keyboard focus
-canvas.style.outline = 'none';
-canvas.addEventListener('mousedown', () => { 
-  if (!state.isTouchDevice) { 
-    focusGame(); 
-    if (lockFailed === false && document.pointerLockElement !== canvas && state.running && !state.paused) {
-      const um = document.getElementById('unlockedMenu');
-      if (um) um.style.display = 'none';
-      tryLock();
-    } 
-  } 
-});
 export const overlay = document.getElementById('overlay');
 
 export function startMode(mode) {
@@ -298,17 +284,7 @@ export function focusGame() {
   try { window.focus(); } catch (e) {}
   canvas.focus();
 }
-document.addEventListener('pointerlockerror', () => { if (!state.isTouchDevice) lockFailed = true; });
 
-document.addEventListener('pointerlockchange', () => {
-  if (state.isTouchDevice) return;
-  if (document.pointerLockElement !== canvas && state.running) {
-    if (!state.paused && !lockFailed) {
-      pauseGame();
-    }
-  }
-  setCursor();
-});
 
 state.sens = 0.0023, state.invertY = false;
 state.steerX = 0, state.steerY = 0;                 // joystick steering (unlocked mode)
@@ -322,32 +298,8 @@ export function look(dx, dy) {
   if (state.player.yaw < -Math.PI) state.player.yaw += Math.PI * 2;
 }
 
-addEventListener('mousemove', e => {
-  if (state.isTouchDevice) return;
-  state.cursorX = e.clientX; state.cursorY = e.clientY;
-  if (!state.running || state.paused) return;
 
-  if (isLocked()) {
-    state.steerX = state.steerY = 0;
-    look(e.movementX || 0, e.movementY || 0);
-  } else {
-    const nx = (e.clientX / innerWidth)  * 2 - 1;
-    const ny = (e.clientY / innerHeight) * 2 - 1;
-    const dz = 0.08;
-    const curve = v => { const m = Math.abs(v); return m < dz ? 0 : Math.sign(v) * Math.pow((m - dz) / (1 - dz), 1.7); };
-    state.steerX = curve(nx);
-    state.steerY = 0;
-    state.player.pitch = THREE.MathUtils.clamp(-ny * 0.5, -0.6, 0.55);
-  }
-});
 
-canvas.addEventListener('click', () => { if (!state.isTouchDevice && state.running && !isLocked()) tryLock(); });
-
-addEventListener('wheel', e => {
-  if (!state.running) return;
-  state.sens = THREE.MathUtils.clamp(state.sens * (e.deltaY > 0 ? 0.9 : 1.1), 0.0006, 0.012);
-  showSens();
-}, { passive: true });
 export function showSens() {
   const s = document.getElementById('sens');
   if (!s || state.isTouchDevice) return;
@@ -356,16 +308,6 @@ export function showSens() {
   showSens._t = setTimeout(() => s.style.opacity = 0, 1200);
 }
 
-addEventListener('mousedown', e => {
-  if (state.isTouchDevice || !state.running || state.paused) return;
-  if (e.button === 0) throwDisc();
-  if (e.button === 2) state.player.blocking = true;
-});
-addEventListener('mouseup', e => {
-  if (state.isTouchDevice) return;
-  if (e.button === 2 && !state.touchBlocking) state.player.blocking = false;
-});
-addEventListener('contextmenu', e => e.preventDefault());
 
 state.moveTouchId = null;
 export const moveStartPos = { x: 0, y: 0 };
@@ -489,10 +431,6 @@ export function onTouchEnd(e) {
   }
 }
 
-window.addEventListener('touchstart', onTouchStart, { passive: false });
-window.addEventListener('touchmove', onTouchMove, { passive: false });
-window.addEventListener('touchend', onTouchEnd, { passive: false });
-window.addEventListener('touchcancel', onTouchEnd, { passive: false });
 
 export function bindMobileButtons() {
   const btnThrow = document.getElementById('btnThrow');
@@ -581,4 +519,72 @@ export function bindMobileButtons() {
     btnCurveR.addEventListener('click', doCurveR);
   }
 }
-bindMobileButtons();
+
+
+
+export function initInput(renderer) {
+  canvas = renderer.domElement;
+  addEventListener('keydown', onDown, { passive: false, capture: true });
+  addEventListener('keyup', onUp, { capture: true });
+  addEventListener('blur', () => { for (const k in state.keys) state.keys[k] = false; if (!state.touchBlocking) state.player.blocking = false; });  // no stuck keys
+  canvas.style.outline = 'none';
+  canvas.addEventListener('mousedown', () => { 
+    if (!state.isTouchDevice) { 
+      focusGame(); 
+      if (lockFailed === false && document.pointerLockElement !== canvas && state.running && !state.paused) {
+        const um = document.getElementById('unlockedMenu');
+        if (um) um.style.display = 'none';
+        tryLock();
+      } 
+    } 
+  });
+  document.addEventListener('pointerlockerror', () => { if (!state.isTouchDevice) lockFailed = true; });
+  document.addEventListener('pointerlockchange', () => {
+    if (state.isTouchDevice) return;
+    if (document.pointerLockElement !== canvas && state.running) {
+      if (!state.paused && !lockFailed) {
+        pauseGame();
+      }
+    }
+    setCursor();
+  });
+  addEventListener('mousemove', e => {
+    if (state.isTouchDevice) return;
+    state.cursorX = e.clientX; state.cursorY = e.clientY;
+    if (!state.running || state.paused) return;
+  
+    if (isLocked()) {
+      state.steerX = state.steerY = 0;
+      look(e.movementX || 0, e.movementY || 0);
+    } else {
+      const nx = (e.clientX / innerWidth)  * 2 - 1;
+      const ny = (e.clientY / innerHeight) * 2 - 1;
+      const dz = 0.08;
+      const curve = v => { const m = Math.abs(v); return m < dz ? 0 : Math.sign(v) * Math.pow((m - dz) / (1 - dz), 1.7); };
+      state.steerX = curve(nx);
+      state.steerY = 0;
+      state.player.pitch = THREE.MathUtils.clamp(-ny * 0.5, -0.6, 0.55);
+    }
+  });
+  canvas.addEventListener('click', () => { if (!state.isTouchDevice && state.running && !isLocked()) tryLock(); });
+  addEventListener('wheel', e => {
+    if (!state.running) return;
+    state.sens = THREE.MathUtils.clamp(state.sens * (e.deltaY > 0 ? 0.9 : 1.1), 0.0006, 0.012);
+    showSens();
+  }, { passive: true });
+  addEventListener('mousedown', e => {
+    if (state.isTouchDevice || !state.running || state.paused) return;
+    if (e.button === 0) throwDisc();
+    if (e.button === 2) state.player.blocking = true;
+  });
+  addEventListener('mouseup', e => {
+    if (state.isTouchDevice) return;
+    if (e.button === 2 && !state.touchBlocking) state.player.blocking = false;
+  });
+  addEventListener('contextmenu', e => e.preventDefault());
+  window.addEventListener('touchstart', onTouchStart, { passive: false });
+  window.addEventListener('touchmove', onTouchMove, { passive: false });
+  window.addEventListener('touchend', onTouchEnd, { passive: false });
+  window.addEventListener('touchcancel', onTouchEnd, { passive: false });
+  bindMobileButtons();
+}
