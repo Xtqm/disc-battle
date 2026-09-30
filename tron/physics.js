@@ -190,31 +190,25 @@ export function updateTrajectory(aim, dt) {
 
   // colour the arc by outcome: white-hot when the line actually connects
   const willHit = !!sim.hitFoe;
-  const rearKill = willHit && (() => {
+  
+  // Safe rearKill calculation (pure vector math, no allocations)
+  let rearKill = false;
+  if (willHit && sim.hitFoe.foe) {
     const f = sim.hitFoe.foe;
-    // Since visor is at +Z in local space:
-    const fwd = new THREE.Vector3(
-      Math.sin(f.obj.rotation.y),
-      0,
-      Math.cos(f.obj.rotation.y)
-    ).normalize();
-
-    // Approach 1 (Position relative to foe)
-    const dRel = sim.hitFoe.point.clone().sub(f.pos).setY(0);
-    if (dRel.lengthSq() > 1e-6) dRel.normalize();
-    const posRear = dRel.dot(fwd) < 0.05;
-
-    // Approach 2 (Velocity alignment)
-    const seg = sim.pts[sim.pts.length - 1].clone().sub(sim.pts[Math.max(0, sim.pts.length - 4)]).setY(0);
-    if (seg.lengthSq() > 1e-6) seg.normalize();
-    const velRear = seg.dot(fwd) > 0.05;
-
-    const rear = posRear || velRear;
-    return rear && sim.hitFoe.bounces > 0;
-  })();
+    const rotY = f.obj ? f.obj.rotation.y : (f.yaw || 0);
+    const fwdX = Math.sin(rotY);
+    const fwdZ = Math.cos(rotY);
+    const dx = sim.hitFoe.point.x - f.pos.x;
+    const dz = sim.hitFoe.point.z - f.pos.z;
+    const len = Math.hypot(dx, dz);
+    if (len > 0.001) {
+      const dot = (dx / len) * fwdX + (dz / len) * fwdZ;
+      rearKill = (dot < 0.1 && sim.hitFoe.bounces > 0);
+    }
+  }
 
   const isCurving = Math.abs(curve) > 0.05;
-  trajLine.material.color.setHex(rearKill ? 0xffffff : willHit ? ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
+  trajLine.material.color.setHex(rearKill ? config.WHITE : willHit ? config.ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
   trajLine.material.opacity = willHit ? .95 : isCurving ? .75 : .45;
   trajLine.material.dashSize = isCurving ? 0.28 : 0.45;
   trajLine.material.gapSize = isCurving ? 0.20 : 0.35;
@@ -233,7 +227,7 @@ export function updateTrajectory(aim, dt) {
     const pip = bouncePips[i];
     pip.visible = true; pip.position.copy(b);
     pip.lookAt(camera.position);
-    pip.material.color.setHex(willHit ? ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
+    pip.material.color.setHex(willHit ? config.ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
     pip.scale.setScalar(1 + Math.sin(state.time * 7 + i) * .12);
   });
 
@@ -241,7 +235,7 @@ export function updateTrajectory(aim, dt) {
   impactMark.visible = true;
   impactMark.position.copy(end);
   impactMark.lookAt(camera.position);
-  impactMark.material.color.setHex(rearKill ? 0xffffff : willHit ? ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
+  impactMark.material.color.setHex(rearKill ? config.WHITE : willHit ? config.ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
   impactMark.scale.setScalar((willHit ? 1.3 : .9) + Math.sin(state.time * 9) * .1);
 
   return { willHit, rearKill, bounces: sim.bounceAt.length };

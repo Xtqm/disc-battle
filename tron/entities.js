@@ -316,13 +316,45 @@ export function killFoe(f) {
   burst(f.pos.clone().setY(1.5 + (f.y || 0)), config.ORANGE, 70, 14);
   scene.remove(f.obj);
   state.foes = state.foes.filter(x => x !== f);
+  state.score += 150;
+
+  // 1. Single-Player Solo Duel (AI)
   if (state.gameMode === 'duel') {
-    state.score += 500 + state.duelTier * 250;
-    message('MATCH WON — TIER ' + state.duelTier + ' CLEARED');
-    state.duelTier++;
-    state.spawnTimer = 2.5;
-  } else {
+    message('RIVAL TERMINATED — VICTORY');
+    setTimeout(() => {
+      showGameOver('VICTORY', 'ELITE RIVAL DEFEATED');
+    }, 800);
+    return;
+  }
+
+  // 2. Multiplayer Duels & Duos
+  if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
+    message('VICTORY — OPPONENT DEREZZED');
+    if (state.db && state.currentRoomId && state.playerRole === 'p1') {
+      const roomRef = getRoomRef(state.currentRoomId);
+      const myTeam = (state.playerRole === 'p1' || state.playerRole === 'p3') ? 1 : 2;
+      const payload = { status: 'finished', winnerTeam: myTeam };
+      if (state.gameMode === 'duel_multi') {
+        payload.winner = state.playerRole;
+      }
+      roomUpdateDoc(roomRef, payload).catch(() => {});
+    }
+    setTimeout(() => {
+      showMultiplayerVictory();
+    }, 900);
+    return;
+  }
+
+  // 3. Solo Swarm Mode ONLY
+  if (state.gameMode === 'swarm') {
     state.score += 100 + state.wave * 10;
+    if (state.foes.length === 0) {
+      state.wave++;
+      message('CYCLE ' + state.wave);
+      state.spawnTimer = 2.2;
+    }
+  } else {
+    // Fallback for any other custom modes
     if (state.foes.length === 0) {
       state.wave++;
       message('CYCLE ' + state.wave);

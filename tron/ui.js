@@ -32,11 +32,11 @@ export function message(t) {
   }
 }
 
-export function showGameOver() {
+export function showGameOver(customTitle, customSubtitle) {
   const overlayEl = overlay || document.getElementById('overlay');
   if (overlayEl) overlayEl.style.display = 'flex';
-  const title = state.gameMode === 'duel' ? 'DUEL ELIMINATED' : 'DEREZZED';
-  const subtitle = state.gameOverReason || 'YOUR DISC WAS CLAIMED';
+  const title = customTitle || (state.gameMode === 'duel' ? 'DUEL ELIMINATED' : 'DEREZZED');
+  const subtitle = customSubtitle || state.gameOverReason || 'YOUR DISC WAS CLAIMED';
   const stats = state.gameMode === 'duel'
     ? `TIERS CLEARED <b style="color:#fff">${state.duelTier - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`
     : `CYCLES SURVIVED <b style="color:#fff">${state.wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`;
