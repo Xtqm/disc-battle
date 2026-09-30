@@ -1,4 +1,7 @@
 import * as THREE from './vendor/three.module.js';
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
+import { getAuth, signInWithCustomToken, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state, player } from './state.js';
 import { config } from './config.js';
 import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
@@ -7,7 +10,6 @@ import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThre
 import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
 import { el, msgEl, message, showGameOver, shake } from './ui.js';
-import { clock, update, loop } from './main.js';
 
 config.appId = typeof __app_id !== 'undefined' ? __app_id : 'tron-disc-arena';
 state.db = null, state.auth = null, state.currentUser = null;
@@ -747,7 +749,7 @@ export function syncNetworkState(dt) {
   };
 
   const payload = {};
-  payload[`state.${playerRole}`] = myState;
+  payload[`state.${state.playerRole}`] = myState;
   
   // Backwards compatibility sync just in case
   payload[state.playerRole] = myState;
@@ -794,7 +796,7 @@ export function bindGameOverActions() {
       voteBtn.disabled = true;
       const roomRef = getRoomRef(state.currentRoomId);
       const patch = {};
-      patch[`rematchVotes.${playerRole}`] = true;
+      patch[`rematchVotes.${state.playerRole}`] = true;
       roomUpdateDoc(roomRef, patch);
     };
   }

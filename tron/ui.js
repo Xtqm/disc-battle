@@ -4,10 +4,8 @@ import { config } from './config.js';
 import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
 import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
-import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { clock, update, loop } from './main.js';
 
 export const el = id => document.getElementById(id);
 export const msgEl = el('msg');
@@ -36,8 +34,8 @@ export function showGameOver() {
   const title = state.gameMode === 'duel' ? 'DUEL ELIMINATED' : 'DEREZZED';
   const subtitle = state.gameOverReason || 'YOUR DISC WAS CLAIMED';
   const stats = state.gameMode === 'duel'
-    ? `TIERS CLEARED <b style="color:#fff">${duelTier - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b>`
-    : `CYCLES SURVIVED <b style="color:#fff">${wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${score}</b>`;
+    ? `TIERS CLEARED <b style="color:#fff">${state.duelTier - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`
+    : `CYCLES SURVIVED <b style="color:#fff">${state.wave - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`;
   overlay.innerHTML = `<div class="card dead">
     <h1>${title}</h1>
     <h2>${subtitle}</h2>
@@ -45,7 +43,7 @@ export function showGameOver() {
       ${stats}
     </div>
     <div class="menu-actions" style="max-width:320px;margin:0 auto">
-      <button id="recompileBtn" class="btn">RE-COMPILE (${gameMode.toUpperCase()})</button>
+      <button id="recompileBtn" class="btn">RE-COMPILE (${state.gameMode.toUpperCase()})</button>
       <button id="returnMenuBtn" class="btn" style="border-color:var(--orange);color:#ffb37a">MODE SELECT</button>
     </div>
   </div>`;

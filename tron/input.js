@@ -7,9 +7,9 @@ import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThre
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
 import { el, msgEl, message, showGameOver, shake } from './ui.js';
-import { clock, update, loop } from './main.js';
 
-state.paused = false, lockFailed = false;
+state.paused = false;
+export let lockFailed = false;
 state.lastPauseToggle = 0;
 state.justResumed = false;
 state.keys = {};
@@ -188,11 +188,15 @@ export function showModeSelectMenu() {
 }
 
 export function bindMainMenuEvents() {
-  state.db = document.getElementById('duelBtn');
-  const sb = document.getElementById('swarmBtn');
-  const cr = document.getElementById('createRoomBtn');
-  const cr2 = document.getElementById('createDuosBtn');
-  const jr = document.getElementById('joinRoomBtn');
+  const bind = (id, fn) => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.addEventListener('click', fn);
+      el.addEventListener('touchstart', fn, { passive: false });
+    } else {
+      console.warn(`UI Binding Warning: Button #${id} not found.`);
+    }
+  };
 
   const startDuel = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('duel'); };
   const startSwarm = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('swarm'); };
@@ -200,11 +204,11 @@ export function bindMainMenuEvents() {
   const createDuosRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); onClickCreateRoom(e, '2v2'); };
   const joinRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showJoinInputModal(); };
 
-  if (state.db) { state.db.onclick = startDuel; state.db.ontouchstart = startDuel; }
-  if (sb) { sb.onclick = startSwarm; sb.ontouchstart = startSwarm; }
-  if (cr) { cr.onclick = createRoom; cr.ontouchstart = createRoom; }
-  if (cr2) { cr2.onclick = createDuosRoom; cr2.ontouchstart = createDuosRoom; }
-  if (jr) { jr.onclick = joinRoom; jr.ontouchstart = joinRoom; }
+  bind('duelBtn', startDuel);
+  bind('swarmBtn', startSwarm);
+  bind('createRoomBtn', createRoom);
+  bind('createDuosBtn', createDuosRoom);
+  bind('joinRoomBtn', joinRoom);
 }
 
 // Bind pause menu & HUD buttons
@@ -223,7 +227,6 @@ if (restartBtn) { restartBtn.onclick = onRestartClick; restartBtn.ontouchstart =
 export const modeSelectBtn = document.getElementById('modeSelectBtn');
 export const onModeSelectClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showModeSelect(); };
 if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; modeSelectBtn.ontouchstart = onModeSelectClick; }
-bindMainMenuEvents();
 
 // Bind room modal buttons
 export const btnCopyCode = document.getElementById('btnCopyCode');

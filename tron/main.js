@@ -896,7 +896,14 @@ export function loop() {
   }
   renderer.render(scene, camera);
 }
-loop();
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    bindMainMenuEvents();
+    loop();
+  } catch (err) {
+    console.error("Initialization Error:", err);
+  }
+});
 
 
 // debug hooks (headless test harness)
