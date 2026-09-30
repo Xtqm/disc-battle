@@ -1,9 +1,13 @@
 import * as THREE from './vendor/three.module.js';
 window.THREE = THREE;
 
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
 // ───────────────────────────── constants ─────────────────────────────
 const ARENA = 46;              // half-extent of the square grid
-const CYAN = 0x4ff2ff, ORANGE = 0xff6a10, WHITE = 0xffffff;
+const CYAN = 0x4ff2ff, ORANGE = 0xff6a10, WHITE = 0xffffff, PURPLE = 0xb026ff;
 const PLAYER_R = 0.9, FOE_R = 0.95, DISC_R = 0.55;
 const CURVE_ACCEL = 38.0;              // lateral Magnus acceleration m/s^2 (hooks around pillars)
 const CURVE_LAMBDA = 0.45;             // exponential decay rate per second
@@ -558,7 +562,8 @@ function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, cu
     }
 
     // does it intercept a program?
-    for (const f of foes) {
+    const simFoes = (gameMode === 'duel_multi' && duelOpponent) ? [duelOpponent] : foes;
+    for (const f of simFoes) {
       if (p.distanceTo(tmp.copy(f.pos).setY(1.5 + (f.y || 0))) < FOE_R + DISC_R + .35) {
         hitFoe = { foe: f, point: p.clone(), bounces };
         pts.push(p.clone());
@@ -707,9 +712,658 @@ const player = {
 };
 scene.add(player.obj);
 
-let gameMode = 'swarm'; // 'duel' or 'swarm'
+let gameMode = 'swarm'; // 'duel', 'swarm', or 'duel_multi'
 let duelTier = 1;
 let foes = [], discs = [], wave = 1, score = 0, running = false, spawnTimer = 0, gameOverT = 0;
+
+// ───────────────────────────── multiplayer networking ────────────────
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'tron-disc-arena';
+let db = null, auth = null, currentUser = null;
+
+let currentRoomId = null;
+let playerRole = null; // 'p1' (host) or 'p2' (guest)
+let roomUnsubscribe = null;
+let duelOpponent = null;
+let lastProcessedThrowId = null;
+let roomFallenTiles = [];
+let netSyncTimer = 0;
+
+// Mock peer network for multi-tab testing / offline fallback
+let mockChannel = null;
+const mockStore = new Map();
+const mockListeners = new Map();
+
+function initMockNetwork() {
+  if (currentUser) return;
+  const dummyUid = 'user_' + Math.random().toString(36).substring(2, 9);
+  currentUser = { uid: dummyUid, isAnonymous: true };
+  auth = { currentUser };
+  db = { isMock: true };
+
+  if (!mockChannel && typeof BroadcastChannel !== 'undefined') {
+    mockChannel = new BroadcastChannel('tron_disc_arena_mock_net_' + appId);
+    mockChannel.onmessage = (e) => {
+      const msg = e.data;
+      if (!msg) return;
+      if (msg.type === 'doc_set' || msg.type === 'doc_update') {
+        mockStore.set(msg.path, msg.data);
+        const set = mockListeners.get(msg.path);
+        if (set) {
+          const snap = {
+            exists: () => true,
+            data: () => JSON.parse(JSON.stringify(msg.data))
+          };
+          for (const cb of set) {
+            try { cb(snap); } catch (err) { console.error(err); }
+          }
+        }
+      } else if (msg.type === 'doc_query') {
+        let stored = mockStore.get(msg.path);
+        if (!stored && typeof localStorage !== 'undefined') {
+          try {
+            const item = localStorage.getItem('tron_doc_' + msg.path);
+            if (item) stored = JSON.parse(item);
+          } catch (_) {}
+        }
+        if (stored) {
+          mockStore.set(msg.path, stored);
+          mockChannel.postMessage({ type: 'doc_set', path: msg.path, data: stored });
+        }
+      }
+    };
+  }
+}
+
+function mockDocRef(path, id) {
+  return { isMock: true, path, id };
+}
+
+function mockSetDoc(ref, data) {
+  if (!currentUser) return Promise.resolve();
+  const serialized = JSON.parse(JSON.stringify(data));
+  mockStore.set(ref.path, serialized);
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.setItem('tron_doc_' + ref.path, JSON.stringify(serialized)); } catch (_) {}
+  }
+  if (mockChannel) {
+    mockChannel.postMessage({ type: 'doc_set', path: ref.path, data: serialized });
+  }
+  const set = mockListeners.get(ref.path);
+  if (set) {
+    const snap = { exists: () => true, data: () => JSON.parse(JSON.stringify(serialized)) };
+    for (const cb of set) {
+      try { cb(snap); } catch (err) { console.error(err); }
+    }
+  }
+  return Promise.resolve();
+}
+
+function mockGetDoc(ref) {
+  let data = mockStore.get(ref.path);
+  if (!data && typeof localStorage !== 'undefined') {
+    try {
+      const item = localStorage.getItem('tron_doc_' + ref.path);
+      if (item) {
+        data = JSON.parse(item);
+        mockStore.set(ref.path, data);
+      }
+    } catch (_) {}
+  }
+  return Promise.resolve({
+    exists: () => !!data,
+    data: () => data ? JSON.parse(JSON.stringify(data)) : null
+  });
+}
+
+function mockUpdateDoc(ref, patch) {
+  if (!currentUser) return Promise.resolve();
+  let existing = mockStore.get(ref.path);
+  if (!existing && typeof localStorage !== 'undefined') {
+    try {
+      const item = localStorage.getItem('tron_doc_' + ref.path);
+      if (item) existing = JSON.parse(item);
+    } catch (_) {}
+  }
+  const merged = Object.assign({}, existing || {}, JSON.parse(JSON.stringify(patch)));
+  if (patch.p1 && existing && existing.p1) merged.p1 = Object.assign({}, existing.p1, patch.p1);
+  if (patch.p2 && existing && existing.p2) merged.p2 = Object.assign({}, existing.p2, patch.p2);
+
+  mockStore.set(ref.path, merged);
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.setItem('tron_doc_' + ref.path, JSON.stringify(merged)); } catch (_) {}
+  }
+  if (mockChannel) {
+    mockChannel.postMessage({ type: 'doc_update', path: ref.path, data: merged });
+  }
+  const set = mockListeners.get(ref.path);
+  if (set) {
+    const snap = { exists: () => true, data: () => JSON.parse(JSON.stringify(merged)) };
+    for (const cb of set) {
+      try { cb(snap); } catch (err) { console.error(err); }
+    }
+  }
+  return Promise.resolve();
+}
+
+function mockOnSnapshot(ref, onUpdate, onError) {
+  if (!mockListeners.has(ref.path)) {
+    mockListeners.set(ref.path, new Set());
+  }
+  const set = mockListeners.get(ref.path);
+  set.add(onUpdate);
+
+  mockGetDoc(ref).then(snap => {
+    if (snap.exists() && set.has(onUpdate)) {
+      try { onUpdate(snap); } catch (err) { if (onError) onError(err); }
+    } else if (mockChannel) {
+      mockChannel.postMessage({ type: 'doc_query', path: ref.path });
+    }
+  });
+
+  return () => {
+    set.delete(onUpdate);
+  };
+}
+
+async function initNetwork() {
+  if (db) return;
+  if (typeof __firebase_config === 'undefined' || !__firebase_config) {
+    if (window.__useMockNetwork !== false && (typeof BroadcastChannel !== 'undefined' || typeof localStorage !== 'undefined')) {
+      initMockNetwork();
+      return;
+    }
+    console.warn("No Firebase configuration found; multiplayer offline.");
+    return;
+  }
+  try {
+    const firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
+    const app = initializeApp(firebaseConfig);
+    auth = getAuth(app);
+    db = getFirestore(app);
+
+    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+      await signInWithCustomToken(auth, __initial_auth_token);
+    } else {
+      await signInAnonymously(auth);
+    }
+    currentUser = auth.currentUser;
+  } catch (err) {
+    console.warn("Firebase initialization error:", err);
+    if (window.__useMockNetwork !== false && typeof BroadcastChannel !== 'undefined') {
+      initMockNetwork();
+    }
+  }
+}
+
+function getRoomRef(roomCode) {
+  if (db && db.isMock) {
+    return mockDocRef(`artifacts/${appId}/public/data/rooms/${roomCode}`, roomCode);
+  }
+  return doc(db, 'artifacts', appId, 'public', 'data', 'rooms', roomCode);
+}
+
+function roomSetDoc(roomRef, data) {
+  if (!currentUser) return Promise.resolve();
+  if (roomRef && roomRef.isMock) {
+    return mockSetDoc(roomRef, data);
+  }
+  return setDoc(roomRef, data);
+}
+
+function roomGetDoc(roomRef) {
+  if (roomRef && roomRef.isMock) {
+    return mockGetDoc(roomRef);
+  }
+  return getDoc(roomRef);
+}
+
+function roomUpdateDoc(roomRef, data) {
+  if (!currentUser) return Promise.resolve();
+  if (roomRef && roomRef.isMock) {
+    return mockUpdateDoc(roomRef, data);
+  }
+  return updateDoc(roomRef, data);
+}
+
+function roomOnSnapshot(roomRef, onUpdate, onError) {
+  if (roomRef && roomRef.isMock) {
+    return mockOnSnapshot(roomRef, onUpdate, onError);
+  }
+  return onSnapshot(roomRef, onUpdate, onError);
+}
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function copyRoomCode(code) {
+  try {
+    const el = document.createElement('textarea');
+    el.value = code;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    message('ROOM CODE COPIED');
+  } catch (err) {
+    message('CODE: ' + code);
+  }
+}
+
+function showHostWaitingModal(code) {
+  const overlay = document.getElementById('overlay');
+  if (overlay) overlay.style.display = 'none';
+  const rm = document.getElementById('roomModal');
+  if (rm) rm.style.display = 'flex';
+  const rt = document.getElementById('roomTitle');
+  if (rt) rt.textContent = 'DUEL ROOM';
+  const rs = document.getElementById('roomSubtitle');
+  if (rs) rs.textContent = 'SHARE THIS CODE WITH YOUR FRIEND';
+  const rcd = document.getElementById('roomCodeDisplay');
+  if (rcd) {
+    rcd.style.display = 'block';
+    rcd.textContent = code;
+  }
+  const hwb = document.getElementById('hostWaitBlock');
+  if (hwb) hwb.style.display = 'block';
+  const jib = document.getElementById('joinInputBlock');
+  if (jib) jib.style.display = 'none';
+}
+
+function showJoinInputModal() {
+  const overlay = document.getElementById('overlay');
+  if (overlay) overlay.style.display = 'none';
+  const rm = document.getElementById('roomModal');
+  if (rm) rm.style.display = 'flex';
+  const rt = document.getElementById('roomTitle');
+  if (rt) rt.textContent = 'JOIN DUEL';
+  const rs = document.getElementById('roomSubtitle');
+  if (rs) rs.textContent = 'ENTER 4-CHARACTER ROOM CODE';
+  const rcd = document.getElementById('roomCodeDisplay');
+  if (rcd) rcd.style.display = 'none';
+  const hwb = document.getElementById('hostWaitBlock');
+  if (hwb) hwb.style.display = 'none';
+  const jib = document.getElementById('joinInputBlock');
+  if (jib) jib.style.display = 'block';
+  const inp = document.getElementById('joinRoomInput');
+  if (inp) {
+    inp.value = '';
+    setTimeout(() => inp.focus(), 50);
+  }
+}
+
+async function onClickCreateRoom(e) {
+  if (e) {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+  }
+  try {
+    await initNetwork();
+    if (!currentUser) {
+      message('MULTIPLAYER OFFLINE');
+      return;
+    }
+    const code = generateRoomCode();
+    currentRoomId = code;
+    playerRole = 'p1';
+    roomFallenTiles = [];
+
+    const roomRef = getRoomRef(code);
+    await roomSetDoc(roomRef, {
+      code,
+      createdAt: Date.now(),
+      status: 'waiting',
+      hostId: currentUser.uid,
+      guestId: null,
+      p1: {
+        x: 0, y: 0, z: 18, yaw: 3.14, pitch: -0.1,
+        hp: 100, blocking: false, hasDisc: true
+      },
+      p2: {
+        x: 0, y: 0, z: -18, yaw: 0, pitch: -0.1,
+        hp: 100, blocking: false, hasDisc: true
+      },
+      lastThrow: null,
+      fallen: []
+    });
+
+    showHostWaitingModal(code);
+
+    if (roomUnsubscribe) { roomUnsubscribe(); roomUnsubscribe = null; }
+    roomUnsubscribe = roomOnSnapshot(roomRef, (snap) => {
+      onRoomSnapshot(snap);
+    }, (err) => {
+      console.warn("Room snapshot error:", err);
+      message("CONNECTION ERROR");
+    });
+  } catch (err) {
+    console.error("Create room error:", err);
+    message('FAILED TO CREATE ROOM');
+  }
+}
+
+async function onClickConfirmJoin(e) {
+  if (e) {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+  }
+  const inp = document.getElementById('joinRoomInput');
+  const code = (inp ? inp.value.trim().toUpperCase() : '');
+  if (code.length !== 4) {
+    message('ENTER 4-CHAR CODE');
+    return;
+  }
+  try {
+    await initNetwork();
+    if (!currentUser) {
+      message('MULTIPLAYER OFFLINE');
+      return;
+    }
+    const roomRef = getRoomRef(code);
+    const snap = await roomGetDoc(roomRef);
+    if (!snap.exists()) {
+      message('ROOM NOT FOUND');
+      return;
+    }
+    const data = snap.data();
+    if (data.status !== 'waiting') {
+      message('ROOM IN SESSION OR FULL');
+      return;
+    }
+    currentRoomId = code;
+    playerRole = 'p2';
+    roomFallenTiles = data.fallen || [];
+
+    await roomUpdateDoc(roomRef, {
+      guestId: currentUser.uid,
+      status: 'active'
+    });
+
+    const rm = document.getElementById('roomModal');
+    if (rm) rm.style.display = 'none';
+
+    if (roomUnsubscribe) { roomUnsubscribe(); roomUnsubscribe = null; }
+    roomUnsubscribe = roomOnSnapshot(roomRef, (snap) => {
+      onRoomSnapshot(snap);
+    }, (err) => {
+      console.warn("Room snapshot error:", err);
+      message("CONNECTION ERROR");
+    });
+
+    startMultiplayerDuel('p2', code);
+    message('CONNECTED TO ARENA — FIGHT!');
+  } catch (err) {
+    console.error("Join room error:", err);
+    message('COULD NOT CONNECT');
+  }
+}
+
+function startMultiplayerDuel(role, roomCode) {
+  gameMode = 'duel_multi';
+  playerRole = role;
+  currentRoomId = roomCode;
+  lastProcessedThrowId = null;
+  netSyncTimer = 0;
+
+  for (const f of foes) scene.remove(f.obj);
+  for (const d of discs) scene.remove(d.obj);
+  foes = []; discs = [];
+
+  // Reset arena tiles
+  for (const tile of tiles.values()) {
+    tile.state = TILE_INTACT;
+    tile.timer = 0;
+    tile.regenTimer = 0;
+    tile.mesh.position.y = tile.origY;
+    tile.mesh.visible = true;
+    if (tile.slabMesh.material !== tileMatIntact) {
+      tile.slabMesh.material.dispose();
+      tile.edgeMesh.material.dispose();
+      tile.slabMesh.material = tileMatIntact;
+      tile.edgeMesh.material = tileEdgeMatIntact;
+    }
+  }
+
+  // Setup player role kinematic state
+  if (role === 'p1') {
+    player.pos.set(0, 0, 18);
+    player.yaw = Math.PI;
+  } else {
+    player.pos.set(0, 0, -18);
+    player.yaw = 0;
+  }
+  player.pitch = -0.1;
+  player.vel.set(0, 0, 0);
+  player.y = 0;
+  player.vy = 0;
+  player.grounded = true;
+  player.jumps = 0;
+  player.hp = 100;
+  player.energy = 100;
+  player.hasDisc = true;
+  player.alive = true;
+  player.blocking = false;
+  player.obj.visible = true;
+  player.obj.position.copy(player.pos);
+  player.obj.rotation.y = player.yaw;
+  player.obj.userData.backDisc.visible = true;
+
+  // Remote opponent model
+  if (duelOpponent && duelOpponent.obj) {
+    scene.remove(duelOpponent.obj);
+  }
+  const oppObj = makeProgram(PURPLE);
+  scene.add(oppObj);
+  const oppStartPos = role === 'p1' ? new THREE.Vector3(0, 0, -18) : new THREE.Vector3(0, 0, 18);
+  const oppStartYaw = role === 'p1' ? 0 : Math.PI;
+  oppObj.position.copy(oppStartPos);
+  oppObj.rotation.y = oppStartYaw;
+  duelOpponent = {
+    obj: oppObj,
+    pos: oppStartPos.clone(),
+    targetPos: oppStartPos.clone(),
+    y: 0,
+    targetY: 0,
+    yaw: oppStartYaw,
+    targetYaw: oppStartYaw,
+    hp: 100,
+    blocking: false,
+    hasDisc: true,
+    alive: true
+  };
+
+  running = true;
+  paused = false;
+  justResumed = true;
+  gameOverT = 0;
+  gameOverReason = '';
+
+  const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
+  const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const camOff = new THREE.Vector3()
+    .addScaledVector(fwd, -4.2)
+    .addScaledVector(side, 1.35)
+    .setY(2.2 - player.pitch * 5.0);
+  camera.position.copy(player.pos).add(camOff);
+  const look = player.pos.clone().add(new THREE.Vector3(0, 2.0, 0)).addScaledVector(side, 1.7).addScaledVector(fwd, 14);
+  camera.lookAt(look);
+
+  updateHUD();
+  tryLock();
+  focusGame();
+}
+
+function onRoomSnapshot(snap) {
+  if (!snap.exists()) return;
+  const data = snap.data();
+  if (!data) return;
+
+  if (playerRole === 'p1' && data.status === 'active' && gameMode !== 'duel_multi') {
+    const rm = document.getElementById('roomModal');
+    if (rm) rm.style.display = 'none';
+    startMultiplayerDuel('p1', currentRoomId);
+    message('CHALLENGER DETECTED — FIGHT!');
+  }
+
+  if (gameMode !== 'duel_multi') return;
+
+  const oppRole = playerRole === 'p1' ? 'p2' : 'p1';
+  const oppData = data[oppRole];
+  if (oppData && duelOpponent) {
+    duelOpponent.targetPos.set(oppData.x, 0, oppData.z);
+    duelOpponent.targetY = oppData.y || 0;
+    duelOpponent.targetYaw = oppData.yaw;
+    if (oppData.hp !== undefined) duelOpponent.hp = oppData.hp;
+    duelOpponent.blocking = !!oppData.blocking;
+    if (oppData.hasDisc !== undefined) duelOpponent.hasDisc = oppData.hasDisc;
+
+    if (oppData.hp <= 0 && duelOpponent.alive) {
+      duelOpponent.alive = false;
+      burst(duelOpponent.pos.clone().setY(duelOpponent.y + 1.4), PURPLE, 80, 15);
+      duelOpponent.obj.visible = false;
+    }
+  }
+
+  if (data.lastThrow && data.lastThrow.id !== lastProcessedThrowId && data.lastThrow.sender === oppRole) {
+    lastProcessedThrowId = data.lastThrow.id;
+    const t = data.lastThrow;
+    const origin = new THREE.Vector3(t.x, t.y, t.z);
+    const vel = new THREE.Vector3(t.vx, t.vy, t.vz);
+    const oppDisc = spawnDisc(origin, vel, duelOpponent, PURPLE, t.curve || 0);
+    oppDisc.remoteThrowId = t.id;
+    if (duelOpponent) {
+      duelOpponent.hasDisc = false;
+      if (duelOpponent.obj && duelOpponent.obj.userData && duelOpponent.obj.userData.backDisc) {
+        duelOpponent.obj.userData.backDisc.visible = false;
+      }
+    }
+    shake(0.08);
+  }
+
+  if (playerRole === 'p2' && Array.isArray(data.fallen)) {
+    for (const [ix, iz] of data.fallen) {
+      const tileKey = `${ix}_${iz}`;
+      const t = tiles.get(tileKey);
+      if (t && t.state === TILE_INTACT) {
+        triggerTileWarning(t, PURPLE);
+      }
+    }
+  }
+
+  if (data.status === 'finished') {
+    if (data.winner === playerRole) {
+      showMultiplayerVictory();
+    }
+  }
+}
+
+function syncNetworkState(dt) {
+  if (!db || !currentRoomId || gameMode !== 'duel_multi') return;
+  if (!currentUser) return;
+  netSyncTimer -= dt;
+  if (netSyncTimer > 0) return;
+  netSyncTimer = 0.055; // ~18 Hz
+
+  const roomRef = getRoomRef(currentRoomId);
+  const myState = {
+    x: +player.pos.x.toFixed(2),
+    y: +player.y.toFixed(2),
+    z: +player.pos.z.toFixed(2),
+    yaw: +player.yaw.toFixed(2),
+    pitch: +player.pitch.toFixed(2),
+    hp: player.hp,
+    blocking: player.blocking,
+    hasDisc: player.hasDisc
+  };
+
+  const payload = {};
+  payload[playerRole] = myState; // 'p1' or 'p2'
+  roomUpdateDoc(roomRef, payload).catch(err => console.warn("Sync err:", err));
+}
+
+function onTileDestabilizedByHost(ix, iz) {
+  if (gameMode !== 'duel_multi' || playerRole !== 'p1') return;
+  if (!currentRoomId || !db || !currentUser) return;
+  if (!roomFallenTiles.some(([x, z]) => x === ix && z === iz)) {
+    roomFallenTiles.push([ix, iz]);
+    const roomRef = getRoomRef(currentRoomId);
+    roomUpdateDoc(roomRef, {
+      fallen: roomFallenTiles
+    }).catch(err => console.warn("Fallen tiles sync err:", err));
+  }
+}
+
+function showMultiplayerVictory() {
+  running = false;
+  overlay.style.display = 'flex';
+  overlay.innerHTML = `<div class="card" style="border-color:#b026ff;box-shadow:0 0 60px rgba(176,38,255,.3);">
+    <h1 style="color:#d896ff;text-shadow:0 0 30px #b026ff">VICTORY</h1>
+    <h2>CHALLENGER WAS DEREZZED — GRID SECURED</h2>
+    <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
+      ROOM <b style="color:#fff">${currentRoomId || '----'}</b> &nbsp;·&nbsp; ROLE <b style="color:#fff">${playerRole ? playerRole.toUpperCase() : ''}</b>
+    </div>
+    <div class="menu-actions" style="max-width:320px;margin:0 auto">
+      <button id="multiMenuBtn" class="btn purple">RETURN TO MENU</button>
+    </div>
+  </div>`;
+  const btn = el('multiMenuBtn');
+  if (btn) btn.onclick = (e) => {
+    e.stopPropagation();
+    teardownMultiplayer();
+    showModeSelectMenu();
+  };
+}
+
+function showMultiplayerDefeat() {
+  running = false;
+  overlay.style.display = 'flex';
+  const subtitle = gameOverReason || 'YOU WERE ELIMINATED IN THE ARENA';
+  overlay.innerHTML = `<div class="card dead">
+    <h1>DEREZZED</h1>
+    <h2>${subtitle}</h2>
+    <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
+      ROOM <b style="color:#fff">${currentRoomId || '----'}</b> &nbsp;·&nbsp; ROLE <b style="color:#fff">${playerRole ? playerRole.toUpperCase() : ''}</b>
+    </div>
+    <div class="menu-actions" style="max-width:320px;margin:0 auto">
+      <button id="multiMenuBtn" class="btn" style="border-color:var(--orange);color:#ffb37a">RETURN TO MENU</button>
+    </div>
+  </div>`;
+  const btn = el('multiMenuBtn');
+  if (btn) btn.onclick = (e) => {
+    e.stopPropagation();
+    teardownMultiplayer();
+    showModeSelectMenu();
+  };
+}
+
+function teardownMultiplayer() {
+  if (roomUnsubscribe) {
+    roomUnsubscribe();
+    roomUnsubscribe = null;
+  }
+  if (duelOpponent && duelOpponent.obj) {
+    scene.remove(duelOpponent.obj);
+    duelOpponent = null;
+  }
+  for (const d of discs) scene.remove(d.obj);
+  discs = [];
+  currentRoomId = null;
+  playerRole = null;
+  lastProcessedThrowId = null;
+  roomFallenTiles = [];
+  gameMode = 'swarm';
+  running = false;
+  paused = false;
+  if (document.pointerLockElement) {
+    document.exitPointerLock();
+  }
+  setCursor();
+}
 
 // ───────────────────────────── input & pause ─────────────────────────
 let paused = false, lockFailed = false;
@@ -736,6 +1390,7 @@ function codeOf(e) {
   return '';
 }
 function onDown(e) {
+  if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) return;
   const c = codeOf(e);
   if (!c) return;
   keys[c] = true;
@@ -821,6 +1476,7 @@ function showModeSelect() {
   if (pm) pm.style.display = 'none';
   paused = false;
   running = false;
+  teardownMultiplayer();
   if (document.pointerLockElement) {
     document.exitPointerLock();
   }
@@ -856,6 +1512,8 @@ function getMainMenuHtml() {
   <div class="mode-select">
     <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
+    <button id="createRoomBtn" class="mode-btn multi-btn">CREATE DUEL ROOM (VS FRIEND)</button>
+    <button id="joinRoomBtn" class="mode-btn multi-btn">JOIN DUEL ROOM</button>
   </div>
 </div>`;
 }
@@ -870,16 +1528,18 @@ function showModeSelectMenu() {
 function bindMainMenuEvents() {
   const db = document.getElementById('duelBtn');
   const sb = document.getElementById('swarmBtn');
+  const cr = document.getElementById('createRoomBtn');
+  const jr = document.getElementById('joinRoomBtn');
+
   const startDuel = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('duel'); };
   const startSwarm = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('swarm'); };
-  if (db) {
-    db.onclick = startDuel;
-    db.ontouchstart = startDuel;
-  }
-  if (sb) {
-    sb.onclick = startSwarm;
-    sb.ontouchstart = startSwarm;
-  }
+  const createRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); onClickCreateRoom(e); };
+  const joinRoom = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showJoinInputModal(); };
+
+  if (db) { db.onclick = startDuel; db.ontouchstart = startDuel; }
+  if (sb) { sb.onclick = startSwarm; sb.ontouchstart = startSwarm; }
+  if (cr) { cr.onclick = createRoom; cr.ontouchstart = createRoom; }
+  if (jr) { jr.onclick = joinRoom; jr.ontouchstart = joinRoom; }
 }
 
 // Bind pause menu & HUD buttons
@@ -899,6 +1559,47 @@ const modeSelectBtn = document.getElementById('modeSelectBtn');
 const onModeSelectClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showModeSelect(); };
 if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; modeSelectBtn.ontouchstart = onModeSelectClick; }
 bindMainMenuEvents();
+
+// Bind room modal buttons
+const btnCopyCode = document.getElementById('btnCopyCode');
+if (btnCopyCode) {
+  btnCopyCode.onclick = (e) => {
+    e.stopPropagation();
+    if (currentRoomId) copyRoomCode(currentRoomId);
+  };
+}
+
+const btnConfirmJoin = document.getElementById('btnConfirmJoin');
+if (btnConfirmJoin) {
+  btnConfirmJoin.onclick = (e) => {
+    e.stopPropagation();
+    onClickConfirmJoin(e);
+  };
+}
+
+const btnCancelRoom = document.getElementById('btnCancelRoom');
+if (btnCancelRoom) {
+  btnCancelRoom.onclick = (e) => {
+    e.stopPropagation();
+    teardownMultiplayer();
+    const rm = document.getElementById('roomModal');
+    if (rm) rm.style.display = 'none';
+    showModeSelectMenu();
+  };
+}
+
+const joinRoomInput = document.getElementById('joinRoomInput');
+if (joinRoomInput) {
+  joinRoomInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      onClickConfirmJoin(e);
+    }
+  });
+  joinRoomInput.addEventListener('input', () => {
+    joinRoomInput.value = joinRoomInput.value.toUpperCase();
+  });
+}
 
 // Pointer lock can throw synchronously (SecurityError) inside sandboxed/permission-less
 // iframes, and can also fail async. Both paths just enable the cursor-steering fallback.
@@ -1236,6 +1937,16 @@ function updateHUD() {
     if (bbw) bbw.style.display = 'block';
     const bb = el('bossbar');
     if (bb && bb.firstElementChild) bb.firstElementChild.style.width = hpPct + '%';
+  } else if (gameMode === 'duel_multi') {
+    const rl = el('roundLabel');
+    if (rl) rl.innerHTML = `ROOM <span id="wave" class="big">${currentRoomId || '----'}</span>`;
+    const oppHp = duelOpponent ? Math.max(0, Math.ceil(duelOpponent.hp)) : 100;
+    const sl = el('subLabel');
+    if (sl) sl.innerHTML = `RIVAL HP <span id="foes">${oppHp}</span>`;
+    const bbw = el('bossBarWrap');
+    if (bbw) bbw.style.display = 'block';
+    const bb = el('bossbar');
+    if (bb && bb.firstElementChild) bb.firstElementChild.style.width = oppHp + '%';
   } else {
     const rl = el('roundLabel');
     if (rl) rl.innerHTML = `CYCLE <span id="wave" class="big">${wave}</span>`;
@@ -1350,15 +2061,34 @@ function throwDisc() {
   const chest = player.pos.clone().add(new THREE.Vector3(0, 1.7 + player.y, 0));
   // aim from the chest at the exact point under the crosshair => reticle is truthful
   const dir = aim.point.clone().sub(chest).normalize();
-  const origin = chest.add(dir.clone().multiplyScalar(1.1));
+  const origin = chest.clone().add(dir.clone().multiplyScalar(1.1));
   const curve = getPlayerCurveIntent();
-  spawnDisc(origin, dir.multiplyScalar(38), 'player', CYAN, curve);
+  const vel = dir.clone().multiplyScalar(38);
+  spawnDisc(origin, vel, 'player', CYAN, curve);
   window.__lastThrowDot = dir.clone().normalize().dot(aim.point.clone().sub(origin).normalize());
   shake(0.12);
   if (touchCurveL || touchCurveR) {
     touchCurveL = false;
     touchCurveR = false;
     updateCurveButtons();
+  }
+
+  // Network sync throw for multiplayer
+  if (gameMode === 'duel_multi' && db && currentRoomId && currentUser) {
+    const roomRef = getRoomRef(currentRoomId);
+    roomUpdateDoc(roomRef, {
+      lastThrow: {
+        id: Math.random().toString(36).substring(2, 9),
+        sender: playerRole,
+        x: +origin.x.toFixed(2),
+        y: +origin.y.toFixed(2),
+        z: +origin.z.toFixed(2),
+        vx: +vel.x.toFixed(2),
+        vy: +vel.y.toFixed(2),
+        vz: +vel.z.toFixed(2),
+        curve: +curve.toFixed(2)
+      }
+    }).catch(err => console.warn("Throw sync err:", err));
   }
 }
 
@@ -1394,7 +2124,8 @@ function aimTarget() {
     if (t > 0.5 && t < best && _ro.y + _rd.y * t < 6.5) { best = t; hitFoe = null; }
   }
   // programs (sphere around the torso)
-  for (const f of foes) {
+  const aimFoes = (gameMode === 'duel_multi' && duelOpponent) ? [duelOpponent] : foes;
+  for (const f of aimFoes) {
     const cx = f.pos.x - _ro.x, cy = (1.5 + (f.y || 0)) - _ro.y, cz = f.pos.z - _ro.z;
     const proj = cx * _rd.x + cy * _rd.y + cz * _rd.z;
     if (proj < 0.5) continue;
@@ -1445,7 +2176,31 @@ function damagePlayer(amount, from) {
     player.hp = 0; player.alive = false; running = false; gameOverT = 0;
     burst(player.pos.clone().setY(player.y + 1.4), CYAN, 90, 16);
     player.obj.visible = false;
-    setTimeout(showGameOver, 900);
+    if (gameMode === 'duel_multi') {
+      if (db && currentRoomId && currentUser) {
+        const oppRole = playerRole === 'p1' ? 'p2' : 'p1';
+        const roomRef = getRoomRef(currentRoomId);
+        const myState = {
+          x: +player.pos.x.toFixed(2),
+          y: +player.y.toFixed(2),
+          z: +player.pos.z.toFixed(2),
+          yaw: +player.yaw.toFixed(2),
+          pitch: +player.pitch.toFixed(2),
+          hp: 0,
+          blocking: false,
+          hasDisc: player.hasDisc
+        };
+        const payload = {
+          status: 'finished',
+          winner: oppRole
+        };
+        payload[playerRole] = myState;
+        roomUpdateDoc(roomRef, payload).catch(err => console.warn("Game over sync err:", err));
+      }
+      setTimeout(showMultiplayerDefeat, 900);
+    } else {
+      setTimeout(showGameOver, 900);
+    }
   }
 }
 
@@ -2034,6 +2789,9 @@ function update(dt) {
   // ── update destructible tiles
   updateTiles(dt);
 
+  // ── multiplayer network state broadcast
+  syncNetworkState(dt);
+
   // ── player movement
   if (player.alive) {
     const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
@@ -2169,7 +2927,29 @@ function update(dt) {
       d.position.set(0, 1.8, -.45); d.rotation.x = Math.PI / 2;
     }
   }
-  player.hurtFlash = Math.max(0, player.hurtFlash - dt * 2);
+  // ── remote opponent (multiplayer interpolation)
+  if (gameMode === 'duel_multi' && duelOpponent && duelOpponent.obj) {
+    duelOpponent.pos.lerp(duelOpponent.targetPos, dt * 16);
+    duelOpponent.y = THREE.MathUtils.lerp(duelOpponent.y || 0, duelOpponent.targetY || 0, dt * 16);
+    duelOpponent.obj.position.copy(duelOpponent.pos);
+    duelOpponent.obj.position.y = duelOpponent.y;
+    duelOpponent.yaw = THREE.MathUtils.lerp(
+      duelOpponent.yaw !== undefined ? duelOpponent.yaw : duelOpponent.obj.rotation.y,
+      duelOpponent.targetYaw,
+      dt * 14
+    );
+    duelOpponent.obj.rotation.y = duelOpponent.yaw;
+    if (duelOpponent.obj.userData && duelOpponent.obj.userData.backDisc) {
+      duelOpponent.obj.userData.backDisc.visible = duelOpponent.hasDisc;
+      if (duelOpponent.blocking && duelOpponent.hasDisc) {
+        duelOpponent.obj.userData.backDisc.position.set(0, 1.75, .75);
+        duelOpponent.obj.userData.backDisc.rotation.x = 0;
+      } else {
+        duelOpponent.obj.userData.backDisc.position.set(0, 1.8, -.45);
+        duelOpponent.obj.userData.backDisc.rotation.x = Math.PI / 2;
+      }
+    }
+  }
 
   // ── foes
   for (let fi = foes.length - 1; fi >= 0; fi--) {
@@ -2330,7 +3110,7 @@ function update(dt) {
     D.t += dt; D.spin += dt * 26;
 
     const holder = D.owner === 'player' ? player : D.owner;
-    const holderAlive = D.owner === 'player' ? player.alive : foes.includes(D.owner);
+    const holderAlive = D.owner === 'player' ? player.alive : (gameMode === 'duel_multi' ? (duelOpponent && duelOpponent.alive) : foes.includes(D.owner));
 
     if (!holderAlive) { scene.remove(D.obj); discs.splice(i, 1); continue; }
 
@@ -2408,6 +3188,9 @@ function update(dt) {
       if (isSolid) {
         if (tile && tile.state === TILE_INTACT) {
           triggerTileWarning(tile, D.color);
+          if (gameMode === 'duel_multi' && playerRole === 'p1') {
+            onTileDestabilizedByHost(tile.ix, tile.iz);
+          }
         }
         D.pos.y = yFloor;
         if (D.vel.y < 0) {
@@ -2468,6 +3251,24 @@ function update(dt) {
     // hits
     let discCaught = false;
     if (D.owner === 'player') {
+      if (gameMode === 'duel_multi' && duelOpponent && duelOpponent.alive) {
+        const f = duelOpponent;
+        const fCenter = tmp.copy(f.pos).setY(1.5 + (f.y || 0));
+        const dist = D.pos.distanceTo(fCenter);
+        if (dist < FOE_R + DISC_R + .35) {
+          if (f.blocking && f.hasDisc) {
+            burst(D.pos.clone(), WHITE, 24, 10);
+            shake(0.12);
+            message('RIVAL BLOCKED!');
+            D.returning = true;
+          } else {
+            burst(D.pos.clone(), PURPLE, 28, 12);
+            shake(0.18);
+            message('DIRECT HIT ON RIVAL!');
+            D.returning = true;
+          }
+        }
+      }
       for (const f of foes) {
         if (D.hitFoes && D.hitFoes.has(f)) continue;
         const fCenter = tmp.copy(f.pos).setY(1.5 + (f.y || 0));
@@ -2653,12 +3454,33 @@ function update(dt) {
           });
           const incomingSpd = D.vel.length();
           const spd = Math.max(36, incomingSpd * 1.25);
-          const targetFoe = (D.originalOwner && foes.includes(D.originalOwner)) ? D.originalOwner : foes[0];
-          if (targetFoe) {
-            const dirToRival = targetFoe.pos.clone().setY(1.7 + (targetFoe.y || 0)).sub(D.pos).normalize();
+          if (gameMode === 'duel_multi' && duelOpponent) {
+            const dirToRival = duelOpponent.pos.clone().setY(1.7 + (duelOpponent.y || 0)).sub(D.pos).normalize();
             D.vel.copy(dirToRival).multiplyScalar(spd);
+            if (db && currentRoomId && currentUser) {
+              const roomRef = getRoomRef(currentRoomId);
+              roomUpdateDoc(roomRef, {
+                lastThrow: {
+                  id: Math.random().toString(36).substring(2, 9),
+                  sender: playerRole,
+                  x: +D.pos.x.toFixed(2),
+                  y: +D.pos.y.toFixed(2),
+                  z: +D.pos.z.toFixed(2),
+                  vx: +D.vel.x.toFixed(2),
+                  vy: +D.vel.y.toFixed(2),
+                  vz: +D.vel.z.toFixed(2),
+                  curve: 0
+                }
+              }).catch(err => console.warn("Parry sync err:", err));
+            }
           } else {
-            D.vel.copy(facing).multiplyScalar(spd);
+            const targetFoe = (D.originalOwner && foes.includes(D.originalOwner)) ? D.originalOwner : foes[0];
+            if (targetFoe) {
+              const dirToRival = targetFoe.pos.clone().setY(1.7 + (targetFoe.y || 0)).sub(D.pos).normalize();
+              D.vel.copy(dirToRival).multiplyScalar(spd);
+            } else {
+              D.vel.copy(facing).multiplyScalar(spd);
+            }
           }
           D.pos.addScaledVector(toDisc, 1.2);
           message('DEFLECTED!');
@@ -2941,16 +3763,20 @@ window.__dbg = {
     const d = spawnDisc(p, new THREE.Vector3(0, 0, 24), b, ORANGE, 0);
     return d;
   },
-  spawnParryTestDisc: () => {
-    const b = foes.find(f => f.isBoss) || foes[0];
+  spawnParryTestDisc: (dist = 2.0) => {
+    const b = (gameMode === 'duel_multi' && duelOpponent) ? duelOpponent : (foes.find(f => f.isBoss) || foes[0]);
     if (!b) return null;
     b.hasDisc = false;
     const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw)).normalize();
-    const p = player.pos.clone().addScaledVector(fwd, 3.5).setY(1.5);
+    const p = player.pos.clone().addScaledVector(fwd, dist).setY(1.5);
     const d = spawnDisc(p, fwd.clone().multiplyScalar(-24), b, ORANGE, 0);
-    return d;
+    return {
+      pos: { x: +p.x.toFixed(2), y: +p.y.toFixed(2), z: +p.z.toFixed(2) },
+      speed: 24
+    };
   },
   spawnDeflectedMissDisc: () => {
+    spawnTimer = 0;
     let b = foes.find(f => f.isBoss) || foes[0];
     if (!b) {
       spawnDuelBoss(duelTier);
@@ -3051,7 +3877,35 @@ window.__dbg = {
     updateCurveButtons();
   },
   checkOrientation: () => checkOrientation(),
-  particleBurstCount: (n = 22) => isTouchDevice ? Math.max(1, Math.round(n * 0.5)) : n
+  particleBurstCount: (n = 22) => isTouchDevice ? Math.max(1, Math.round(n * 0.5)) : n,
+  initNetwork: () => initNetwork(),
+  createRoom: () => onClickCreateRoom(),
+  joinRoom: (code) => {
+    const inp = document.getElementById('joinRoomInput');
+    if (inp) inp.value = code;
+    return onClickConfirmJoin();
+  },
+  currentRoomId: () => currentRoomId,
+  playerRole: () => playerRole,
+  duelOpponent: () => duelOpponent ? {
+    pos: { x: +duelOpponent.pos.x.toFixed(2), z: +duelOpponent.pos.z.toFixed(2) },
+    y: +duelOpponent.y.toFixed(2),
+    hp: duelOpponent.hp,
+    hasDisc: duelOpponent.hasDisc,
+    blocking: duelOpponent.blocking,
+    targetPos: { x: +duelOpponent.targetPos.x.toFixed(2), z: +duelOpponent.targetPos.z.toFixed(2) }
+  } : null,
+  copyRoomCode: (code) => copyRoomCode(code),
+  teardownMultiplayer: () => teardownMultiplayer(),
+  startMultiplayerDuel: (role, code) => startMultiplayerDuel(role, code),
+  syncNetworkState: (dt) => syncNetworkState(dt),
+  enableMockNetwork: () => initMockNetwork(),
+  onTileDestabilizedByHost: (ix, iz) => onTileDestabilizedByHost(ix, iz),
+  getRoomData: async (code) => {
+    const roomRef = getRoomRef(code || currentRoomId);
+    const snap = await roomGetDoc(roomRef);
+    return snap.exists() ? snap.data() : null;
+  }
 };
 
 window.__TRON__ = window.__dbg;

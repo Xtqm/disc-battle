@@ -154,6 +154,49 @@
     box-shadow:0 0 24px rgba(79,242,255,.75), inset 0 0 16px rgba(79,242,255,.4);
     transform:translateY(-2px);
   }
+  .multi-btn {
+    border:1px solid #b026ff; color:#d896ff;
+    box-shadow:0 0 14px rgba(176,38,255,.35), inset 0 0 10px rgba(176,38,255,.18);
+  }
+  .multi-btn:hover {
+    background:rgba(176,38,255,.24); color:#fff;
+    box-shadow:0 0 24px rgba(176,38,255,.75), inset 0 0 16px rgba(176,38,255,.4);
+    transform:translateY(-2px);
+  }
+  .btn.purple {
+    border-color:#b026ff; color:#d896ff;
+    box-shadow:0 0 14px rgba(176,38,255,.35), inset 0 0 10px rgba(176,38,255,.18);
+  }
+  .btn.purple:hover {
+    background:rgba(176,38,255,.24); color:#fff;
+    box-shadow:0 0 24px rgba(176,38,255,.75), inset 0 0 16px rgba(176,38,255,.4);
+    transform:translateY(-2px);
+  }
+  .modal-overlay {
+    position:fixed; inset:0; z-index:25; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 50%, rgba(0,20,30,.92), rgba(0,0,0,.98));
+    backdrop-filter:blur(6px);
+  }
+  .room-code-display {
+    font-size:52px; letter-spacing:14px; font-weight:700; color:#fff;
+    text-shadow:0 0 24px #b026ff, 0 0 44px #b026ff, 0 0 8px #fff;
+    margin:14px 0 20px 14px; font-family:"Courier New", Courier, monospace, inherit;
+  }
+  .waiting-indicator {
+    font-size:13px; letter-spacing:4px; color:#d896ff;
+    animation:pulse 1.6s infinite; text-shadow:0 0 14px rgba(176,38,255,.6);
+    margin-bottom:8px;
+  }
+  .room-input {
+    background:rgba(0,16,24,.85); border:1.5px solid #b026ff; color:#fff;
+    font-family:inherit; font-size:26px; letter-spacing:10px; text-align:center;
+    padding:10px 16px; margin:0 auto 16px; width:220px; display:block;
+    text-transform:uppercase; outline:none;
+    box-shadow:0 0 16px rgba(176,38,255,.3) inset, 0 0 12px rgba(176,38,255,.2);
+  }
+  .room-input:focus {
+    border-color:#fff; box-shadow:0 0 24px rgba(176,38,255,.7) inset, 0 0 16px rgba(176,38,255,.5);
+  }
 
   /* Pause Menu Modal */
   .modal {
@@ -528,6 +571,28 @@
   </div>
 </div>
 
+<div id="roomModal" class="modal-overlay" style="display:none;">
+  <div class="card">
+    <h1 id="roomTitle">DUEL ROOM</h1>
+    <h2 id="roomSubtitle">SHARE THIS CODE WITH YOUR FRIEND</h2>
+    <div id="roomCodeDisplay" class="room-code-display">----</div>
+    
+    <!-- Host waiting view -->
+    <div id="hostWaitBlock">
+      <button class="btn" id="btnCopyCode" style="margin:0 auto 14px; width:100%; max-width:280px;">COPY ROOM CODE</button>
+      <div class="waiting-indicator">WAITING FOR CHALLENGER...</div>
+    </div>
+
+    <!-- Guest join input view -->
+    <div id="joinInputBlock" style="display:none;">
+      <input type="text" id="joinRoomInput" class="room-input" maxlength="4" placeholder="CODE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
+      <button class="btn purple" id="btnConfirmJoin" style="margin:0 auto; width:100%; max-width:280px;">CONNECT TO ROOM</button>
+    </div>
+
+    <button class="btn" id="btnCancelRoom" style="margin:16px auto 0; width:100%; max-width:280px; border-color:var(--orange); color:#ffb37a;">RETURN TO MENU</button>
+  </div>
+</div>
+
 <div id="overlay"><div class="card">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys desktop-keys">
@@ -555,6 +620,8 @@
   <div class="mode-select">
     <button id="duelBtn" class="mode-btn duel-btn">ENTER DUEL (1v1)</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
+    <button id="createRoomBtn" class="mode-btn multi-btn">CREATE DUEL ROOM (VS FRIEND)</button>
+    <button id="joinRoomBtn" class="mode-btn multi-btn">JOIN DUEL ROOM</button>
   </div>
 </div></div>
 
