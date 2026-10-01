@@ -10,12 +10,49 @@
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:#000; overflow:hidden;
     font-family: "Segoe UI", Helvetica, Arial, sans-serif; color:var(--cyan); }
-  html, body, canvas, #hud, .touch-btn, .touch-zone, #mobileControls, .modal, #overlay, #orientationOverlay {
+  html, body, canvas, #hud, .touch-btn, .touch-zone, #mobileControls, #orientationOverlay {
     touch-action: none;
     -webkit-touch-callout: none;
     -webkit-user-select: none;
     user-select: none;
     overscroll-behavior: none;
+  }
+  .modal-overlay, .modal, #overlay {
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  .card {
+    text-align: center; 
+    width: 92%; 
+    max-width: 580px; 
+    padding: 32px 36px;
+    border: 1px solid rgba(79,242,255,0.45); 
+    border-radius: 12px;
+    box-shadow: 0 0 50px rgba(79,242,255,0.18), inset 0 0 24px rgba(79,242,255,0.1);
+    background: rgba(1, 14, 22, 0.88); 
+    
+    /* Critical Scrolling Fixes */
+    max-height: 85vh; /* slightly tighter to account for mobile address bars */
+    overflow-y: auto;
+    touch-action: pan-y !important; /* Forces browser to allow vertical scrolling here */
+    overscroll-behavior: contain; /* Prevents scroll chaining to the body */
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS Safari */
+    pointer-events: auto;
+  }
+  .card::-webkit-scrollbar {
+    width: 6px;
+  }
+  .card::-webkit-scrollbar-track {
+    background: rgba(0, 15, 20, 0.5);
+    border-radius: 4px;
+  }
+  .card::-webkit-scrollbar-thumb {
+    background: var(--cyan);
+    border-radius: 4px;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  .card * {
+    touch-action: pan-y;
   }
   canvas { display:block; }
   #hud { position:fixed; inset:0; pointer-events:none; z-index:5; }
@@ -101,9 +138,8 @@
     pointer-events:none; color:var(--cyan); text-shadow:0 0 8px rgba(79,242,255,.4); display:none;
   }
   #overlay { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
-    background:radial-gradient(circle at 50% 50%, rgba(0,30,40,.9), rgba(0,0,0,.97)); cursor:pointer; }
-  #overlay .card { text-align:center; max-width:640px; padding:40px 48px; border:1px solid rgba(79,242,255,.4);
-    box-shadow:0 0 60px rgba(79,242,255,.15); background:rgba(0,10,16,.6); }
+    background:radial-gradient(circle at 50% 50%, rgba(0,30,40,.9), rgba(0,0,0,.97)); cursor:default;
+    touch-action: pan-y; overscroll-behavior: contain; }
   h1 { margin:0 0 6px; font-size:54px; letter-spacing:18px; text-shadow:0 0 30px var(--cyan); }
   h2 { margin:0 0 26px; font-size:13px; letter-spacing:8px; font-weight:400; color:#9fe9f2; }
   .keys { display:grid; grid-template-columns:auto auto; gap:8px 18px; font-size:13px; text-align:left;
@@ -183,6 +219,8 @@
     position:fixed; inset:0; z-index:25; display:flex; align-items:center; justify-content:center;
     background:radial-gradient(circle at 50% 50%, rgba(0,20,30,.92), rgba(0,0,0,.98));
     backdrop-filter:blur(6px);
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
   .room-code-display {
     font-size:52px; letter-spacing:14px; font-weight:700; color:#fff;
@@ -210,15 +248,11 @@
     position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
     background:radial-gradient(circle at 50% 50%, rgba(0,25,35,.88), rgba(0,0,0,.96));
     backdrop-filter:blur(4px);
+    touch-action: pan-y;
+    overscroll-behavior: contain;
   }
-  .modal .card {
-    text-align:center; max-width:520px; width:90%; padding:36px 44px;
-    border:1px solid rgba(79,242,255,.45);
-    box-shadow:0 0 60px rgba(79,242,255,.2), inset 0 0 30px rgba(79,242,255,.05);
-    background:rgba(0,10,16,.88);
-  }
-  .modal .card h1 { font-size:40px; letter-spacing:14px; margin:0 0 6px; }
-  .modal .card h2 { font-size:12px; letter-spacing:6px; margin:0 0 22px; }
+  .modal h1, .modal .card h1 { font-size:40px; letter-spacing:14px; margin:0 0 6px; }
+  .modal h2, .modal .card h2 { font-size:12px; letter-spacing:6px; margin:0 0 22px; }
   .menu-actions {
     display:flex; flex-direction:column; gap:12px; margin-top:20px;
   }

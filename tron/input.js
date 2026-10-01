@@ -94,7 +94,11 @@ export function pauseGame() {
   state.paused = true;
   state.lastPauseToggle = performance.now();
   const pm = document.getElementById('pauseMenu');
-  if (pm) pm.style.display = 'flex';
+  if (pm) {
+    pm.style.display = 'flex';
+    const card = pm.querySelector('.card');
+    if (card) card.scrollTop = 0;
+  }
   if (document.pointerLockElement) {
     document.exitPointerLock();
   }
@@ -185,6 +189,8 @@ export function showModeSelectMenu() {
   if (!overlay) return;
   overlay.style.display = 'flex';
   overlay.innerHTML = getMainMenuHtml();
+  const card = overlay.querySelector('.card');
+  if (card) card.scrollTop = 0;
   bindMainMenuEvents();
 }
 
@@ -193,7 +199,6 @@ export function bindMainMenuEvents() {
     const el = document.getElementById(id);
     if (el) {
       el.addEventListener('click', fn);
-      el.addEventListener('touchstart', fn, { passive: false });
     } else {
       console.warn(`UI Binding Warning: Button #${id} not found.`);
     }
@@ -204,7 +209,11 @@ export function bindMainMenuEvents() {
     e.stopPropagation(); if (e.cancelable) e.preventDefault();
     if (overlay) overlay.style.display = 'none';
     const hm = document.getElementById('hostModal');
-    if (hm) hm.style.display = 'flex';
+    if (hm) {
+      hm.style.display = 'flex';
+      const card = hm.querySelector('.card');
+      if (card) card.scrollTop = 0;
+    }
   };
   const openJoinModal = (e) => {
     e.stopPropagation(); if (e.cancelable) e.preventDefault();
@@ -252,13 +261,13 @@ export function bindPauseAndModalEvents() {
   if (pauseBtn) { pauseBtn.onclick = onPauseClick; pauseBtn.ontouchstart = onPauseClick; }
 
   resumeBtn = document.getElementById('resumeBtn');
-  if (resumeBtn) { resumeBtn.onclick = onResumeClick; resumeBtn.ontouchstart = onResumeClick; }
+  if (resumeBtn) { resumeBtn.onclick = onResumeClick; }
 
   restartBtn = document.getElementById('restartBtn');
-  if (restartBtn) { restartBtn.onclick = onRestartClick; restartBtn.ontouchstart = onRestartClick; }
+  if (restartBtn) { restartBtn.onclick = onRestartClick; }
 
   modeSelectBtn = document.getElementById('modeSelectBtn');
-  if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; modeSelectBtn.ontouchstart = onModeSelectClick; }
+  if (modeSelectBtn) { modeSelectBtn.onclick = onModeSelectClick; }
 
   btnCopyCode = document.getElementById('btnCopyCode');
   if (btnCopyCode) {
@@ -299,7 +308,6 @@ export function bindPauseAndModalEvents() {
       startMode('duel_ai');
     };
     practiceBtn.onclick = onPractice;
-    practiceBtn.ontouchstart = onPractice;
   }
 
   const host1v1Btn = document.getElementById('host1v1Btn');
@@ -310,7 +318,6 @@ export function bindPauseAndModalEvents() {
       onClickCreateRoom(e, '1v1');
     };
     host1v1Btn.onclick = onHost1v1;
-    host1v1Btn.ontouchstart = onHost1v1;
   }
 
   const host2v2Btn = document.getElementById('host2v2Btn');
@@ -321,7 +328,6 @@ export function bindPauseAndModalEvents() {
       onClickCreateRoom(e, '2v2');
     };
     host2v2Btn.onclick = onHost2v2;
-    host2v2Btn.ontouchstart = onHost2v2;
   }
 
   const cancelHostBtn = document.getElementById('cancelHostBtn');
@@ -332,7 +338,6 @@ export function bindPauseAndModalEvents() {
       showModeSelectMenu();
     };
     cancelHostBtn.onclick = onCancelHost;
-    cancelHostBtn.ontouchstart = onCancelHost;
   }
 
   joinRoomInput = document.getElementById('joinRoomInput');
@@ -528,9 +533,15 @@ export function updateCurveButtons() {
 }
 
 export function onTouchStart(e) {
+  // If the user is touching a UI modal card, let the browser handle the native scroll
+  if (e.target && e.target.closest && e.target.closest('.card')) {
+    return;
+  }
+
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
-    if (t.target.closest('.touch-btn, .hud-btn, .btn, .mode-btn')) continue;
+    if (t.target && t.target.closest && t.target.closest('.card')) continue;
+    if (t.target && t.target.closest && t.target.closest('.touch-btn, .hud-btn, .btn, .mode-btn')) continue;
     if (!state.running || state.paused) continue;
 
     if (t.clientX < window.innerWidth * 0.45 && state.moveTouchId === null) {
@@ -556,8 +567,14 @@ export function onTouchStart(e) {
 }
 
 export function onTouchMove(e) {
+  // If the user is touching a UI modal card, let the browser handle the native scroll
+  if (e.target && e.target.closest && e.target.closest('.card')) {
+    return; // Do not call e.preventDefault() here!
+  }
+
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
+    if (t.target && t.target.closest && t.target.closest('.card')) continue;
     if (t.identifier === state.moveTouchId) {
       e.preventDefault();
       updateJoystick(t.clientX, t.clientY);
@@ -588,8 +605,12 @@ export function onTouchMove(e) {
 }
 
 export function onTouchEnd(e) {
+  if (e.target && e.target.closest && e.target.closest('.card')) {
+    return;
+  }
   for (let i = 0; i < e.changedTouches.length; i++) {
     const t = e.changedTouches[i];
+    if (t.target && t.target.closest && t.target.closest('.card')) continue;
     if (t.identifier === state.moveTouchId) {
       state.moveTouchId = null;
       hideJoystick();
