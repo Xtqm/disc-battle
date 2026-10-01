@@ -31,7 +31,7 @@ export const state = {
   paused: false,
   lastPauseToggle: 0,
   justResumed: false,
-  sens: 0.0023,
+  sens: 0.0022,
   invertY: false,
   steerX: 0,
   steerY: 0,
@@ -39,6 +39,8 @@ export const state = {
   cursorY: innerHeight / 2,
   moveTouchId: null,
   lookTouchId: null,
+  lookMomentumX: 0,
+  lookMomentumY: 0,
   touchJumpHeld: false,
   touchDashRequested: false,
   touchBlocking: false,
@@ -51,6 +53,34 @@ export const state = {
   keys: {},
   joystick: { active: false, x: 0, y: 0, baseX: 0, baseY: 0, curX: 0, curY: 0 }
 };
+
+export const touchState = {
+  get moveId() { return state.moveTouchId; },
+  set moveId(v) { state.moveTouchId = v; },
+  get moveTouchId() { return state.moveTouchId; },
+  set moveTouchId(v) { state.moveTouchId = v; },
+  get lookId() { return state.lookTouchId; },
+  set lookId(v) { state.lookTouchId = v; },
+  get lookTouchId() { return state.lookTouchId; },
+  set lookTouchId(v) { state.lookTouchId = v; },
+  lastLookX: 0,
+  lastLookY: 0,
+  lookMomentumX: 0,
+  lookMomentumY: 0
+};
+
+Object.defineProperty(state, 'lookMomentumX', {
+  get() { return touchState.lookMomentumX; },
+  set(v) { touchState.lookMomentumX = v; },
+  configurable: true,
+  enumerable: true
+});
+Object.defineProperty(state, 'lookMomentumY', {
+  get() { return touchState.lookMomentumY; },
+  set(v) { touchState.lookMomentumY = v; },
+  configurable: true,
+  enumerable: true
+});
 
 // We will keep player inside state as well, but in game.js it was created with THREE objects.
 // Wait, player needs THREE. So we can't initialize it purely here unless we import THREE.

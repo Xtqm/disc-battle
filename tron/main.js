@@ -5,7 +5,7 @@ import { initGraphics, renderer, scene, camera, checkOrientation, key, d, floor,
 import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound, SFX } from './audio.js';
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
-import { initInput, EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
+import { initInput, EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, sens, moveStartPos, touchMove, lookLastPos, touchState, updateTouchMomentum, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
 import { el, msgEl, message, showGameOver, shake, bindMenuButtons } from './ui.js';
 
@@ -49,7 +49,7 @@ export function update(dt) {
 
     // Freeze AI velocity
     for (const f of state.foes) {
-      f.vel.set(0, 0, 0);
+      if (f.vel) f.vel.set(0, 0, 0);
       f.vy = 0;
     }
 
@@ -116,6 +116,7 @@ export function update(dt) {
 
   // ── player movement
   if (state.player.alive) {
+    updateTouchMomentum(dt);
     const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
     const right = new THREE.Vector3(-fwd.z, 0, fwd.x);   // +X when yaw=0; A/D were inverted
     const wish = new THREE.Vector3();
@@ -1242,10 +1243,18 @@ window.__dbg = {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, state.isTouchDevice ? 1.5 : 2));
     checkOrientation();
   },
+  sens: () => sens,
+  setSens: (v) => { state.sens = v; },
   touchMove: () => ({ x: touchMove.x, y: touchMove.y }),
   touchState: () => ({
     moveTouchId: state.moveTouchId,
     lookTouchId: state.lookTouchId,
+    moveId: touchState.moveId,
+    lookId: touchState.lookId,
+    lastLookX: touchState.lastLookX,
+    lastLookY: touchState.lastLookY,
+    lookMomentumX: touchState.lookMomentumX,
+    lookMomentumY: touchState.lookMomentumY,
     touchJumpHeld: state.touchJumpHeld,
     touchDashRequested: state.touchDashRequested,
     touchBlocking: state.touchBlocking,

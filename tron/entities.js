@@ -94,6 +94,8 @@ export function resetRound(spawnX = 0, spawnZ = 14, yaw = Math.PI) {
   state.player.vy = 0;
   state.player.grounded = true;
   state.player.jumps = 0;
+  state.lookMomentumX = 0;
+  state.lookMomentumY = 0;
   if (state.player.obj) {
     state.player.obj.position.copy(state.player.pos);
     state.player.obj.rotation.y = state.player.yaw;
@@ -341,7 +343,7 @@ export function damagePlayer(amount, from) {
           hasDisc: state.player.hasDisc
         };
         const payload = {};
-        payload[`state.${playerRole}`] = myState;
+        payload[`state.${state.playerRole}`] = myState;
         
         let allTeammatesDead = true;
         for (const t of state.teammates) {

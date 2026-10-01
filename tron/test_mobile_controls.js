@@ -542,6 +542,230 @@ async function runMobileTests() {
     throw new Error(`Test 7 FAILED: ${JSON.stringify(test7)}`);
   }
 
+  // -------------------------------------------------------------
+  // TEST 8: Camera Inertia (Momentum), Tap-to-Stop & Dynamic Sens
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 8: Camera Inertia (Momentum), Tap-to-Stop & Dynamic Sens ---');
+  const test8 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    dbg.setPlayerPos(0, 0, 0);
+    dbg.setYaw(0);
+
+    // Part A: Dynamic sensitivity check (sens * 2.5)
+    const baseSens = dbg.sens(); // Should be 0.0022
+    const isDefaultSens = Math.abs(baseSens - 0.0022) < 0.0001;
+
+    // Test swipe 1: at default sensitivity
+    const touchStart1 = new Touch({
+      identifier: 301,
+      target: document.body,
+      clientX: 600,
+      clientY: 200,
+      screenX: 600,
+      screenY: 200,
+      pageX: 600,
+      pageY: 200
+    });
+    window.dispatchEvent(new TouchEvent('touchstart', {
+      changedTouches: [touchStart1],
+      touches: [touchStart1],
+      cancelable: true
+    }));
+
+    const yawBeforeSwipe = dbg.yaw();
+    const touchMove1 = new Touch({
+      identifier: 301,
+      target: document.body,
+      clientX: 560, // dX = -40
+      clientY: 200, // dY = 0
+      screenX: 560,
+      screenY: 200,
+      pageX: 560,
+      pageY: 200
+    });
+    window.dispatchEvent(new TouchEvent('touchmove', {
+      changedTouches: [touchMove1],
+      touches: [touchMove1],
+      cancelable: true
+    }));
+
+    const deltaYaw1 = Math.abs(dbg.yaw() - yawBeforeSwipe);
+    // Expected immediate rotation: -dX * sens * 2.5 = 40 * 0.0022 * 2.5 = 0.22
+    const expectedDelta1 = 40 * baseSens * 2.5;
+    const dynamicSensAccurate = Math.abs(deltaYaw1 - expectedDelta1) < 0.005;
+
+    // End touch 1
+    window.dispatchEvent(new TouchEvent('touchend', {
+      changedTouches: [touchMove1],
+      touches: [],
+      cancelable: true
+    }));
+
+    // Part B: Swipe momentum (inertia) test
+    dbg.setYaw(0);
+    const touchStart2 = new Touch({
+      identifier: 302,
+      target: document.body,
+      clientX: 600,
+      clientY: 200,
+      screenX: 600,
+      screenY: 200,
+      pageX: 600,
+      pageY: 200
+    });
+    window.dispatchEvent(new TouchEvent('touchstart', {
+      changedTouches: [touchStart2],
+      touches: [touchStart2],
+      cancelable: true
+    }));
+
+    const touchMove2 = new Touch({
+      identifier: 302,
+      target: document.body,
+      clientX: 500, // dX = -100
+      clientY: 180, // dY = -20
+      screenX: 500,
+      screenY: 180,
+      pageX: 500,
+      pageY: 180
+    });
+    window.dispatchEvent(new TouchEvent('touchmove', {
+      changedTouches: [touchMove2],
+      touches: [touchMove2],
+      cancelable: true
+    }));
+
+    const tStateAfterMove = dbg.touchState();
+    const momentumCaptured = tStateAfterMove.lookMomentumX === -100 && tStateAfterMove.lookMomentumY === -20;
+    const yawAtRelease = dbg.yaw();
+
+    // Release finger -> lookId becomes null, momentum remains
+    window.dispatchEvent(new TouchEvent('touchend', {
+      changedTouches: [touchMove2],
+      touches: [],
+      cancelable: true
+    }));
+
+    const lookClearedOnRelease = dbg.touchState().lookId === null;
+
+    // Step 5 frames to observe inertia drift
+    for (let f = 0; f < 5; f++) dbg.step(0.016);
+    const yawAfterDrift = dbg.yaw();
+    const hasDrifted = Math.abs(yawAfterDrift - yawAtRelease) > 0.01;
+    // Since dX was -100 (swipe left), yaw should increase
+    const driftedInCorrectDirection = yawAfterDrift > yawAtRelease;
+
+    // Step until momentum is fully degraded by friction
+    for (let f = 0; f < 60; f++) dbg.step(0.016);
+    const momentumFinal = dbg.touchState();
+    const momentumDecayedToZero = momentumFinal.lookMomentumX === 0 && momentumFinal.lookMomentumY === 0;
+
+    // Part C: Tapping screen stops momentum instantly
+    const touchStart3 = new Touch({
+      identifier: 303,
+      target: document.body,
+      clientX: 600,
+      clientY: 200,
+      screenX: 600,
+      screenY: 200,
+      pageX: 600,
+      pageY: 200
+    });
+    window.dispatchEvent(new TouchEvent('touchstart', {
+      changedTouches: [touchStart3],
+      touches: [touchStart3],
+      cancelable: true
+    }));
+
+    const touchMove3 = new Touch({
+      identifier: 303,
+      target: document.body,
+      clientX: 450, // dX = -150
+      clientY: 200,
+      screenX: 450,
+      screenY: 200,
+      pageX: 450,
+      pageY: 200
+    });
+    window.dispatchEvent(new TouchEvent('touchmove', {
+      changedTouches: [touchMove3],
+      touches: [touchMove3],
+      cancelable: true
+    }));
+
+    window.dispatchEvent(new TouchEvent('touchend', {
+      changedTouches: [touchMove3],
+      touches: [],
+      cancelable: true
+    }));
+
+    // Step 2 frames - momentum active
+    dbg.step(0.016);
+    dbg.step(0.016);
+    const momentumActiveBeforeTap = Math.abs(dbg.touchState().lookMomentumX) > 1.0;
+
+    // Now tap the screen in the look zone
+    const tapTouch = new Touch({
+      identifier: 304,
+      target: document.body,
+      clientX: 620,
+      clientY: 210,
+      screenX: 620,
+      screenY: 210,
+      pageX: 620,
+      pageY: 210
+    });
+    window.dispatchEvent(new TouchEvent('touchstart', {
+      changedTouches: [tapTouch],
+      touches: [tapTouch],
+      cancelable: true
+    }));
+
+    const momentumStoppedOnTap = dbg.touchState().lookMomentumX === 0 && dbg.touchState().lookMomentumY === 0;
+
+    const yawAtTap = dbg.yaw();
+    // Step 5 frames
+    for (let f = 0; f < 5; f++) dbg.step(0.016);
+    const yawAfterTapStep = dbg.yaw();
+    const noDriftAfterTap = yawAfterTapStep === yawAtTap;
+
+    // Release tap
+    window.dispatchEvent(new TouchEvent('touchend', {
+      changedTouches: [tapTouch],
+      touches: [],
+      cancelable: true
+    }));
+
+    // Part D: Desktop mouse look check
+    dbg.setTouchDevice(false);
+    const desktopLookMomentum = dbg.touchState().lookMomentumX === 0 && dbg.touchState().lookMomentumY === 0;
+    dbg.setTouchDevice(true);
+
+    return {
+      isDefaultSens,
+      dynamicSensAccurate,
+      momentumCaptured,
+      lookClearedOnRelease,
+      hasDrifted,
+      driftedInCorrectDirection,
+      momentumDecayedToZero,
+      momentumActiveBeforeTap,
+      momentumStoppedOnTap,
+      noDriftAfterTap,
+      desktopLookMomentum
+    };
+  });
+
+  console.log('Test 8 results:', test8);
+  if (test8.isDefaultSens && test8.dynamicSensAccurate && test8.momentumCaptured &&
+      test8.lookClearedOnRelease && test8.hasDrifted && test8.driftedInCorrectDirection &&
+      test8.momentumDecayedToZero && test8.momentumActiveBeforeTap && test8.momentumStoppedOnTap &&
+      test8.noDriftAfterTap && test8.desktopLookMomentum) {
+    console.log('>>> TEST 8 PASSED: Camera inertia drifts smoothly, stops on tap, dynamic sens scales cleanly, desktop unaffected!');
+  } else {
+    throw new Error(`Test 8 FAILED: ${JSON.stringify(test8)}`);
+  }
+
   console.log('\n======================================================');
   console.log('ALL MOBILE ACCEPTANCE CRITERIA VERIFIED SUCCESSFULLY!');
   console.log('======================================================\n');

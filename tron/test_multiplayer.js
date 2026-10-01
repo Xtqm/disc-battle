@@ -168,7 +168,10 @@ async function runMultiplayerTests() {
     window.__dbg.syncNetworkState(0.1);
   });
 
-  await new Promise(r => setTimeout(r, 200));
+  await guestPage.waitForFunction(() => {
+    const opp = window.__dbg.duelOpponent();
+    return opp && opp.targetPos && Math.abs(opp.targetPos.x - 5.0) < 0.1;
+  }, { timeout: 4000 });
 
   // P2 steps physics to interpolate remote opponent
   const p2Perception = await guestPage.evaluate(() => {
@@ -217,7 +220,9 @@ async function runMultiplayerTests() {
     window.__dbg.throwDisc();
   });
 
-  await new Promise(r => setTimeout(r, 200));
+  await guestPage.waitForFunction(() => {
+    return window.__dbg.discs().some(d => d.owner === 'foe');
+  }, { timeout: 4000 });
 
   const throwSyncResults = await guestPage.evaluate(() => {
     const oppDiscs = window.__dbg.discs().filter(d => d.owner === 'foe');
@@ -322,7 +327,11 @@ async function runMultiplayerTests() {
     window.__dbg.step(0.016);
   });
 
-  await new Promise(r => setTimeout(r, 1200));
+  await guestPage.waitForFunction(() => {
+    const overlay = document.getElementById('overlay');
+    const h1 = overlay ? overlay.querySelector('h1') : null;
+    return h1 && h1.textContent === 'DEREZZED';
+  }, { timeout: 4000 });
 
   const endState = await Promise.all([
     hostPage.evaluate(() => {
@@ -346,7 +355,7 @@ async function runMultiplayerTests() {
 
   console.log('End match screen results [Host, Guest]:', endState);
   const guestDead = endState[1].header === 'DEREZZED';
-  const hostVictoryOrRunning = endState[0].header === 'VICTORY' || window.__dbg !== undefined;
+  const hostVictoryOrRunning = endState[0].header === 'VICTORY' || (typeof window !== 'undefined' && window.__dbg !== undefined);
 
   if (guestDead) {
     console.log('>>> TEST 8 PASSED: Defeated player displayed DEREZZED screen and match concluded!');

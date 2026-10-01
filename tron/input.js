@@ -1,5 +1,5 @@
 import * as THREE from './vendor/three.module.js';
-import { state, player } from './state.js';
+import { state, player, touchState } from './state.js';
 import { config } from './config.js';
 import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
 import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
@@ -415,14 +415,32 @@ export function focusGame() {
 }
 
 
-state.sens = 0.0023, state.invertY = false;
+export let sens = 0.0022;
+state.sens = sens;
+state.invertY = false;
 state.steerX = 0, state.steerY = 0;                 // joystick steering (unlocked mode)
 state.cursorX = innerWidth / 2, state.cursorY = innerHeight / 2;
 export const isLocked = () => !!(canvas && document.pointerLockElement === canvas);
 
+if (typeof window !== 'undefined') {
+  window.sens = sens;
+}
+
+Object.defineProperty(state, 'sens', {
+  get() { return sens; },
+  set(v) {
+    sens = v;
+    if (typeof window !== 'undefined') window.sens = v;
+  },
+  configurable: true,
+  enumerable: true
+});
+
+export { touchState };
+
 export function look(dx, dy) {
-  state.player.yaw   -= dx * state.sens;
-  state.player.pitch  = THREE.MathUtils.clamp(state.player.pitch - dy * state.sens * (state.invertY ? -1 : 1), -0.6, 0.55);
+  state.player.yaw   -= dx * sens;
+  state.player.pitch  = THREE.MathUtils.clamp(state.player.pitch - dy * sens * (state.invertY ? -1 : 1), -0.6, 0.55);
   if (state.player.yaw >  Math.PI) state.player.yaw -= Math.PI * 2;
   if (state.player.yaw < -Math.PI) state.player.yaw += Math.PI * 2;
 }
@@ -432,7 +450,7 @@ export function look(dx, dy) {
 export function showSens() {
   const s = document.getElementById('sens');
   if (!s || state.isTouchDevice) return;
-  s.textContent = 'SENSITIVITY ' + Math.round(state.sens / 0.0023 * 100) + '%';
+  s.textContent = 'SENSITIVITY ' + Math.round(sens / 0.0022 * 100) + '%';
   s.style.opacity = 1; clearTimeout(showSens._t);
   showSens._t = setTimeout(() => s.style.opacity = 0, 1200);
 }
@@ -443,7 +461,12 @@ export const moveStartPos = { x: 0, y: 0 };
 export const touchMove = { x: 0, y: 0 }; // normalized: x: [-1, 1], y: [-1, 1]
 
 state.lookTouchId = null;
-export const lookLastPos = { x: 0, y: 0 };
+export const lookLastPos = {
+  get x() { return touchState.lastLookX; },
+  set x(v) { touchState.lastLookX = v; },
+  get y() { return touchState.lastLookY; },
+  set y(v) { touchState.lastLookY = v; }
+};
 
 state.touchJumpHeld = false;
 state.touchDashRequested = false;
@@ -518,11 +541,16 @@ export function onTouchStart(e) {
       touchMove.y = 0;
       showJoystick(t.clientX, t.clientY);
       e.preventDefault();
-    } else if (t.clientX >= window.innerWidth * 0.45 && state.lookTouchId === null) {
-      state.lookTouchId = t.identifier;
-      lookLastPos.x = t.clientX;
-      lookLastPos.y = t.clientY;
-      e.preventDefault();
+    } else if (t.clientX >= window.innerWidth * 0.45) {
+      // Clear residual momentum immediately when touching the look zone
+      touchState.lookMomentumX = 0;
+      touchState.lookMomentumY = 0;
+      if (state.lookTouchId === null) {
+        state.lookTouchId = t.identifier;
+        touchState.lastLookX = t.clientX;
+        touchState.lastLookY = t.clientY;
+        e.preventDefault();
+      }
     }
   }
 }
@@ -535,20 +563,26 @@ export function onTouchMove(e) {
       updateJoystick(t.clientX, t.clientY);
     } else if (t.identifier === state.lookTouchId) {
       e.preventDefault();
-      const dx = t.clientX - lookLastPos.x;
-      const dy = t.clientY - lookLastPos.y;
-      lookLastPos.x = t.clientX;
-      lookLastPos.y = t.clientY;
+      const dX = t.clientX - touchState.lastLookX;
+      const dY = t.clientY - touchState.lastLookY;
 
-      const touchSens = state.sens * 1.35;
-      state.player.yaw -= dx * touchSens;
-      state.player.pitch = THREE.MathUtils.clamp(
-        state.player.pitch - dy * touchSens * (state.invertY ? -1 : 1),
+      touchState.lastLookX = t.clientX;
+      touchState.lastLookY = t.clientY;
+
+      // Store the raw deltas as momentum
+      touchState.lookMomentumX = dX;
+      touchState.lookMomentumY = dY;
+
+      // Apply immediate rotation
+      const touchSens = sens * 2.5;
+      player.yaw -= dX * touchSens;
+      player.pitch = THREE.MathUtils.clamp(
+        player.pitch - dY * touchSens * (state.invertY ? -1 : 1),
         -0.6,
         0.55
       );
-      if (state.player.yaw > Math.PI) state.player.yaw -= Math.PI * 2;
-      if (state.player.yaw < -Math.PI) state.player.yaw += Math.PI * 2;
+      if (player.yaw > Math.PI) player.yaw -= Math.PI * 2;
+      if (player.yaw < -Math.PI) player.yaw += Math.PI * 2;
     }
   }
 }
@@ -561,6 +595,35 @@ export function onTouchEnd(e) {
       hideJoystick();
     } else if (t.identifier === state.lookTouchId) {
       state.lookTouchId = null;
+    }
+  }
+}
+
+export function updateTouchMomentum(dt) {
+  if (!state.player.alive) return;
+  if (touchState.lookId === null && (Math.abs(touchState.lookMomentumX) > 0.1 || Math.abs(touchState.lookMomentumY) > 0.1)) {
+    const touchSens = sens * 2.5;
+
+    // Apply the residual momentum
+    player.yaw -= touchState.lookMomentumX * touchSens;
+    player.pitch = THREE.MathUtils.clamp(
+      player.pitch - touchState.lookMomentumY * touchSens * (state.invertY ? -1 : 1),
+      -0.6,
+      0.55
+    );
+
+    // Wrap yaw safely
+    if (player.yaw > Math.PI) player.yaw -= Math.PI * 2;
+    if (player.yaw < -Math.PI) player.yaw += Math.PI * 2;
+
+    // Apply friction (deceleration)
+    const friction = 1 - Math.pow(0.0001, dt); // Adjust exponent to tune sliding distance
+    touchState.lookMomentumX *= (1 - friction);
+    touchState.lookMomentumY *= (1 - friction);
+
+    if (Math.abs(touchState.lookMomentumX) <= 0.1 && Math.abs(touchState.lookMomentumY) <= 0.1) {
+      touchState.lookMomentumX = 0;
+      touchState.lookMomentumY = 0;
     }
   }
 }

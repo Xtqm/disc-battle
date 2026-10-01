@@ -531,7 +531,7 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
     if (r === role) continue;
     
     const isTeammate = spawns[r].team === mySpawn.team;
-    const color = isTeammate ? CYAN : config.PURPLE;
+    const color = isTeammate ? config.CYAN : config.PURPLE;
     const oppObj = makeProgram(color);
     scene.add(oppObj);
     
@@ -624,7 +624,7 @@ export function onRoomSnapshot(snap) {
 
         if (oppData.hp <= 0 && opp.alive) {
           opp.alive = false;
-          burst(opp.pos.clone().setY(opp.y + 1.4), opp.team === state.multiPlayers[state.playerRole]?.team ? CYAN : config.PURPLE, 80, 15);
+          burst(opp.pos.clone().setY(opp.y + 1.4), opp.team === state.multiPlayers[state.playerRole]?.team ? config.CYAN : config.PURPLE, 80, 15);
           opp.obj.visible = false;
         }
       }
@@ -659,7 +659,7 @@ export function onRoomSnapshot(snap) {
     if (opp) {
       const origin = new THREE.Vector3(t.x, t.y, t.z);
       const vel = new THREE.Vector3(t.vx, t.vy, t.vz);
-      const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? CYAN : config.PURPLE, t.curve || 0);
+      const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? config.CYAN : config.PURPLE, t.curve || 0);
       oppDisc.remoteThrowId = t.id;
       opp.hasDisc = false;
       if (opp.obj && opp.obj.userData && opp.obj.userData.backDisc) {
@@ -670,7 +670,8 @@ export function onRoomSnapshot(snap) {
   }
 
   if (state.playerRole !== 'p1' && Array.isArray(data.fallen)) {
-    for (const [ix, iz] of data.fallen) {
+    for (const item of data.fallen) {
+      const [ix, iz] = Array.isArray(item) ? item : item.split('_').map(Number);
       const tileKey = `${ix}_${iz}`;
       const t = tiles.get(tileKey);
       if (t && t.state === config.TILE_INTACT) {
@@ -763,8 +764,10 @@ export function syncNetworkState(dt) {
 export function onTileDestabilizedByHost(ix, iz) {
   if ((state.gameMode !== 'duel_multi' && state.gameMode !== 'duos_multi') || state.playerRole !== 'p1') return;
   if (!state.currentRoomId || !state.db || !state.currentUser) return;
-  if (!state.roomFallenTiles.some(([x, z]) => x === ix && z === iz)) {
-    state.roomFallenTiles.push([ix, iz]);
+  const tileStr = `${ix}_${iz}`;
+  const alreadyAdded = state.roomFallenTiles.some(item => Array.isArray(item) ? (item[0] === ix && item[1] === iz) : item === tileStr);
+  if (!alreadyAdded) {
+    state.roomFallenTiles.push(tileStr);
     const roomRef = getRoomRef(state.currentRoomId);
     roomUpdateDoc(roomRef, {
       fallen: state.roomFallenTiles
@@ -812,7 +815,7 @@ export function showMultiplayerVictory(data = null) {
     <h1 style="color:#d896ff;text-shadow:0 0 30px #b026ff">VICTORY</h1>
     <h2>GRID SECURED</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
-      ROOM <b style="color:#fff">${currentRoomId || '----'}</b> &nbsp;·&nbsp; ROLE <b style="color:#fff">${playerRole ? playerRole.toUpperCase() : ''}</b>
+      ROOM <b style="color:#fff">${state.currentRoomId || '----'}</b> &nbsp;·&nbsp; ROLE <b style="color:#fff">${state.playerRole ? state.playerRole.toUpperCase() : ''}</b>
     </div>
     <div class="menu-actions" style="max-width:320px;margin:0 auto">
       ${renderGameOverActions(data)}
@@ -829,7 +832,7 @@ export function showMultiplayerDefeat(data = null) {
     <h1>DEREZZED</h1>
     <h2>${subtitle}</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
-      ROOM <b style="color:#fff">${currentRoomId || '----'}</b> &nbsp;·&nbsp; ROLE <b style="color:#fff">${playerRole ? playerRole.toUpperCase() : ''}</b>
+      ROOM <b style="color:#fff">${state.currentRoomId || '----'}</b> &nbsp;·&nbsp; ROLE <b style="color:#fff">${state.playerRole ? state.playerRole.toUpperCase() : ''}</b>
     </div>
     <div class="menu-actions" style="max-width:320px;margin:0 auto">
       ${renderGameOverActions(data)}
