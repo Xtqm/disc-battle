@@ -1,5 +1,9 @@
+import * as THREE from '../../vendor/three.module.js';
+
 export const state = {
-  isTouchDevice: ('ontouchstart' in window) || (navigator.maxTouchPoints > 0) || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
+  isTouchDevice: (typeof window !== 'undefined' && ('ontouchstart' in window)) ||
+    (typeof navigator !== 'undefined' && navigator.maxTouchPoints > 0) ||
+    (typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(pointer: coarse)').matches),
   orientationPaused: false,
   gameMode: 'swarm',
   tier: 1,
@@ -35,8 +39,8 @@ export const state = {
   invertY: false,
   steerX: 0,
   steerY: 0,
-  cursorX: innerWidth / 2,
-  cursorY: innerHeight / 2,
+  cursorX: typeof innerWidth !== 'undefined' ? innerWidth / 2 : 0,
+  cursorY: typeof innerHeight !== 'undefined' ? innerHeight / 2 : 0,
   moveTouchId: null,
   lookTouchId: null,
   lookMomentumX: 0,
@@ -51,7 +55,8 @@ export const state = {
   shakeAmt: 0,
   time: 0,
   keys: {},
-  joystick: { active: false, x: 0, y: 0, baseX: 0, baseY: 0, curX: 0, curY: 0 }
+  joystick: { active: false, x: 0, y: 0, baseX: 0, baseY: 0, curX: 0, curY: 0 },
+  audioCtx: null
 };
 
 export const touchState = {
@@ -82,12 +87,8 @@ Object.defineProperty(state, 'lookMomentumY', {
   enumerable: true
 });
 
-// We will keep player inside state as well, but in game.js it was created with THREE objects.
-// Wait, player needs THREE. So we can't initialize it purely here unless we import THREE.
-import * as THREE from './vendor/three.module.js';
-
 export const player = {
-  obj: null, // Will be initialized in graphics.js or main.js
+  obj: null,
   pos: new THREE.Vector3(0, 0, 14), 
   vel: new THREE.Vector3(),
   yaw: Math.PI, 

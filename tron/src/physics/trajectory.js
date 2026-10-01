@@ -1,17 +1,11 @@
-import * as THREE from './vendor/three.module.js';
-import { state, player } from './state.js';
-import { config } from './config.js';
-import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
-import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
-import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
-import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
-import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { el, msgEl, message, showGameOver, shake } from './ui.js';
-import { clock, update, loop } from './main.js';
+import * as THREE from '../../vendor/three.module.js';
+import { state } from '../core/state.js';
+import { config } from '../core/config.js';
+import { scene, camera } from '../graphics/scene.js';
+import { getTileAt, pillars } from '../entities/Arena.js';
+import { tmp } from '../graphics/materials.js';
+import { getPlayerCurveIntent } from '../input/keyboard.js';
 
-// Runs the EXACT same integration the live disc uses, so the dotted arc is a
-// real simulation of the throw (walls, pillars, bounce count, return curve),
-// not a decorative straight line.
 export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, curve = 0) {
   const p = origin.clone(), v = vel.clone();
   const pts = [p.clone()], bounceAt = [];
@@ -45,10 +39,10 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
 
     p.addScaledVector(v, step);
     if (p.y > config.DISC_R) {
-      p.y += (1.7 - p.y) * Math.min(1, step * 2.2);        // same hover easing
+      p.y += (1.7 - p.y) * Math.min(1, step * 2.2);
     }
 
-    // floor collision & void check
+    // Floor collision & void check
     const yFloor = config.DISC_R;
     if (p.y <= yFloor) {
       const tile = getTileAt(p.x, p.z);
@@ -67,7 +61,6 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
           }
         }
       } else {
-        // Tile is FALLEN: do not reflect vertically; allow path to trace into void
         v.y -= 25 * step;
       }
     }
@@ -94,7 +87,7 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
       k = -k * 0.5;
     }
 
-    // does it intercept a program?
+    // Intercepts a foe program?
     const simFoes = state.foes;
     for (const f of simFoes) {
       if (p.distanceTo(tmp.copy(f.pos).setY(1.5 + (f.y || 0))) < config.FOE_R + config.DISC_R + .35) {
@@ -108,7 +101,7 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
   return { pts, bounceAt, hitFoe };
 }
 
-// visuals: dotted line + bounce pips + impact reticle
+// Visuals
 export const trajLine = new THREE.Line(
   new THREE.BufferGeometry().setAttribute('position', new THREE.BufferAttribute(new Float32Array(1500 * 3), 3)),
   new THREE.LineDashedMaterial({ color: config.CYAN, dashSize: .45, gapSize: .35, transparent: true, opacity: .55,
@@ -125,6 +118,7 @@ for (let i = 0; i < 4; i++) {
   );
   m.visible = false; bouncePips.push(m);
 }
+
 export const impactMark = new THREE.Mesh(
   new THREE.RingGeometry(.55, .75, 24),
   new THREE.MeshBasicMaterial({ color: config.WHITE, transparent: true, opacity: .9, side: THREE.DoubleSide,
@@ -132,8 +126,6 @@ export const impactMark = new THREE.Mesh(
 );
 impactMark.visible = false;
 
-// Incoming enemy discs get a faint predicted path too, so a ricochet coming at
-// your back is readable and parryable instead of a cheap shot.
 export const threatLines = [];
 for (let i = 0; i < 6; i++) {
   const l = new THREE.Line(
@@ -152,6 +144,10 @@ export function initPhysicsVisuals(targetScene = scene) {
   threatLines.forEach(l => { if (!l.parent) targetScene.add(l); });
 }
 
+if (typeof window !== 'undefined') {
+  window.__tronInitPhysicsVisuals = initPhysicsVisuals;
+}
+
 export function updateThreatPaths() {
   if (!trajLine.parent && scene) initPhysicsVisuals(scene);
   let n = 0;
@@ -166,7 +162,6 @@ export function updateThreatPaths() {
     L.geometry.attributes.position.needsUpdate = true;
     L.geometry.computeBoundingSphere();
     L.computeLineDistances();
-    // brighten if this disc is currently tracking toward the player
     const toMe = tmp.copy(state.player.pos).setY(1.7).sub(D.pos).normalize();
     L.material.opacity = 0.18 + Math.max(0, D.vel.clone().normalize().dot(toMe)) * 0.5;
     L.visible = true;
@@ -188,10 +183,8 @@ export function updateTrajectory(aim, dt) {
   const curve = getPlayerCurveIntent();
   const sim = simulatePath(origin, dir.clone().multiplyScalar(38), 3, 1.5, 1 / 90, curve);
 
-  // colour the arc by outcome: white-hot when the line actually connects
   const willHit = !!sim.hitFoe;
   
-  // Safe rearKill calculation (pure vector math, no allocations)
   let rearKill = false;
   if (willHit && sim.hitFoe.foe) {
     const f = sim.hitFoe.foe;
@@ -239,73 +232,4 @@ export function updateTrajectory(aim, dt) {
   impactMark.scale.setScalar((willHit ? 1.3 : .9) + Math.sin(state.time * 9) * .1);
 
   return { willHit, rearKill, bounces: sim.bounceAt.length };
-}
-
-export function resolveCircle(pos, radius, y = 0) {
-  const lim = config.ARENA - 1.4 - radius;
-  pos.x = THREE.MathUtils.clamp(pos.x, -lim, lim);
-  pos.z = THREE.MathUtils.clamp(pos.z, -lim, lim);
-  for (const p of pillars) {
-    const dx = pos.x - p.x, dz = pos.z - p.z;
-    const dist = Math.hypot(dx, dz), min = p.r + radius;
-    if (dist < min && dist > 0.0001) {
-      pos.x = p.x + dx / dist * min;
-      pos.z = p.z + dz / dist * min;
-    }
-  }
-
-  // Vertical edge colliders for intact tiles when entity is in falling zone (y < -0.2m)
-  if (y < -0.2) {
-    const minIX = Math.max(0, Math.floor((pos.x - radius + config.ARENA) / config.TILE_W));
-    const maxIX = Math.min(config.TILE_N - 1, Math.floor((pos.x + radius + config.ARENA) / config.TILE_W));
-    const minIZ = Math.max(0, Math.floor((pos.z - radius + config.ARENA) / config.TILE_W));
-    const maxIZ = Math.min(config.TILE_N - 1, Math.floor((pos.z + radius + config.ARENA) / config.TILE_W));
-
-    for (let ix = minIX; ix <= maxIX; ix++) {
-      for (let iz = minIZ; iz <= maxIZ; iz++) {
-        const t = tiles.get(`${ix}_${iz}`);
-        if (!t || t.state === config.TILE_FALLEN || t.state === config.TILE_REBUILDING) continue;
-
-        const tMinX = -config.ARENA + ix * config.TILE_W;
-        const tMaxX = -config.ARENA + (ix + 1) * config.TILE_W;
-        const tMinZ = -config.ARENA + iz * config.TILE_W;
-        const tMaxZ = -config.ARENA + (iz + 1) * config.TILE_W;
-
-        const cx = Math.max(tMinX, Math.min(pos.x, tMaxX));
-        const cz = Math.max(tMinZ, Math.min(pos.z, tMaxZ));
-        const dx = pos.x - cx;
-        const dz = pos.z - cz;
-        const distSq = dx * dx + dz * dz;
-
-        if (distSq < radius * radius && distSq > 1e-6) {
-          const dist = Math.sqrt(distSq);
-          const push = radius - dist;
-          pos.x += (dx / dist) * push;
-          pos.z += (dz / dist) * push;
-        } else if (distSq <= 1e-6) {
-          const dL = pos.x - tMinX;
-          const dR = tMaxX - pos.x;
-          const dB = pos.z - tMinZ;
-          const dT = tMaxZ - pos.z;
-          const minD = Math.min(dL, dR, dB, dT);
-          if (minD === dL) pos.x = tMinX - radius;
-          else if (minD === dR) pos.x = tMaxX + radius;
-          else if (minD === dB) pos.z = tMinZ - radius;
-          else pos.z = tMaxZ + radius;
-        }
-      }
-    }
-  }
-}
-
-export function lineOfSight(a, b) {
-  for (const p of pillars) {
-    const ax = a.x - p.x, az = a.z - p.z, bx = b.x - p.x, bz = b.z - p.z;
-    const dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz;
-    let t = L ? -(ax * dx + az * dz) / L : 0;
-    t = THREE.MathUtils.clamp(t, 0, 1);
-    const cx = ax + dx * t, cz = az + dz * t;
-    if (Math.hypot(cx, cz) < p.r + .5) return false;
-  }
-  return true;
 }

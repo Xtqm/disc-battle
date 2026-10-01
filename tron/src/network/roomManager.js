@@ -1,232 +1,16 @@
-import * as THREE from './vendor/three.module.js';
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
-import { getAuth, signInWithCustomToken, signInAnonymously } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
-import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
-import { state, player } from './state.js';
-import { config } from './config.js';
-import { renderer, scene, camera, checkOrientation, key, d, floor, grid, ring, tiles, tileGeo, tileEdgeGeo, tileMatIntact, tileEdgeMatIntact, tileGroup, worldToTile, tileToWorld, getTileAt, findNearestIntactTile, wallMat, glowMat, pillars, pillarSpots, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _localY, _duelToP, _duelSide, _duelWant, _duelSafe, _duelCoverDir, _duelLead, _duelAimDir, _duelOrigin, _duelEvade, makeProgram, discGeo, makeDisc, sparks, burst, triggerTileWarning, spawnTileDeRezSparks, updateTiles, getPillarCoverPoint, findBestCoverPillar, updateDuelFoe } from './graphics.js';
-import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from './audio.js';
-import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
-import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
-import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { el, msgEl, message, showGameOver, shake, requestFullScreen } from './ui.js';
-import { startCountdown } from './main.js';
-
-config.appId = typeof __app_id !== 'undefined' ? __app_id : 'tron-disc-arena';
-state.db = null, state.auth = null, state.currentUser = null;
-
-state.currentRoomId = null;
-state.playerRole = null; // 'p1' (host) or 'p2' (guest)
-state.roomUnsubscribe = null;
-state.duelOpponent = null;
-state.lastProcessedThrowId = null;
-state.roomFallenTiles = [];
-state.netSyncTimer = 0;
-
-// Mock peer network for multi-tab testing / offline fallback
-state.mockChannel = null;
-export const mockStore = new Map();
-export const mockListeners = new Map();
-
-export function initMockNetwork() {
-  if (state.currentUser) return;
-  const dummyUid = 'user_' + Math.random().toString(36).substring(2, 9);
-  state.currentUser = { uid: dummyUid, isAnonymous: true };
-  state.auth = { currentUser: state.currentUser };
-  state.db = { isMock: true };
-
-  if (!state.mockChannel && typeof BroadcastChannel !== 'undefined') {
-    state.mockChannel = new BroadcastChannel('tron_disc_arena_mock_net_' + config.appId);
-    state.mockChannel.onmessage = (e) => {
-      const msg = e.data;
-      if (!msg) return;
-      if (msg.type === 'doc_set' || msg.type === 'doc_update') {
-        mockStore.set(msg.path, msg.data);
-        const set = mockListeners.get(msg.path);
-        if (set) {
-          const snap = {
-            exists: () => true,
-            data: () => JSON.parse(JSON.stringify(msg.data))
-          };
-          for (const cb of set) {
-            try { cb(snap); } catch (err) { console.error(err); }
-          }
-        }
-      } else if (msg.type === 'doc_query') {
-        let stored = mockStore.get(msg.path);
-        if (!stored && typeof localStorage !== 'undefined') {
-          try {
-            const item = localStorage.getItem('tron_doc_' + msg.path);
-            if (item) stored = JSON.parse(item);
-          } catch (_) {}
-        }
-        if (stored) {
-          mockStore.set(msg.path, stored);
-          state.mockChannel.postMessage({ type: 'doc_set', path: msg.path, data: stored });
-        }
-      }
-    };
-  }
-}
-
-export function mockDocRef(path, id) {
-  return { isMock: true, path, id };
-}
-
-export function mockSetDoc(ref, data) {
-  if (!state.currentUser) return Promise.resolve();
-  const serialized = JSON.parse(JSON.stringify(data));
-  mockStore.set(ref.path, serialized);
-  if (typeof localStorage !== 'undefined') {
-    try { localStorage.setItem('tron_doc_' + ref.path, JSON.stringify(serialized)); } catch (_) {}
-  }
-  if (state.mockChannel) {
-    state.mockChannel.postMessage({ type: 'doc_set', path: ref.path, data: serialized });
-  }
-  const set = mockListeners.get(ref.path);
-  if (set) {
-    const snap = { exists: () => true, data: () => JSON.parse(JSON.stringify(serialized)) };
-    for (const cb of set) {
-      try { cb(snap); } catch (err) { console.error(err); }
-    }
-  }
-  return Promise.resolve();
-}
-
-export function mockGetDoc(ref) {
-  let data = mockStore.get(ref.path);
-  if (!data && typeof localStorage !== 'undefined') {
-    try {
-      const item = localStorage.getItem('tron_doc_' + ref.path);
-      if (item) {
-        data = JSON.parse(item);
-        mockStore.set(ref.path, data);
-      }
-    } catch (_) {}
-  }
-  return Promise.resolve({
-    exists: () => !!data,
-    data: () => data ? JSON.parse(JSON.stringify(data)) : null
-  });
-}
-
-export function mockUpdateDoc(ref, patch) {
-  if (!state.currentUser) return Promise.resolve();
-  let existing = mockStore.get(ref.path);
-  if (!existing && typeof localStorage !== 'undefined') {
-    try {
-      const item = localStorage.getItem('tron_doc_' + ref.path);
-      if (item) existing = JSON.parse(item);
-    } catch (_) {}
-  }
-  const merged = Object.assign({}, existing || {}, JSON.parse(JSON.stringify(patch)));
-  if (patch.p1 && existing && existing.p1) merged.p1 = Object.assign({}, existing.p1, patch.p1);
-  if (patch.p2 && existing && existing.p2) merged.p2 = Object.assign({}, existing.p2, patch.p2);
-
-  mockStore.set(ref.path, merged);
-  if (typeof localStorage !== 'undefined') {
-    try { localStorage.setItem('tron_doc_' + ref.path, JSON.stringify(merged)); } catch (_) {}
-  }
-  if (state.mockChannel) {
-    state.mockChannel.postMessage({ type: 'doc_update', path: ref.path, data: merged });
-  }
-  const set = mockListeners.get(ref.path);
-  if (set) {
-    const snap = { exists: () => true, data: () => JSON.parse(JSON.stringify(merged)) };
-    for (const cb of set) {
-      try { cb(snap); } catch (err) { console.error(err); }
-    }
-  }
-  return Promise.resolve();
-}
-
-export function mockOnSnapshot(ref, onUpdate, onError) {
-  if (!mockListeners.has(ref.path)) {
-    mockListeners.set(ref.path, new Set());
-  }
-  const set = mockListeners.get(ref.path);
-  set.add(onUpdate);
-
-  mockGetDoc(ref).then(snap => {
-    if (snap.exists() && set.has(onUpdate)) {
-      try { onUpdate(snap); } catch (err) { if (onError) onError(err); }
-    } else if (state.mockChannel) {
-      state.mockChannel.postMessage({ type: 'doc_query', path: ref.path });
-    }
-  });
-
-  return () => {
-    set.delete(onUpdate);
-  };
-}
-
-export async function initNetwork() {
-  if (state.db) return;
-  if (typeof __firebase_config === 'undefined' || !__firebase_config) {
-    if (window.__useMockNetwork !== false && (typeof BroadcastChannel !== 'undefined' || typeof localStorage !== 'undefined')) {
-      initMockNetwork();
-      return;
-    }
-    console.warn("No Firebase configuration found; multiplayer offline.");
-    return;
-  }
-  try {
-    const firebaseConfig = typeof __firebase_config === 'string' ? JSON.parse(__firebase_config) : __firebase_config;
-    const app = initializeApp(firebaseConfig);
-    state.auth = getAuth(app);
-    state.db = getFirestore(app);
-
-    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-      await signInWithCustomToken(state.auth, __initial_auth_token);
-    } else {
-      await signInAnonymously(state.auth);
-    }
-    state.currentUser = state.auth.currentUser;
-  } catch (err) {
-    console.warn("Firebase initialization error:", err);
-    state.db = null;
-    if (window.__useMockNetwork !== false) {
-      initMockNetwork();
-    }
-  }
-}
-
-export function getRoomRef(roomCode) {
-  if (state.db && state.db.isMock) {
-    return mockDocRef(`artifacts/${config.appId}/public/data/rooms/${roomCode}`, roomCode);
-  }
-  return doc(state.db, 'artifacts', config.appId, 'public', 'data', 'rooms', roomCode);
-}
-
-export function roomSetDoc(roomRef, data) {
-  if (!state.currentUser) return Promise.resolve();
-  if (roomRef && roomRef.isMock) {
-    return mockSetDoc(roomRef, data);
-  }
-  return setDoc(roomRef, data);
-}
-
-export function roomGetDoc(roomRef) {
-  if (roomRef && roomRef.isMock) {
-    return mockGetDoc(roomRef);
-  }
-  return getDoc(roomRef);
-}
-
-export function roomUpdateDoc(roomRef, data) {
-  if (!state.currentUser) return Promise.resolve();
-  if (roomRef && roomRef.isMock) {
-    return mockUpdateDoc(roomRef, data);
-  }
-  return updateDoc(roomRef, data);
-}
-
-export function roomOnSnapshot(roomRef, onUpdate, onError) {
-  if (roomRef && roomRef.isMock) {
-    return mockOnSnapshot(roomRef, onUpdate, onError);
-  }
-  return onSnapshot(roomRef, onUpdate, onError);
-}
+import * as THREE from '../../vendor/three.module.js';
+import { state } from '../core/state.js';
+import { config } from '../core/config.js';
+import { scene, camera } from '../graphics/scene.js';
+import { makeProgram } from '../graphics/materials.js';
+import { burst } from '../graphics/particles.js';
+import { tiles, tileMatIntact, tileEdgeMatIntact, triggerTileWarning } from '../entities/Arena.js';
+import { spawnDisc } from '../entities/Disc.js';
+import { initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot } from './firebaseSetup.js';
+import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
+import { shake } from '../ui/UIManager.js';
+import { updateHUD, message, el } from '../ui/hud.js';
+import { requestFullScreen } from '../ui/modals.js';
 
 export function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -239,12 +23,12 @@ export function generateRoomCode() {
 
 export function copyRoomCode(code) {
   try {
-    const el = document.createElement('textarea');
-    el.value = code;
-    document.body.appendChild(el);
-    el.select();
+    const textarea = document.createElement('textarea');
+    textarea.value = code;
+    document.body.appendChild(textarea);
+    textarea.select();
     document.execCommand('copy');
-    document.body.removeChild(el);
+    document.body.removeChild(textarea);
     message('ROOM CODE COPIED');
   } catch (err) {
     message('CODE: ' + code);
@@ -396,13 +180,11 @@ export async function onClickConfirmJoin(e) {
       throw new Error('ROOM IN SESSION OR FULL');
     }
     
-    // Find an empty slot
     const maxPlayers = data.mode === '2v2' ? 4 : 2;
     let assignedRole = null;
     let currentPlayers = 0;
     
-    // Ensure players object exists
-    const players = data.players || { p1: data.hostId, p2: null, p3: null, p4: null }; // Fallback for old schema
+    const players = data.players || { p1: data.hostId, p2: null, p3: null, p4: null };
     
     for (let i = 1; i <= maxPlayers; i++) {
       const role = 'p' + i;
@@ -467,15 +249,13 @@ export async function onClickConfirmJoin(e) {
   }
 }
 
-state.multiPlayers = {};
-state.teammates = [];
-
 export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
   state.gameMode = mode === '2v2' ? 'duos_multi' : 'duel_multi';
   state.playerRole = role;
   state.currentRoomId = roomCode;
   state.lastProcessedThrowId = null;
   state.netSyncTimer = 0;
+  const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'none';
 
   for (const f of state.foes) scene.remove(f.obj);
@@ -486,7 +266,6 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
   for (const d of state.discs) scene.remove(d.obj);
   state.foes = []; state.teammates = []; state.multiPlayers = {}; state.discs = [];
 
-  // Reset arena tiles
   for (const tile of tiles.values()) {
     tile.state = config.TILE_INTACT;
     tile.timer = 0;
@@ -566,7 +345,6 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
     else state.foes.push(mp);
   }
   
-  // Legacy alias for 1v1 logic
   if (mode === '1v1') {
     state.duelOpponent = state.foes[0];
   } else {
@@ -590,7 +368,9 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
   camera.lookAt(look);
 
   updateHUD();
-  startCountdown(3.0);
+  if (typeof window !== 'undefined' && window.__tronStartCountdown) {
+    window.__tronStartCountdown(3.0);
+  }
   tryLock();
   focusGame();
 }
@@ -606,8 +386,6 @@ export function onRoomSnapshot(snap) {
     const jm = document.getElementById('joinModal');
     if (jm) jm.style.display = 'none';
     
-    // Use the stored gameMode to prevent double-starting if we just set running = true,
-    // though !running should cover it.
     startMultiplayerDuel(state.playerRole, state.currentRoomId, data.mode || '1v1');
     message('CHALLENGERS DETECTED — FIGHT!');
     return;
@@ -615,7 +393,6 @@ export function onRoomSnapshot(snap) {
 
   if (state.gameMode !== 'duel_multi' && state.gameMode !== 'duos_multi') return;
 
-  // Process all remote players
   if (data.state) {
     for (const r in state.multiPlayers) {
       const oppData = data.state[r];
@@ -637,7 +414,6 @@ export function onRoomSnapshot(snap) {
     }
   }
 
-  // Fallback for old schema where it was at the root
   for (const r in state.multiPlayers) {
     if (data.state && data.state[r]) continue;
     const oppData = data[r];
@@ -688,7 +464,6 @@ export function onRoomSnapshot(snap) {
 
   if (data.status === 'finished') {
     if (!state.running) {
-      // Update rematch votes display
       const rv = data.rematchVotes || {};
       let vCount = 0;
       let pCount = 0;
@@ -704,7 +479,6 @@ export function onRoomSnapshot(snap) {
         voteLabel.textContent = `REMATCH VOTES: ${vCount} / ${pCount}`;
       }
       
-      // If host, check if all voted yes
       if (state.playerRole === 'p1' && vCount === pCount && vCount > 0) {
         const roomRef = getRoomRef(state.currentRoomId);
         const resetPatch = {
@@ -713,7 +487,6 @@ export function onRoomSnapshot(snap) {
           fallen: [],
           rematchVotes: { p1: false, p2: false, p3: false, p4: false }
         };
-        // Reset everyone's HP
         for (const k in data.players) {
           if (data.players[k]) {
             resetPatch[`state.${k}.hp`] = 100;
@@ -722,7 +495,6 @@ export function onRoomSnapshot(snap) {
         roomUpdateDoc(roomRef, resetPatch);
       }
     } else {
-      // Transition to game over screen
       let isWin = false;
       if (data.mode === '2v2') {
         const myTeam = (state.playerRole === 'p1' || state.playerRole === 'p3') ? 1 : 2;
@@ -736,48 +508,6 @@ export function onRoomSnapshot(snap) {
         showMultiplayerDefeat(data);
       }
     }
-  }
-}
-
-export function syncNetworkState(dt) {
-  if (!state.db || !state.currentRoomId || (state.gameMode !== 'duel_multi' && state.gameMode !== 'duos_multi')) return;
-  if (!state.currentUser) return;
-  state.netSyncTimer -= dt;
-  if (state.netSyncTimer > 0) return;
-  state.netSyncTimer = 0.055; // ~18 Hz
-
-  const roomRef = getRoomRef(state.currentRoomId);
-  const myState = {
-    x: +state.player.pos.x.toFixed(2),
-    y: +state.player.y.toFixed(2),
-    z: +state.player.pos.z.toFixed(2),
-    yaw: +state.player.yaw.toFixed(2),
-    pitch: +state.player.pitch.toFixed(2),
-    hp: state.player.hp,
-    blocking: state.player.blocking,
-    hasDisc: state.player.hasDisc
-  };
-
-  const payload = {};
-  payload[`state.${state.playerRole}`] = myState;
-  
-  // Backwards compatibility sync just in case
-  payload[state.playerRole] = myState;
-
-  roomUpdateDoc(roomRef, payload).catch(err => console.warn("Sync err:", err));
-}
-
-export function onTileDestabilizedByHost(ix, iz) {
-  if ((state.gameMode !== 'duel_multi' && state.gameMode !== 'duos_multi') || state.playerRole !== 'p1') return;
-  if (!state.currentRoomId || !state.db || !state.currentUser) return;
-  const tileStr = `${ix}_${iz}`;
-  const alreadyAdded = state.roomFallenTiles.some(item => Array.isArray(item) ? (item[0] === ix && item[1] === iz) : item === tileStr);
-  if (!alreadyAdded) {
-    state.roomFallenTiles.push(tileStr);
-    const roomRef = getRoomRef(state.currentRoomId);
-    roomUpdateDoc(roomRef, {
-      fallen: state.roomFallenTiles
-    }).catch(err => console.warn("Fallen tiles sync err:", err));
   }
 }
 
@@ -797,7 +527,9 @@ export function bindGameOverActions() {
   if (btn) btn.onclick = (e) => {
     e.stopPropagation();
     teardownMultiplayer();
-    showModeSelectMenu();
+    if (typeof window !== 'undefined' && window.__tronShowModeSelectMenu) {
+      window.__tronShowModeSelectMenu();
+    }
   };
   
   const voteBtn = el('voteRematchBtn');
@@ -816,8 +548,9 @@ export function bindGameOverActions() {
 
 export function showMultiplayerVictory(data = null) {
   state.running = false;
-  overlay.style.display = 'flex';
-  overlay.innerHTML = `<div class="card" style="border-color:#b026ff;box-shadow:0 0 60px rgba(176,38,255,.3);">
+  const overlay = document.getElementById('overlay');
+  if (overlay) overlay.style.display = 'flex';
+  if (overlay) overlay.innerHTML = `<div class="card" style="border-color:#b026ff;box-shadow:0 0 60px rgba(176,38,255,.3);">
     <h1 style="color:#d896ff;text-shadow:0 0 30px #b026ff">VICTORY</h1>
     <h2>GRID SECURED</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
@@ -832,9 +565,10 @@ export function showMultiplayerVictory(data = null) {
 
 export function showMultiplayerDefeat(data = null) {
   state.running = false;
-  overlay.style.display = 'flex';
+  const overlay = document.getElementById('overlay');
+  if (overlay) overlay.style.display = 'flex';
   const subtitle = state.gameOverReason || 'YOU WERE ELIMINATED IN THE ARENA';
-  overlay.innerHTML = `<div class="card dead">
+  if (overlay) overlay.innerHTML = `<div class="card dead">
     <h1>DEREZZED</h1>
     <h2>${subtitle}</h2>
     <div style="font-size:15px;letter-spacing:4px;margin-bottom:26px">
@@ -865,7 +599,7 @@ export function teardownMultiplayer() {
   state.gameMode = 'swarm';
   state.running = false;
   state.paused = false;
-  if (document.pointerLockElement) {
+  if (typeof document !== 'undefined' && document.pointerLockElement) {
     document.exitPointerLock();
   }
   setCursor();
