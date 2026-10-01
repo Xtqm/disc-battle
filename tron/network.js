@@ -9,7 +9,7 @@ import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
 import { EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, moveStartPos, touchMove, lookLastPos, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { el, msgEl, message, showGameOver, shake } from './ui.js';
+import { el, msgEl, message, showGameOver, shake, requestFullScreen } from './ui.js';
 import { startCountdown } from './main.js';
 
 config.appId = typeof __app_id !== 'undefined' ? __app_id : 'tron-disc-arena';
@@ -302,6 +302,9 @@ export function showJoinInputModal() {
 }
 
 export async function onClickCreateRoom(e, mode = '1v1') {
+  if (state.isTouchDevice) {
+    requestFullScreen();
+  }
   if (e) {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
@@ -356,6 +359,9 @@ export async function onClickCreateRoom(e, mode = '1v1') {
 }
 
 export async function onClickConfirmJoin(e) {
+  if (state.isTouchDevice) {
+    requestFullScreen();
+  }
   if (e) {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();

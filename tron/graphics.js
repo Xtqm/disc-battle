@@ -56,13 +56,19 @@ export function checkOrientation() {
     }
   }
 }
-addEventListener('resize', () => {
-  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+export function onResize() {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, state.isTouchDevice ? 1.5 : 2));
   checkOrientation();
-});
+}
+addEventListener('resize', onResize);
 window.addEventListener('orientationchange', checkOrientation);
+document.addEventListener('fullscreenchange', onResize);
+document.addEventListener('webkitfullscreenchange', onResize);
+document.addEventListener('mozfullscreenchange', onResize);
+document.addEventListener('MSFullscreenChange', onResize);
 
 scene.add(new THREE.HemisphereLight(0x3f9ab5, 0x061820, 0.95));
 export const key = new THREE.DirectionalLight(0x9ff0ff, 0.8);

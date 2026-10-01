@@ -538,7 +538,10 @@
   <div class="panel" id="tr">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
       <div id="roundLabel">Cycle <span id="wave" class="big">1</span></div>
-      <button id="pauseBtn" class="hud-btn">II PAUSE</button>
+      <div style="display:flex;align-items:center;gap:6px">
+        <button id="hudFullscreenBtn" class="hud-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">FULLSCREEN</button>
+        <button id="pauseBtn" class="hud-btn">II PAUSE</button>
+      </div>
     </div>
     <div style="margin-top:4px">Score <span id="score">0</span></div>
     <div id="subLabel" style="margin-top:4px">Hostiles <span id="foes">0</span></div>
@@ -601,16 +604,19 @@
   </div>
 </div>
 
+<div id="pauseModal" style="display:contents;">
 <div id="pauseMenu" class="modal" style="display:none;">
   <div class="card">
     <h1>SYSTEM PAUSED</h1>
     <h2>GRID SIMULATION SUSPENDED</h2>
     <div class="menu-actions">
       <button id="resumeBtn" class="btn">RESUME</button>
+      <button id="fullscreenBtn" class="btn">FULLSCREEN</button>
       <button id="restartBtn" class="btn">RESTART MATCH</button>
       <button id="modeSelectBtn" class="btn">MODE SELECT</button>
     </div>
   </div>
+</div>
 </div>
 
 <div id="hostModal" class="modal-overlay" style="display:none;">

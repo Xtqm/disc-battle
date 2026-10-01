@@ -7,7 +7,7 @@ import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThre
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { initInput, EAT, getPlayerCurveIntent, codeOf, onDown, onUp, canvas, overlay, startMode, startGame, pauseGame, resumeGame, restartMatch, showModeSelect, getMainMenuHtml, showModeSelectMenu, bindMainMenuEvents, pauseBtn, onPauseClick, resumeBtn, onResumeClick, restartBtn, onRestartClick, modeSelectBtn, onModeSelectClick, btnCopyCode, btnConfirmJoin, btnCancelRoom, joinRoomInput, tryLock, setCursor, focusGame, isLocked, look, showSens, sens, moveStartPos, touchMove, lookLastPos, touchState, updateTouchMomentum, joyBase, joyThumb, R_STICK, showJoystick, updateJoystick, hideJoystick, updateCurveButtons, onTouchStart, onTouchMove, onTouchEnd, bindMobileButtons } from './input.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { el, msgEl, message, showGameOver, shake, bindMenuButtons } from './ui.js';
+import { el, msgEl, message, showGameOver, shake, bindMenuButtons, requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen } from './ui.js';
 
 export const clock = new THREE.Clock();
 state.time = 0;
@@ -1301,8 +1301,14 @@ window.__dbg = {
     const roomRef = getRoomRef(code || state.currentRoomId);
     const snap = await roomGetDoc(roomRef);
     return snap.exists() ? snap.data() : null;
-  }
+  },
+  requestFullScreen: () => requestFullScreen(),
+  exitFullScreen: () => exitFullScreen(),
+  toggleFullScreen: () => toggleFullScreen(),
+  isFullScreen: () => isFullScreen()
 };
 
 window.__TRON__ = window.__dbg;
+
+export { requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen };
 

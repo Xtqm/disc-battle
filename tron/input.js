@@ -6,7 +6,7 @@ import { getAudioCtx, playDeRezSound, playWarningSound, playTileDropSound } from
 import { simulatePath, trajLine, bouncePips, impactMark, threatLines, updateThreatPaths, updateTrajectory, resolveCircle, lineOfSight } from './physics.js';
 import { mockStore, mockListeners, initMockNetwork, mockDocRef, mockSetDoc, mockGetDoc, mockUpdateDoc, mockOnSnapshot, initNetwork, getRoomRef, roomSetDoc, roomGetDoc, roomUpdateDoc, roomOnSnapshot, generateRoomCode, copyRoomCode, showHostWaitingModal, showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, startMultiplayerDuel, onRoomSnapshot, syncNetworkState, onTileDestabilizedByHost, renderGameOverActions, bindGameOverActions, showMultiplayerVictory, showMultiplayerDefeat, teardownMultiplayer } from './network.js';
 import { updateHUD, resetGame, spawnDuelBoss, spawnWave, throwDisc, _ro, aimTarget, aimDir, spawnDisc, damagePlayer, killFoe } from './entities.js';
-import { el, msgEl, message, showGameOver, shake } from './ui.js';
+import { el, msgEl, message, showGameOver, shake, requestFullScreen, toggleFullScreen, isFullScreen } from './ui.js';
 
 state.paused = false;
 export let lockFailed = false;
@@ -86,6 +86,9 @@ export function startMode(mode) {
 }
 
 export function startGame() {
+  if (state.isTouchDevice) {
+    requestFullScreen();
+  }
   startMode(state.gameMode || 'swarm');
 }
 
@@ -204,7 +207,14 @@ export function bindMainMenuEvents() {
     }
   };
 
-  const startSwarm = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('swarm'); };
+  const startSwarm = (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    if (state.isTouchDevice) {
+      requestFullScreen();
+    }
+    startMode('swarm');
+  };
   const openHostModal = (e) => {
     e.stopPropagation(); if (e.cancelable) e.preventDefault();
     if (overlay) overlay.style.display = 'none';
@@ -220,7 +230,14 @@ export function bindMainMenuEvents() {
     if (overlay) overlay.style.display = 'none';
     showJoinInputModal();
   };
-  const startDuelAi = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); startMode('duel_ai'); };
+  const startDuelAi = (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    if (state.isTouchDevice) {
+      requestFullScreen();
+    }
+    startMode('duel_ai');
+  };
 
   bind('swarmBtn', startSwarm);
   bind('hostMatchBtn', openHostModal);
@@ -231,6 +248,9 @@ export function bindMainMenuEvents() {
 
 // Bind pause menu & HUD buttons
 export let pauseBtn = null;
+export let hudFullscreenBtn = null;
+export let fullscreenBtn = null;
+
 export const onPauseClick = (e) => {
   e.stopPropagation(); if (e.cancelable) e.preventDefault();
   if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
@@ -241,11 +261,31 @@ export const onPauseClick = (e) => {
   }
 };
 
+export const onFullscreenToggleClick = (e) => {
+  e.stopPropagation();
+  if (e.cancelable) e.preventDefault();
+  toggleFullScreen();
+};
+
 export let resumeBtn = null;
-export const onResumeClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); resumeGame(); };
+export const onResumeClick = (e) => {
+  e.stopPropagation();
+  if (e.cancelable) e.preventDefault();
+  if (state.isTouchDevice) {
+    requestFullScreen();
+  }
+  resumeGame();
+};
 
 export let restartBtn = null;
-export const onRestartClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); restartMatch(); };
+export const onRestartClick = (e) => {
+  e.stopPropagation();
+  if (e.cancelable) e.preventDefault();
+  if (state.isTouchDevice) {
+    requestFullScreen();
+  }
+  restartMatch();
+};
 
 export let modeSelectBtn = null;
 export const onModeSelectClick = (e) => { e.stopPropagation(); if (e.cancelable) e.preventDefault(); showModeSelect(); };
@@ -259,6 +299,18 @@ export let joinRoomInput = null;
 export function bindPauseAndModalEvents() {
   pauseBtn = document.getElementById('pauseBtn');
   if (pauseBtn) { pauseBtn.onclick = onPauseClick; pauseBtn.ontouchstart = onPauseClick; }
+
+  hudFullscreenBtn = document.getElementById('hudFullscreenBtn');
+  if (hudFullscreenBtn) {
+    hudFullscreenBtn.onclick = onFullscreenToggleClick;
+    hudFullscreenBtn.ontouchstart = onFullscreenToggleClick;
+  }
+
+  fullscreenBtn = document.getElementById('fullscreenBtn');
+  if (fullscreenBtn) {
+    fullscreenBtn.onclick = onFullscreenToggleClick;
+    fullscreenBtn.ontouchstart = onFullscreenToggleClick;
+  }
 
   resumeBtn = document.getElementById('resumeBtn');
   if (resumeBtn) { resumeBtn.onclick = onResumeClick; }
@@ -304,6 +356,9 @@ export function bindPauseAndModalEvents() {
   if (practiceBtn) {
     const onPractice = (e) => {
       e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (state.isTouchDevice) {
+        requestFullScreen();
+      }
       if (hm) hm.style.display = 'none';
       startMode('duel_ai');
     };
@@ -314,6 +369,9 @@ export function bindPauseAndModalEvents() {
   if (host1v1Btn) {
     const onHost1v1 = (e) => {
       e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (state.isTouchDevice) {
+        requestFullScreen();
+      }
       if (hm) hm.style.display = 'none';
       onClickCreateRoom(e, '1v1');
     };
@@ -324,6 +382,9 @@ export function bindPauseAndModalEvents() {
   if (host2v2Btn) {
     const onHost2v2 = (e) => {
       e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (state.isTouchDevice) {
+        requestFullScreen();
+      }
       if (hm) hm.style.display = 'none';
       onClickCreateRoom(e, '2v2');
     };
@@ -838,3 +899,5 @@ export function initInput(canvasOrRenderer) {
   // Setup touch listeners if mobile
   initTouchControls(canvas);
 }
+
+export { requestFullScreen, toggleFullScreen, isFullScreen } from './ui.js';

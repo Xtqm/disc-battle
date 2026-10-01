@@ -54,6 +54,9 @@ export function showGameOver(customTitle, customSubtitle) {
   const rc = el('recompileBtn');
   if (rc) rc.onclick = (e) => {
     e.stopPropagation();
+    if (state.isTouchDevice) {
+      requestFullScreen();
+    }
     state.player.obj.visible = true;
     overlayEl.style.display = 'none';
     resetGame();
@@ -74,3 +77,78 @@ export function showGameOver(customTitle, customSubtitle) {
 // camera shake
 state.shakeAmt = 0;
 export function shake(v) { state.shakeAmt = Math.min(state.shakeAmt + v, .8); }
+
+export function requestFullScreen() {
+  const el = document.documentElement; // Make the whole page fullscreen
+
+  try {
+    let p;
+    if (el.requestFullscreen) {
+      p = el.requestFullscreen();
+    } else if (el.mozRequestFullScreen) { /* Firefox */
+      p = el.mozRequestFullScreen();
+    } else if (el.webkitRequestFullscreen) { /* Chrome, Safari and Opera */
+      p = el.webkitRequestFullscreen();
+    } else if (el.webkitRequestFullScreen) {
+      p = el.webkitRequestFullScreen();
+    } else if (el.msRequestFullscreen) { /* IE/Edge */
+      p = el.msRequestFullscreen();
+    }
+    if (p && typeof p.catch === 'function') {
+      p.catch(err => {
+        console.warn("Fullscreen request failed or was blocked:", err);
+      });
+    }
+  } catch (err) {
+    console.warn("Fullscreen request failed or was blocked:", err);
+  }
+}
+
+export function exitFullScreen() {
+  try {
+    let p;
+    if (document.exitFullscreen) {
+      p = document.exitFullscreen();
+    } else if (document.webkitExitFullscreen) {
+      p = document.webkitExitFullscreen();
+    } else if (document.webkitCancelFullScreen) {
+      p = document.webkitCancelFullScreen();
+    } else if (document.mozCancelFullScreen) {
+      p = document.mozCancelFullScreen();
+    } else if (document.msExitFullscreen) {
+      p = document.msExitFullscreen();
+    }
+    if (p && typeof p.catch === 'function') {
+      p.catch(err => {
+        console.warn("Exit fullscreen failed or was blocked:", err);
+      });
+    }
+  } catch (err) {
+    console.warn("Exit fullscreen failed or was blocked:", err);
+  }
+}
+
+export function isFullScreen() {
+  return !!(
+    document.fullscreenElement ||
+    document.webkitFullscreenElement ||
+    document.webkitCurrentFullScreenElement ||
+    document.mozFullScreenElement ||
+    document.msFullscreenElement
+  );
+}
+
+export function toggleFullScreen() {
+  if (!isFullScreen()) {
+    requestFullScreen();
+  } else {
+    exitFullScreen();
+  }
+}
+
+export {
+  requestFullScreen as requestFullscreen,
+  exitFullScreen as exitFullscreen,
+  toggleFullScreen as toggleFullscreen,
+  isFullScreen as isFullscreen
+};
