@@ -178,6 +178,8 @@ export function getMainMenuHtml() {
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
     <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="btnSwarmSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="btnDuelSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="joinRoomBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
   </div>
 </div>`;
@@ -197,6 +199,14 @@ export function showModeSelectMenu() {
   bindMainMenuEvents();
 }
 
+export function startSoloSwarm() {
+  startMode('swarm');
+}
+
+export function startSoloDuel() {
+  startMode('duel_ai');
+}
+
 export function bindMainMenuEvents() {
   const bind = (id, fn) => {
     const el = document.getElementById(id);
@@ -211,9 +221,10 @@ export function bindMainMenuEvents() {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
     if (state.isTouchDevice) {
-      requestFullScreen();
+      if (!isFullScreen()) toggleFullScreen();
+      else requestFullScreen();
     }
-    startMode('swarm');
+    startSoloSwarm();
   };
   const openHostModal = (e) => {
     e.stopPropagation(); if (e.cancelable) e.preventDefault();
@@ -234,15 +245,32 @@ export function bindMainMenuEvents() {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
     if (state.isTouchDevice) {
-      requestFullScreen();
+      if (!isFullScreen()) toggleFullScreen();
+      else requestFullScreen();
     }
-    startMode('duel_ai');
+    startSoloDuel();
   };
 
   bind('swarmBtn', startSwarm);
+  bind('btnSwarmSolo', (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    if (state.isTouchDevice) {
+      toggleFullScreen();
+    }
+    startSoloSwarm();
+  });
   bind('hostMatchBtn', openHostModal);
   bind('joinOnlineBtn', openJoinModal);
   bind('duelBtn', startDuelAi);
+  bind('btnDuelSolo', (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    if (state.isTouchDevice) {
+      toggleFullScreen();
+    }
+    startSoloDuel();
+  });
   bind('joinRoomBtn', openJoinModal);
 }
 
@@ -250,6 +278,13 @@ export function bindMainMenuEvents() {
 export let pauseBtn = null;
 export let hudFullscreenBtn = null;
 export let fullscreenBtn = null;
+export let pauseFullscreenBtn = null;
+
+export const onFullscreenToggleClick = (e) => {
+  e.stopPropagation();
+  if (e.cancelable) e.preventDefault();
+  toggleFullScreen();
+};
 
 export const onPauseClick = (e) => {
   e.stopPropagation(); if (e.cancelable) e.preventDefault();
@@ -259,12 +294,6 @@ export const onPauseClick = (e) => {
   } else {
     pauseGame();
   }
-};
-
-export const onFullscreenToggleClick = (e) => {
-  e.stopPropagation();
-  if (e.cancelable) e.preventDefault();
-  toggleFullScreen();
 };
 
 export let resumeBtn = null;
@@ -300,16 +329,22 @@ export function bindPauseAndModalEvents() {
   pauseBtn = document.getElementById('pauseBtn');
   if (pauseBtn) { pauseBtn.onclick = onPauseClick; pauseBtn.ontouchstart = onPauseClick; }
 
-  hudFullscreenBtn = document.getElementById('hudFullscreenBtn');
-  if (hudFullscreenBtn) {
-    hudFullscreenBtn.onclick = onFullscreenToggleClick;
-    hudFullscreenBtn.ontouchstart = onFullscreenToggleClick;
-  }
-
   fullscreenBtn = document.getElementById('fullscreenBtn');
   if (fullscreenBtn) {
     fullscreenBtn.onclick = onFullscreenToggleClick;
     fullscreenBtn.ontouchstart = onFullscreenToggleClick;
+  }
+
+  hudFullscreenBtn = document.getElementById('hudFullscreenBtn');
+  if (hudFullscreenBtn && hudFullscreenBtn !== fullscreenBtn) {
+    hudFullscreenBtn.onclick = onFullscreenToggleClick;
+    hudFullscreenBtn.ontouchstart = onFullscreenToggleClick;
+  }
+
+  pauseFullscreenBtn = document.getElementById('pauseFullscreenBtn');
+  if (pauseFullscreenBtn) {
+    pauseFullscreenBtn.onclick = onFullscreenToggleClick;
+    pauseFullscreenBtn.ontouchstart = onFullscreenToggleClick;
   }
 
   resumeBtn = document.getElementById('resumeBtn');

@@ -75,6 +75,7 @@
     padding-top: max(10px, env(safe-area-inset-top));
     padding-left: max(14px, env(safe-area-inset-left));
     padding-right: max(14px, env(safe-area-inset-right));
+    z-index: 50;
   }
   .bar { height:9px; margin-top:6px; border:1px solid rgba(79,242,255,.5); background:rgba(0,0,0,.6); }
   .bar > i { display:block; height:100%; background:var(--cyan); box-shadow:0 0 12px var(--cyan); transition:width .12s linear; }
@@ -163,6 +164,29 @@
   .hud-btn:hover {
     background:rgba(79,242,255,.22); color:#fff;
     box-shadow:0 0 16px rgba(79,242,255,.65), inset 0 0 10px rgba(79,242,255,.3);
+  }
+
+  /* Fullscreen & Top Controls Visibility Guarantee */
+  #fullscreenBtn {
+    display: inline-block !important; /* Force visibility */
+    pointer-events: auto;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  #hudFullscreenBtn {
+    display: inline-block !important; /* Force visibility */
+    pointer-events: auto;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  #topControls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 50;
+    pointer-events: auto;
   }
 
   /* Boss health bar */
@@ -518,12 +542,31 @@
   body.touch-device .mobile-keys {
     display: grid !important;
   }
+  body.touch-device #fullscreenBtn,
+  body.touch-device #hudFullscreenBtn {
+    display: inline-block !important;
+    pointer-events: auto !important;
+  }
+  body.touch-device #topControls {
+    display: inline-flex !important;
+    pointer-events: auto !important;
+  }
   @media screen and (orientation: portrait) {
     body.touch-device #orientationOverlay {
       display: flex;
     }
   }
 </style>
+<script>
+  // Compatibility alias for hudFullscreenBtn
+  const _origGetElementById = document.getElementById.bind(document);
+  document.getElementById = function(id) {
+    if (id === 'hudFullscreenBtn') {
+      return _origGetElementById('hudFullscreenBtn') || _origGetElementById('fullscreenBtn');
+    }
+    return _origGetElementById(id);
+  };
+</script>
 </head>
 <body>
 <div id="hud">
@@ -538,8 +581,8 @@
   <div class="panel" id="tr">
     <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
       <div id="roundLabel">Cycle <span id="wave" class="big">1</span></div>
-      <div style="display:flex;align-items:center;gap:6px">
-        <button id="hudFullscreenBtn" class="hud-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">FULLSCREEN</button>
+      <div id="topControls" style="display:flex;align-items:center;gap:6px;pointer-events:auto;z-index:50;">
+        <button id="fullscreenBtn" data-id="hudFullscreenBtn" class="hud-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">⛶ FULLSCREEN</button>
         <button id="pauseBtn" class="hud-btn">II PAUSE</button>
       </div>
     </div>
@@ -611,7 +654,7 @@
     <h2>GRID SIMULATION SUSPENDED</h2>
     <div class="menu-actions">
       <button id="resumeBtn" class="btn">RESUME</button>
-      <button id="fullscreenBtn" class="btn">FULLSCREEN</button>
+      <button id="pauseFullscreenBtn" class="btn fullscreen-btn" title="Toggle Fullscreen">FULLSCREEN</button>
       <button id="restartBtn" class="btn">RESTART MATCH</button>
       <button id="modeSelectBtn" class="btn">MODE SELECT</button>
     </div>

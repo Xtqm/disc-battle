@@ -83,6 +83,7 @@ async function runMobileTests() {
     // Verify touch action buttons min 44x44px
     const buttons = [
       document.getElementById('pauseBtn'),
+      document.getElementById('fullscreenBtn'),
       document.getElementById('btnThrow'),
       document.getElementById('btnJump'),
       document.getElementById('btnDash'),

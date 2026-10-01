@@ -102,6 +102,13 @@ export function requestFullScreen() {
   } catch (err) {
     console.warn("Fullscreen request failed or was blocked:", err);
   }
+
+  // Address bar auto-hide fallback for mobile browsers
+  try {
+    if (typeof window !== 'undefined' && window.scrollTo) {
+      window.scrollTo(0, 1);
+    }
+  } catch (_) {}
 }
 
 export function exitFullScreen() {

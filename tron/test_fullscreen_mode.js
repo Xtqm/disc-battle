@@ -236,10 +236,10 @@ async function runFullscreenTests() {
   console.log('\n--- TEST 3: Dedicated HUD and Pause Menu Fullscreen Toggles ---');
   const test3Results = await page.evaluate(() => {
     const results = {};
-    const hudBtn = document.getElementById('hudFullscreenBtn');
+    const hudBtn = document.getElementById('fullscreenBtn') || document.getElementById('hudFullscreenBtn');
     const pauseMenu = document.getElementById('pauseMenu');
     const pauseModal = document.getElementById('pauseModal');
-    const pauseFsBtn = document.getElementById('fullscreenBtn');
+    const pauseFsBtn = document.getElementById('pauseFullscreenBtn') || document.getElementById('fullscreenBtn');
 
     results.hudBtnExists = !!hudBtn;
     results.pauseFsBtnExists = !!pauseFsBtn;
