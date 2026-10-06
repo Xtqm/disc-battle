@@ -17,6 +17,10 @@ import { updateHUD } from '../ui/hud.js';
 export function updatePlayer(dt) {
   if (!state.player.alive) return;
 
+  if (state.player.invuln > 0) {
+    state.player.invuln -= dt;
+  }
+
   updateTouchMomentum(dt);
   const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
@@ -260,6 +264,8 @@ export function aimDir() {
 export function damagePlayer(amount, from) {
   if (state.countdownTimer > 0) return;
   if (!state.player.alive) return;
+  if (state.player.invuln > 0) return;
+  state.player.invuln = 0.25;
   state.player.hp -= amount;
   state.player.hurtFlash = 1;
   burst(state.player.pos.clone().setY(state.player.y + 1.6), config.CYAN, 18, 8);

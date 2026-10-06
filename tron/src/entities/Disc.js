@@ -366,7 +366,7 @@ export function updateDiscs(dt) {
       }
       
       const pc = tmp.copy(state.player.pos).setY(1.5 + state.player.y);
-      if (!isTeammate && D.pos.distanceTo(pc) < config.PLAYER_R + config.DISC_R + .35) {
+      if (!isTeammate && !D.returning && D.pos.distanceTo(pc) < config.PLAYER_R + config.DISC_R + .35) {
         const toDisc = D.pos.clone().sub(pc).setY(0).normalize();
         const facing = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
         if (state.player.blocking && state.player.hasDisc && toDisc.dot(facing) > .35) {
@@ -434,6 +434,7 @@ export function updateDiscs(dt) {
           D.curve = 0;
           D.isDeflected = false;
           D.returning = true;
+          D.pos.addScaledVector(toDisc, config.PLAYER_R + config.DISC_R + 0.4);
 
           if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7 + (holder.y || 0))) < 1.4) {
             if (D.owner === 'player') {

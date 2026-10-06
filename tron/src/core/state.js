@@ -100,6 +100,7 @@ export const player = {
   discCharge: 1, 
   dashCd: 0, 
   hurtFlash: 0, 
+  invuln: 0, 
   alive: true,
   y: 0, 
   vy: 0, 

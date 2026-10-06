@@ -220,6 +220,12 @@ if (typeof document !== 'undefined') {
 
 // Debug hooks for headless puppeteer test harness
 window.__dbg = {
+  state,
+  player: state.player,
+  hp: () => state.player.hp,
+  setPlayerHp: (v) => { state.player.hp = v; },
+  energy: () => state.player.energy,
+  wave: () => state.wave,
   running: () => state.running,
   paused: () => state.paused,
   mode: () => state.gameMode,
