@@ -16,6 +16,7 @@ import { updateHUD, message, msgEl, updateCrosshair, updateKeyMonitor, updateLoc
 import { startMode, showModeSelect, bindMenuButtons } from '../ui/menus.js';
 import { pauseGame, resumeGame, restartMatch, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen } from '../ui/modals.js';
 import { SFX, playDeRezSound } from '../audio/sfx.js';
+import { authManager } from '../auth/AuthManager.js';
 
 export const clock = new THREE.Clock();
 state.time = 0;
@@ -194,6 +195,7 @@ export const animate = loop;
 
 export function initApp() {
   try {
+    authManager.init().catch(err => console.warn("Auth initialization error:", err));
     initGraphics();
     const canvasEl = renderer?.domElement || document.querySelector('canvas');
     initInput(canvasEl);
@@ -518,9 +520,12 @@ window.__dbg = {
   requestFullScreen: () => requestFullScreen(),
   exitFullScreen: () => exitFullScreen(),
   toggleFullScreen: () => toggleFullScreen(),
-  isFullScreen: () => isFullScreen()
+  isFullScreen: () => isFullScreen(),
+  auth: () => authManager,
+  currentUser: () => authManager.currentUser,
+  saveState: () => authManager.saveState
 };
 
 window.__TRON__ = window.__dbg;
 
-export { requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen };
+export { requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen, authManager };

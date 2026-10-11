@@ -3,6 +3,7 @@ import { getAuth, signInWithCustomToken, signInAnonymously } from 'https://www.g
 import { getFirestore, doc, setDoc, getDoc, updateDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { state } from '../core/state.js';
 import { config } from '../core/config.js';
+import { authManager } from '../auth/AuthManager.js';
 
 config.appId = typeof __app_id !== 'undefined' ? __app_id : 'tron-disc-arena';
 state.db = null;
@@ -15,9 +16,15 @@ export const mockStore = new Map();
 export const mockListeners = new Map();
 
 export function initMockNetwork() {
-  if (state.currentUser) return;
-  const dummyUid = 'user_' + Math.random().toString(36).substring(2, 9);
-  state.currentUser = { uid: dummyUid, isAnonymous: true };
+  if (state.currentUser && state.db) return;
+  if (!state.currentUser) {
+    if (authManager && authManager.currentUser) {
+      state.currentUser = authManager.currentUser;
+    } else {
+      const dummyUid = 'user_' + Math.random().toString(36).substring(2, 9);
+      state.currentUser = { uid: dummyUid, isAnonymous: true };
+    }
+  }
   state.auth = { currentUser: state.currentUser };
   state.db = { isMock: true };
 
