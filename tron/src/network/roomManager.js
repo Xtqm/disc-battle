@@ -255,6 +255,7 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
   state.currentRoomId = roomCode;
   state.lastProcessedThrowId = null;
   state.netSyncTimer = 0;
+  state.roomFallenTiles = [];
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'none';
 
@@ -376,9 +377,10 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
 }
 
 export function onRoomSnapshot(snap) {
-  if (!snap.exists()) return;
-  const data = snap.data();
-  if (!data) return;
+  try {
+    if (!snap.exists()) return;
+    const data = snap.data();
+    if (!data) return;
 
   if (data.status === 'active' && (!state.running || state.gameMode === 'swarm')) {
     const rm = document.getElementById('roomModal');
@@ -462,74 +464,153 @@ export function onRoomSnapshot(snap) {
     }
   }
 
+  if (data.status === 'closed') {
+    const voteBtn = document.getElementById('voteRematchBtn');
+    if (voteBtn) {
+      voteBtn.disabled = true;
+      voteBtn.textContent = 'OPPONENT LEFT';
+    }
+    const voteLabel = document.getElementById('rematchVoteLabel');
+    if (voteLabel) {
+      voteLabel.textContent = 'OPPONENT RETURNED TO MENU';
+    }
+    message('OPPONENT LEFT THE MATCH');
+    if (state.running) {
+      state.running = false;
+      showMultiplayerVictory(data);
+    }
+    return;
+  }
+
   if (data.status === 'finished') {
-    if (!state.running) {
-      const rv = data.rematchVotes || {};
-      let vCount = 0;
-      let pCount = 0;
-      const players = data.players || { p1: true, p2: true };
-      for (const k in players) {
-        if (players[k]) {
-          pCount++;
-          if (rv[k]) vCount++;
-        }
-      }
-      const voteLabel = document.getElementById('rematchVoteLabel');
-      if (voteLabel) {
-        voteLabel.textContent = `REMATCH VOTES: ${vCount} / ${pCount}`;
-      }
-      
-      if (state.playerRole === 'p1' && vCount === pCount && vCount > 0) {
-        const roomRef = getRoomRef(state.currentRoomId);
-        const resetPatch = {
-          status: 'active',
-          lastThrow: null,
-          fallen: [],
-          rematchVotes: { p1: false, p2: false, p3: false, p4: false }
-        };
-        for (const k in data.players) {
-          if (data.players[k]) {
-            resetPatch[`state.${k}.hp`] = 100;
-          }
-        }
-        roomUpdateDoc(roomRef, resetPatch);
-      }
+    let isWin = false;
+    if (data.mode === '2v2' || state.gameMode === 'duos_multi') {
+      const myTeam = (state.playerRole === 'p1' || state.playerRole === 'p3') ? 1 : 2;
+      isWin = data.winnerTeam === myTeam;
     } else {
-      let isWin = false;
-      if (data.mode === '2v2') {
-        const myTeam = (state.playerRole === 'p1' || state.playerRole === 'p3') ? 1 : 2;
-        isWin = data.winnerTeam === myTeam;
-      } else {
-        isWin = data.winner === state.playerRole;
-      }
+      isWin = data.winner === state.playerRole;
+    }
+
+    const overlay = document.getElementById('overlay');
+    const hasRematchBtn = document.getElementById('voteRematchBtn');
+    const isOverlayVisible = overlay && overlay.style.display === 'flex';
+
+    if (!isOverlayVisible || !hasRematchBtn) {
       if (isWin) {
         showMultiplayerVictory(data);
       } else {
         showMultiplayerDefeat(data);
       }
     }
+
+    const rv = data.rematchVotes || {};
+    let vCount = 0;
+    let pCount = 0;
+    const players = data.players || (state.gameMode === 'duos_multi' ? { p1: true, p2: true, p3: true, p4: true } : { p1: true, p2: true });
+    for (const k in players) {
+      if (players[k]) {
+        pCount++;
+        if (rv[k]) vCount++;
+      }
+    }
+    const voteLabel = document.getElementById('rematchVoteLabel');
+    if (voteLabel) {
+      voteLabel.textContent = `REMATCH VOTES: ${vCount} / ${pCount}`;
+    }
+
+    const voteBtn = document.getElementById('voteRematchBtn');
+    if (voteBtn && state.playerRole && rv[state.playerRole]) {
+      voteBtn.textContent = 'VOTED';
+      voteBtn.disabled = true;
+    }
+
+    if (state.playerRole === 'p1' && vCount >= pCount && pCount > 0) {
+      const roomRef = getRoomRef(state.currentRoomId);
+      const resetPatch = {
+        status: 'active',
+        winner: null,
+        winnerTeam: null,
+        lastThrow: null,
+        fallen: [],
+        rematchVotes: { p1: false, p2: false, p3: false, p4: false }
+      };
+      for (const k in data.players) {
+        if (data.players[k]) {
+          resetPatch[`state.${k}.hp`] = 100;
+        }
+      }
+      roomUpdateDoc(roomRef, resetPatch).catch(err => console.warn("Reset rematch err:", err));
+    }
+  }
+  } catch (err) {
+    console.error("onRoomSnapshot error:", err);
   }
 }
 
-export function renderGameOverActions(data) {
-  let btnHtml = '';
-  if (data) {
-    btnHtml = `
-      <button id="voteRematchBtn" class="btn" style="border-color:var(--cyan);color:var(--cyan);margin-bottom:12px;">VOTE REMATCH</button>
-      <div id="rematchVoteLabel" style="font-size:12px;letter-spacing:2px;margin-bottom:20px;">REMATCH VOTES: 0 / 0</div>
-    `;
+export function renderGameOverActions(data = null) {
+  let vCount = 0;
+  let pCount = 0;
+  let hasVoted = false;
+
+  const rv = (data && data.rematchVotes) ? data.rematchVotes : {};
+  const players = (data && data.players) ? data.players : null;
+
+  if (players) {
+    for (const k in players) {
+      if (players[k]) {
+        pCount++;
+        if (rv[k]) vCount++;
+      }
+    }
+  } else {
+    const maxPlayers = state.gameMode === 'duos_multi' ? 4 : 2;
+    pCount = Object.keys(state.multiPlayers).length + 1;
+    if (pCount < 2) pCount = maxPlayers;
+    for (const k in rv) {
+      if (rv[k]) vCount++;
+    }
   }
-  return btnHtml + `<button id="multiMenuBtn" class="btn purple">RETURN TO MENU</button>`;
+
+  if (state.playerRole && rv[state.playerRole]) {
+    hasVoted = true;
+  }
+
+  const btnText = hasVoted ? 'VOTED' : 'VOTE REMATCH';
+  const btnDisabled = hasVoted ? 'disabled' : '';
+
+  return `
+    <button id="voteRematchBtn" class="btn" style="border-color:var(--cyan);color:var(--cyan);margin-bottom:12px;" ${btnDisabled}>${btnText}</button>
+    <div id="rematchVoteLabel" style="font-size:12px;letter-spacing:2px;margin-bottom:20px;">REMATCH VOTES: ${vCount} / ${pCount}</div>
+    <button id="multiMenuBtn" class="btn purple">RETURN TO MENU</button>
+  `;
+}
+
+export function leaveMultiplayerAndReturnToMenu() {
+  if (state.db && state.currentRoomId && state.playerRole) {
+    const roomRef = getRoomRef(state.currentRoomId);
+    const patch = {
+      status: 'closed',
+      closedBy: state.playerRole,
+      closedReason: 'RETURN_TO_MENU'
+    };
+    patch[`players.${state.playerRole}`] = null;
+    roomUpdateDoc(roomRef, patch).catch(() => {});
+  }
+  teardownMultiplayer();
+  if (typeof window !== 'undefined' && window.__tronShowModeSelectMenu) {
+    window.__tronShowModeSelectMenu();
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__tronLeaveMultiplayerAndReturnToMenu = leaveMultiplayerAndReturnToMenu;
 }
 
 export function bindGameOverActions() {
   const btn = el('multiMenuBtn');
   if (btn) btn.onclick = (e) => {
     e.stopPropagation();
-    teardownMultiplayer();
-    if (typeof window !== 'undefined' && window.__tronShowModeSelectMenu) {
-      window.__tronShowModeSelectMenu();
-    }
+    leaveMultiplayerAndReturnToMenu();
   };
   
   const voteBtn = el('voteRematchBtn');
@@ -538,10 +619,12 @@ export function bindGameOverActions() {
       e.stopPropagation();
       voteBtn.textContent = 'VOTED';
       voteBtn.disabled = true;
-      const roomRef = getRoomRef(state.currentRoomId);
-      const patch = {};
-      patch[`rematchVotes.${state.playerRole}`] = true;
-      roomUpdateDoc(roomRef, patch);
+      if (state.db && state.currentRoomId && state.playerRole) {
+        const roomRef = getRoomRef(state.currentRoomId);
+        const patch = {};
+        patch[`rematchVotes.${state.playerRole}`] = true;
+        roomUpdateDoc(roomRef, patch).catch(err => console.warn("Vote err:", err));
+      }
     };
   }
 }
@@ -550,6 +633,29 @@ export function showMultiplayerVictory(data = null) {
   state.running = false;
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'flex';
+
+  const existingVoteLabel = document.getElementById('rematchVoteLabel');
+  if (existingVoteLabel && overlay && overlay.querySelector('.card:not(.dead)')) {
+    if (data) {
+      const rv = data.rematchVotes || {};
+      let vCount = 0, pCount = 0;
+      const players = data.players || (state.gameMode === 'duos_multi' ? { p1: true, p2: true, p3: true, p4: true } : { p1: true, p2: true });
+      for (const k in players) {
+        if (players[k]) {
+          pCount++;
+          if (rv[k]) vCount++;
+        }
+      }
+      existingVoteLabel.textContent = `REMATCH VOTES: ${vCount} / ${pCount}`;
+      const voteBtn = document.getElementById('voteRematchBtn');
+      if (voteBtn && state.playerRole && rv[state.playerRole]) {
+        voteBtn.textContent = 'VOTED';
+        voteBtn.disabled = true;
+      }
+    }
+    return;
+  }
+
   if (overlay) overlay.innerHTML = `<div class="card" style="border-color:#b026ff;box-shadow:0 0 60px rgba(176,38,255,.3);">
     <h1 style="color:#d896ff;text-shadow:0 0 30px #b026ff">VICTORY</h1>
     <h2>GRID SECURED</h2>
@@ -568,6 +674,29 @@ export function showMultiplayerDefeat(data = null) {
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'flex';
   const subtitle = state.gameOverReason || 'YOU WERE ELIMINATED IN THE ARENA';
+
+  const existingVoteLabel = document.getElementById('rematchVoteLabel');
+  if (existingVoteLabel && overlay && overlay.querySelector('.card.dead')) {
+    if (data) {
+      const rv = data.rematchVotes || {};
+      let vCount = 0, pCount = 0;
+      const players = data.players || (state.gameMode === 'duos_multi' ? { p1: true, p2: true, p3: true, p4: true } : { p1: true, p2: true });
+      for (const k in players) {
+        if (players[k]) {
+          pCount++;
+          if (rv[k]) vCount++;
+        }
+      }
+      existingVoteLabel.textContent = `REMATCH VOTES: ${vCount} / ${pCount}`;
+      const voteBtn = document.getElementById('voteRematchBtn');
+      if (voteBtn && state.playerRole && rv[state.playerRole]) {
+        voteBtn.textContent = 'VOTED';
+        voteBtn.disabled = true;
+      }
+    }
+    return;
+  }
+
   if (overlay) overlay.innerHTML = `<div class="card dead">
     <h1>DEREZZED</h1>
     <h2>${subtitle}</h2>

@@ -288,11 +288,15 @@ export function bindPauseAndModalEvents() {
       if (um) um.style.display = 'none';
       state.running = false;
       state.paused = false;
-      if (typeof window !== 'undefined' && window.__tronTeardownMultiplayer) {
-        window.__tronTeardownMultiplayer();
-      }
-      if (typeof window !== 'undefined' && window.__tronShowModeSelectMenu) {
-        window.__tronShowModeSelectMenu();
+      if (typeof window !== 'undefined' && window.__tronLeaveMultiplayerAndReturnToMenu) {
+        window.__tronLeaveMultiplayerAndReturnToMenu();
+      } else {
+        if (typeof window !== 'undefined' && window.__tronTeardownMultiplayer) {
+          window.__tronTeardownMultiplayer();
+        }
+        if (typeof window !== 'undefined' && window.__tronShowModeSelectMenu) {
+          window.__tronShowModeSelectMenu();
+        }
       }
     };
   }

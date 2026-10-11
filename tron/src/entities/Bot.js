@@ -139,8 +139,13 @@ export function killFoe(f) {
   }
 
   if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
+    const allFoesDead = state.foes.every(x => !x.alive || x.hp <= 0);
+    if (!allFoesDead && state.gameMode === 'duos_multi') {
+      message('OPPONENT DEREZZED');
+      return;
+    }
     message('VICTORY — OPPONENT DEREZZED');
-    if (state.db && state.currentRoomId && state.playerRole === 'p1') {
+    if (state.db && state.currentRoomId && state.playerRole) {
       const roomRef = getRoomRef(state.currentRoomId);
       const myTeam = (state.playerRole === 'p1' || state.playerRole === 'p3') ? 1 : 2;
       const payload = { status: 'finished', winnerTeam: myTeam };

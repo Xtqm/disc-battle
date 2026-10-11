@@ -106,6 +106,19 @@ export function mockUpdateDoc(ref, patch) {
     } catch (_) {}
   }
   const merged = Object.assign({}, existing || {}, JSON.parse(JSON.stringify(patch)));
+  for (const k in patch) {
+    if (k.includes('.')) {
+      const parts = k.split('.');
+      let curr = merged;
+      for (let i = 0; i < parts.length - 1; i++) {
+        if (!curr[parts[i]] || typeof curr[parts[i]] !== 'object') {
+          curr[parts[i]] = {};
+        }
+        curr = curr[parts[i]];
+      }
+      curr[parts[parts.length - 1]] = patch[k];
+    }
+  }
   if (patch.p1 && existing && existing.p1) merged.p1 = Object.assign({}, existing.p1, patch.p1);
   if (patch.p2 && existing && existing.p2) merged.p2 = Object.assign({}, existing.p2, patch.p2);
 
