@@ -81,6 +81,59 @@ export class AuthManager {
   }
 
   /**
+   * Signs in or promotes user via direct passkey credentials.
+   * @param {string} email
+   * @param {string} password
+   * @param {string} [handle]
+   * @returns {Promise<object>}
+   */
+  async signInWithCredentials(email, password, handle = '') {
+    if (!this._provider) throw new Error('AuthManager: No active auth provider.');
+    const user = await this._provider.signInWithCredentials(email, password, handle);
+    this._applyUser(user);
+    return user;
+  }
+
+  /**
+   * Signs in or links account via federated provider.
+   * @param {string} providerName
+   * @param {object} [profile]
+   * @returns {Promise<object>}
+   */
+  async signInWithFederated(providerName, profile = null) {
+    if (!this._provider) throw new Error('AuthManager: No active auth provider.');
+    const user = await this._provider.signInWithFederated(providerName, profile);
+    this._applyUser(user);
+    return user;
+  }
+
+  /**
+   * Updates user display handle / callsign and persists to save state.
+   * @param {string} newCallsign
+   * @returns {Promise<object>}
+   */
+  async updateCallsign(newCallsign) {
+    if (!newCallsign || typeof newCallsign !== 'string') {
+      throw new Error('Callsign must be a non-empty string.');
+    }
+    const sanitized = newCallsign.trim().toUpperCase();
+    if (!/^[A-Za-z0-9_-]{3,16}$/.test(sanitized)) {
+      throw new Error('Callsign must be 3-16 characters (letters, numbers, underscore, hyphen).');
+    }
+    if (this._provider && typeof this._provider.updateHandle === 'function') {
+      await this._provider.updateHandle(sanitized);
+    }
+    if (this._currentUser) {
+      this._currentUser.handle = sanitized;
+    }
+    if (this._saveState) {
+      this._saveState.handle = sanitized;
+    }
+    authEventBus.emit(AuthEvents.PROFILE_UPDATED, { user: this._currentUser, saveState: this._saveState });
+    return this._currentUser;
+  }
+
+  /**
    * Terminates the current authentication session.
    * @returns {Promise<void>}
    */
@@ -89,6 +142,7 @@ export class AuthManager {
     await this._provider.signOut();
     this._applyUser(null);
   }
+
 
   /**
    * Updates combat statistics in the current user's save state.

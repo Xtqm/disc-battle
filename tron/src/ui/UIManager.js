@@ -2,6 +2,8 @@ import { state } from '../core/state.js';
 import { updateHUD, message, el, updateCrosshair, updateKeyMonitor, updateLockStateBanner } from './hud.js';
 import { startMode, startGame, showModeSelect, showModeSelectMenu, bindMenuButtons, bindMainMenuEvents } from './menus.js';
 import { pauseGame, resumeGame, restartMatch, showGameOver, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
+import { updateIdentityHeader, showAuthTerminal, hideAuthTerminal, initAuthTerminal } from './authTerminal.js';
+
 
 export function shake(v) {
   state.shakeAmt = Math.min(state.shakeAmt + v, 0.8);
@@ -73,5 +75,10 @@ export {
   exitFullScreen,
   toggleFullScreen,
   isFullScreen,
-  bindPauseAndModalEvents
+  bindPauseAndModalEvents,
+  updateIdentityHeader,
+  showAuthTerminal,
+  hideAuthTerminal,
+  initAuthTerminal
 };
+

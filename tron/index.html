@@ -556,6 +556,315 @@
       display: flex;
     }
   }
+
+  /* ───────────────────────── Identity Header & Grid Terminal ───────────────────────── */
+  .identity-header {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    z-index: 25;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    user-select: none;
+    pointer-events: auto;
+  }
+  @media (max-width: 640px) {
+    .identity-header {
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      gap: 6px;
+    }
+  }
+  .id-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    background: rgba(0, 16, 24, 0.75);
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+  }
+  .id-badge.amber-wireframe {
+    border: 1px dashed rgba(255, 123, 26, 0.65);
+    color: #ffb37a;
+    box-shadow: 0 0 14px rgba(255, 123, 26, 0.2), inset 0 0 8px rgba(255, 123, 26, 0.1);
+  }
+  .id-badge.cyan-glow {
+    border: 1px solid rgba(79, 242, 255, 0.75);
+    color: var(--cyan);
+    box-shadow: 0 0 16px rgba(79, 242, 255, 0.3), inset 0 0 10px rgba(79, 242, 255, 0.15);
+  }
+  .id-icon {
+    color: var(--orange);
+    font-size: 13px;
+  }
+  .status-circuit {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-circuit.green-circuit {
+    background: #00ff66;
+    box-shadow: 0 0 8px #00ff66, 0 0 14px #00ff66;
+    animation: circuitPulse 2s infinite ease-in-out;
+  }
+  @keyframes circuitPulse {
+    0%, 100% { opacity: 0.8; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 12px #00ff66, 0 0 20px #00ff66; }
+  }
+  .id-btn {
+    pointer-events: auto;
+    cursor: pointer;
+    background: rgba(0, 16, 24, 0.85);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 7px 14px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.18s ease;
+  }
+  .id-btn.pulse-amber {
+    border: 1px solid var(--orange);
+    color: #ffb37a;
+    animation: pulseAmber 1.8s infinite ease-in-out;
+  }
+  @keyframes pulseAmber {
+    0%, 100% {
+      box-shadow: 0 0 8px rgba(255, 123, 26, 0.4);
+      border-color: rgba(255, 123, 26, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(255, 123, 26, 0.95), inset 0 0 10px rgba(255, 123, 26, 0.4);
+      border-color: #ffaa00;
+      color: #fff;
+    }
+  }
+  .id-btn.cyan-btn {
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 10px rgba(79, 242, 255, 0.25);
+  }
+  .id-btn.cyan-btn:hover {
+    background: rgba(79, 242, 255, 0.2);
+    color: #fff;
+    box-shadow: 0 0 18px var(--cyan);
+  }
+
+  /* ───────────────────────── Grid Authorization Terminal Card ───────────────────────── */
+  .auth-terminal-card {
+    position: relative;
+    max-width: 520px;
+    background: rgba(1, 12, 18, 0.95) !important;
+    border: 1px solid var(--cyan) !important;
+    box-shadow: 0 0 50px rgba(79, 242, 255, 0.35), inset 0 0 28px rgba(0, 24, 36, 0.75) !important;
+    overflow: hidden;
+    text-align: left !important;
+    padding: 28px 32px !important;
+  }
+  .terminal-scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+    background-size: 100% 3px, 4px 100%;
+    opacity: 0.85;
+    z-index: 2;
+  }
+  .terminal-header {
+    border-bottom: 1px solid rgba(79, 242, 255, 0.3);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  .terminal-title {
+    font-size: 22px;
+    letter-spacing: 6px;
+    color: var(--cyan);
+    text-shadow: 0 0 14px var(--cyan);
+    font-weight: 700;
+  }
+  .terminal-ver {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #9fe9f2;
+    opacity: 0.75;
+    margin-top: 4px;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .terminal-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin-bottom: 18px;
+    border-radius: 4px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    background: rgba(0, 24, 32, 0.5);
+  }
+  .terminal-status-banner.state-guest {
+    border: 1px dashed rgba(255, 123, 26, 0.5);
+    color: #ffb37a;
+  }
+  .terminal-status-banner.state-auth {
+    border: 1px solid rgba(79, 242, 255, 0.5);
+    color: var(--cyan);
+  }
+  .terminal-field-group {
+    margin-bottom: 14px;
+  }
+  .terminal-field-group label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #9fe9f2;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .terminal-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .terminal-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(0, 8, 14, 0.85);
+    border: 1px solid rgba(79, 242, 255, 0.45);
+    color: #fff;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+    outline: none;
+    border-radius: 4px;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
+    transition: all 0.15s ease;
+  }
+  .terminal-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(79, 242, 255, 0.5), inset 0 0 8px rgba(79, 242, 255, 0.2);
+    color: var(--cyan);
+  }
+  .terminal-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 18px 0 14px 0;
+    border-bottom: 1px solid rgba(79, 242, 255, 0.25);
+    padding-bottom: 8px;
+  }
+  .tab-btn {
+    flex: 1;
+    background: rgba(0, 16, 24, 0.6);
+    border: 1px solid rgba(79, 242, 255, 0.3);
+    color: #9fe9f2;
+    padding: 8px 12px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    text-align: center;
+  }
+  .tab-btn.active {
+    background: rgba(79, 242, 255, 0.2);
+    border-color: var(--cyan);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(79, 242, 255, 0.4);
+    font-weight: 700;
+  }
+  .terminal-btn {
+    cursor: pointer;
+    background: rgba(0, 24, 34, 0.8);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    text-transform: uppercase;
+  }
+  .terminal-btn:hover {
+    background: rgba(79, 242, 255, 0.25);
+    color: #fff;
+    box-shadow: 0 0 16px var(--cyan);
+  }
+  .terminal-actions-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .terminal-actions-row .terminal-btn {
+    flex: 1;
+    text-align: center;
+  }
+  .sync-desc {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #9fe9f2;
+    margin-bottom: 14px;
+    text-align: center;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .sync-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sync-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+  }
+  .sync-btn.google-sync {
+    border-color: #4285F4;
+    color: #8ab4f8;
+  }
+  .sync-btn.google-sync:hover {
+    background: rgba(66, 133, 244, 0.25);
+    box-shadow: 0 0 16px #4285F4;
+    color: #fff;
+  }
+  .sync-btn.discord-sync {
+    border-color: #5865F2;
+    color: #949cf7;
+  }
+  .sync-btn.discord-sync:hover {
+    background: rgba(88, 101, 242, 0.25);
+    box-shadow: 0 0 16px #5865F2;
+    color: #fff;
+  }
+  .terminal-console {
+    margin-top: 16px;
+    padding: 8px 12px;
+    background: rgba(0, 5, 8, 0.9);
+    border: 1px solid rgba(79, 242, 255, 0.2);
+    border-radius: 4px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+  }
+  .terminal-console.msg-info { color: #9fe9f2; }
+  .terminal-console.msg-success { color: #00ff66; text-shadow: 0 0 8px #00ff66; border-color: rgba(0, 255, 102, 0.4); }
+  .terminal-console.msg-error { color: var(--orange); text-shadow: 0 0 8px var(--orange); border-color: rgba(255, 123, 26, 0.4); }
 </style>
 <script>
   // Compatibility alias for hudFullscreenBtn
@@ -697,7 +1006,75 @@
   </div>
 </div>
 
-<div id="overlay"><div class="card" id="mainMenu">
+<div id="authModal" class="modal-overlay" style="display:none;">
+  <div class="card auth-terminal-card">
+    <div class="terminal-scanlines"></div>
+    <div class="terminal-header">
+      <div class="terminal-title">GRID AUTHORIZATION TERMINAL</div>
+      <div class="terminal-ver">// SYSTEM PROTOCOL v2.04</div>
+    </div>
+
+    <!-- Active Identity Overview -->
+    <div class="terminal-status-banner" id="terminalStatusBanner">
+      <span class="status-indicator-dot"></span>
+      <span id="terminalIdentityReadout">IDENTITY: GUEST // SUB-ROUTINE</span>
+    </div>
+
+    <!-- Callsign Customization -->
+    <div class="terminal-field-group">
+      <label for="authCallsignInput">GRID CALLSIGN // DISPLAY NAME</label>
+      <div class="terminal-input-row">
+        <input type="text" id="authCallsignInput" class="terminal-input" maxlength="16" placeholder="ENTER CALLSIGN" autocomplete="off" spellcheck="false" />
+        <button id="btnSaveCallsign" class="terminal-btn">COMMIT</button>
+      </div>
+    </div>
+
+    <!-- Dual Tab Selector -->
+    <div class="terminal-tabs">
+      <button id="tabDirectPasskey" class="tab-btn active">DIRECT PASSKEY</button>
+      <button id="tabQuickSync" class="tab-btn">QUICK SYNC</button>
+    </div>
+
+    <!-- Tab 1: Direct Passkey -->
+    <div id="panelDirectPasskey" class="tab-panel active">
+      <div class="terminal-field-group">
+        <label for="authEmailInput">GRID COMM IDENT // EMAIL</label>
+        <input type="email" id="authEmailInput" class="terminal-input" placeholder="USER@GRID.TRON" autocomplete="email" spellcheck="false" />
+      </div>
+      <div class="terminal-field-group">
+        <label for="authPasswordInput">ENCRYPTED PASSKEY // SECURITY PHRASE</label>
+        <input type="password" id="authPasswordInput" class="terminal-input" placeholder="MIN 6 CHARACTERS" autocomplete="current-password" />
+      </div>
+      <div class="terminal-actions-row">
+        <button id="btnAuthorizePasskey" class="terminal-btn primary-btn">AUTHORIZE PASSKEY</button>
+        <button id="btnRegisterPasskey" class="terminal-btn secondary-btn">REGISTER NEW IDENT</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Quick Sync -->
+    <div id="panelQuickSync" class="tab-panel" style="display:none;">
+      <div class="sync-desc">FEDERATED GRID CREDENTIAL HARMONIZATION</div>
+      <div class="sync-buttons">
+        <button id="btnSyncGoogle" class="terminal-btn sync-btn google-sync">
+          <span class="sync-icon">G</span> LINK GOOGLE SUITE
+        </button>
+        <button id="btnSyncDiscord" class="terminal-btn sync-btn discord-sync">
+          <span class="sync-icon">D</span> LINK DISCORD PROTOCOL
+        </button>
+      </div>
+    </div>
+
+    <!-- Console Readout -->
+    <div id="terminalConsoleMsg" class="terminal-console">&gt; TERMINAL READY. SECURE IDENTITY TO PRESERVE COMBAT STATS.</div>
+
+    <!-- Modal Dismiss Button -->
+    <button id="btnCloseTerminal" class="btn" style="margin-top:20px; width:100%; border-color:var(--orange); color:#ffb37a;">DISMISS TERMINAL</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="identityHeader" class="identity-header"></div>
+  <div class="card" id="mainMenu">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys desktop-keys">
     <b>W A S D</b><span>Move &amp; strafe across the grid</span>

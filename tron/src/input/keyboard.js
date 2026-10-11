@@ -21,11 +21,24 @@ export function codeOf(e) {
 }
 
 export function onDown(e) {
-  if (typeof document !== 'undefined' && document.activeElement && 
-     (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) {
+  const c = codeOf(e);
+
+  // Handle Escape dismissal for Grid Authorization Terminal
+  if (c === 'Escape' && state.authModalOpen) {
+    e.preventDefault();
+    const am = document.getElementById('authModal');
+    if (am) am.style.display = 'none';
+    state.authModalOpen = false;
     return;
   }
-  const c = codeOf(e);
+
+  const isInputTarget = typeof document !== 'undefined' && document.activeElement && 
+     (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+
+  if (isInputTarget || state.authModalOpen) {
+    return;
+  }
+
   if (!c) return;
   state.keys[c] = true;
   if (EAT.includes(c)) e.preventDefault();

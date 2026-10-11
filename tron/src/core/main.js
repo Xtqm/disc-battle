@@ -17,6 +17,8 @@ import { startMode, showModeSelect, bindMenuButtons } from '../ui/menus.js';
 import { pauseGame, resumeGame, restartMatch, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen } from '../ui/modals.js';
 import { SFX, playDeRezSound } from '../audio/sfx.js';
 import { authManager } from '../auth/AuthManager.js';
+import { initAuthTerminal, showAuthTerminal, hideAuthTerminal, isAuthTerminalOpen, updateIdentityHeader } from '../ui/authTerminal.js';
+
 
 export const clock = new THREE.Clock();
 state.time = 0;
@@ -200,6 +202,8 @@ export function initApp() {
     const canvasEl = renderer?.domElement || document.querySelector('canvas');
     initInput(canvasEl);
     bindMenuButtons();
+    initAuthTerminal();
+
 
     if (state.isTouchDevice && typeof document !== 'undefined' && document.body) {
       document.body.classList.add('touch-device');
@@ -523,9 +527,14 @@ window.__dbg = {
   isFullScreen: () => isFullScreen(),
   auth: () => authManager,
   currentUser: () => authManager.currentUser,
-  saveState: () => authManager.saveState
+  saveState: () => authManager.saveState,
+  showAuthTerminal: () => showAuthTerminal(),
+  hideAuthTerminal: () => hideAuthTerminal(),
+  isAuthTerminalOpen: () => isAuthTerminalOpen(),
+  updateIdentityHeader: () => updateIdentityHeader()
 };
 
 window.__TRON__ = window.__dbg;
 
-export { requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen, authManager };
+export { requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen, authManager, showAuthTerminal, hideAuthTerminal, updateIdentityHeader, initAuthTerminal };
+

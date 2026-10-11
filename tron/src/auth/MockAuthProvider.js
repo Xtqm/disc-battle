@@ -159,10 +159,68 @@ export class MockAuthProvider extends IAuthProvider {
     return identity;
   }
 
+  async signInWithCredentials(email, password, handle = '') {
+    if (!email || !password) throw new Error('Email and password required');
+    const uid = this._currentUser?.uid || generateUUID();
+    const finalHandle = handle || (email.split('@')[0] || 'USER').toUpperCase();
+    const identity = {
+      uid,
+      handle: finalHandle,
+      email,
+      isAnonymous: false,
+      providerId: 'password',
+      token: `mock_cred_token_${Date.now()}`,
+      createdAt: this._currentUser?.createdAt || Date.now(),
+      lastLoginAt: Date.now()
+    };
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(identity));
+    } catch (_) {}
+    this._currentUser = identity;
+    this._notify();
+    return identity;
+  }
+
+  async signInWithFederated(providerName = 'google', profile = null) {
+    const provId = providerName || 'google';
+    const uid = this._currentUser?.uid || generateUUID();
+    const finalHandle = profile?.handle || `${provId.toUpperCase()}_USER_${uid.slice(0, 4).toUpperCase()}`;
+    const identity = {
+      uid,
+      handle: finalHandle,
+      email: profile?.email || `${finalHandle.toLowerCase()}@${provId}.mock`,
+      isAnonymous: false,
+      providerId: provId,
+      token: `mock_fed_token_${provId}_${Date.now()}`,
+      createdAt: this._currentUser?.createdAt || Date.now(),
+      lastLoginAt: Date.now()
+    };
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(identity));
+    } catch (_) {}
+    this._currentUser = identity;
+    this._notify();
+    return identity;
+  }
+
+  async updateHandle(newHandle) {
+    if (!newHandle) throw new Error('Handle cannot be empty');
+    if (!this._currentUser) {
+      await this.signInGuest();
+    }
+    this._currentUser.handle = newHandle;
+    try {
+      storage.setItem(STORAGE_KEY, JSON.stringify(this._currentUser));
+    } catch (_) {}
+    this._notify();
+    return this._currentUser;
+  }
+
   async signOut() {
     this._currentUser = null;
     this._notify();
   }
+
 
   onAuthStateChanged(callback) {
     if (typeof callback !== 'function') {

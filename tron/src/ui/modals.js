@@ -126,6 +126,9 @@ export function resumeGame() {
   state.lastPauseToggle = performance.now();
   const pm = document.getElementById('pauseMenu');
   if (pm) pm.style.display = 'none';
+  const am = document.getElementById('authModal');
+  if (am) am.style.display = 'none';
+  state.authModalOpen = false;
   state.justResumed = true;
   tryLock();
   focusGame();
@@ -135,6 +138,9 @@ export function resumeGame() {
 export function restartMatch() {
   const pm = document.getElementById('pauseMenu');
   if (pm) pm.style.display = 'none';
+  const am = document.getElementById('authModal');
+  if (am) am.style.display = 'none';
+  state.authModalOpen = false;
   if (typeof window !== 'undefined' && window.__tronResetGame) {
     window.__tronResetGame();
   }

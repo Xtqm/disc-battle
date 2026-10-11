@@ -2,6 +2,7 @@ import { state } from '../core/state.js';
 import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { requestFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
 import { showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer } from '../network/roomManager.js';
+import { updateIdentityHeader, showAuthTerminal } from './authTerminal.js';
 
 export function startMode(mode) {
   state.gameMode = (mode === 'duel' || mode === 'duel_ai') ? 'duel_ai' : mode;
@@ -11,6 +12,9 @@ export function startMode(mode) {
   if (hm) hm.style.display = 'none';
   const rm = document.getElementById('roomModal');
   if (rm) rm.style.display = 'none';
+  const am = document.getElementById('authModal');
+  if (am) am.style.display = 'none';
+  state.authModalOpen = false;
   if (typeof window !== 'undefined' && window.__tronResetGame) {
     window.__tronResetGame();
   }
@@ -34,6 +38,9 @@ export function showModeSelect() {
   if (hm) hm.style.display = 'none';
   const rm = document.getElementById('roomModal');
   if (rm) rm.style.display = 'none';
+  const am = document.getElementById('authModal');
+  if (am) am.style.display = 'none';
+  state.authModalOpen = false;
   state.paused = false;
   state.running = false;
   teardownMultiplayer();
@@ -45,7 +52,8 @@ export function showModeSelect() {
 }
 
 export function getMainMenuHtml() {
-  return `<div class="card" id="mainMenu">
+  return `<div id="identityHeader" class="identity-header"></div>
+<div class="card" id="mainMenu">
   <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
   <div class="keys desktop-keys">
     <b>W A S D</b><span>Move &amp; strafe across the grid</span>
@@ -86,6 +94,9 @@ export function showModeSelectMenu() {
   if (hm) hm.style.display = 'none';
   const rm = document.getElementById('roomModal');
   if (rm) rm.style.display = 'none';
+  const am = document.getElementById('authModal');
+  if (am) am.style.display = 'none';
+  state.authModalOpen = false;
   const overlay = document.getElementById('overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
@@ -104,6 +115,7 @@ export function startSoloDuel() {
 }
 
 export function bindMainMenuEvents() {
+  updateIdentityHeader();
   const bind = (id, fn) => {
     const b = document.getElementById(id);
     if (b) {

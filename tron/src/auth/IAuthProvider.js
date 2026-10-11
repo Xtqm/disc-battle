@@ -44,6 +44,36 @@ export class IAuthProvider {
   }
 
   /**
+   * Authorizes or converts session with direct credentials.
+   * @param {string} email
+   * @param {string} password
+   * @param {string} [handle]
+   * @returns {Promise<object>}
+   */
+  async signInWithCredentials(email, password, handle) {
+    throw new Error('IAuthProvider: signInWithCredentials() must be implemented by subclass.');
+  }
+
+  /**
+   * Links or signs in via federated external provider.
+   * @param {string} providerName
+   * @param {object} [profile]
+   * @returns {Promise<object>}
+   */
+  async signInWithFederated(providerName, profile) {
+    throw new Error('IAuthProvider: signInWithFederated() must be implemented by subclass.');
+  }
+
+  /**
+   * Updates the active user callsign / display handle.
+   * @param {string} newHandle
+   * @returns {Promise<object>}
+   */
+  async updateHandle(newHandle) {
+    throw new Error('IAuthProvider: updateHandle() must be implemented by subclass.');
+  }
+
+  /**
    * Subscribes a listener to authentication state transitions.
    * @param {(user: { uid: string, handle: string, isAnonymous: boolean, token?: string, providerId: string } | null) => void} callback
    * @returns {() => void} Unsubscribe function
@@ -52,3 +82,4 @@ export class IAuthProvider {
     throw new Error('IAuthProvider: onAuthStateChanged() must be implemented by subclass.');
   }
 }
+
