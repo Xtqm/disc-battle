@@ -104,3 +104,21 @@ export function updateLockStateBanner() {
   const lb = document.getElementById('lockstate');
   if (lb) lb.style.display = (state.isTouchDevice || isLocked()) ? 'none' : 'block';
 }
+
+export function updateOfflineBanner(isOnline, pendingCount = 0) {
+  if (typeof document === 'undefined') return;
+  const banner = document.getElementById('offlineSyncBanner');
+  if (!banner) return;
+  if (!isOnline) {
+    banner.style.display = 'flex';
+    const textEl = document.getElementById('offlineBannerText');
+    if (textEl) {
+      textEl.textContent = pendingCount > 0
+        ? `[GRID OFFLINE] ${pendingCount} MUTATIONS QUEUED // PROGRESS SAFEGUARDED`
+        : `[GRID OFFLINE] SYNC BUFFER ACTIVE // PROGRESS SAFEGUARDED`;
+    }
+  } else {
+    banner.style.display = 'none';
+  }
+}
+

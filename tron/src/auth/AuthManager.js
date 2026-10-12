@@ -1,7 +1,10 @@
 import { state } from '../core/state.js';
 import { authEventBus, AuthEvents } from './events.js';
 import { MockAuthProvider } from './MockAuthProvider.js';
-import { getOrCreateSaveState, updateSaveStats, updateSaveSettings } from './saveState.js';
+import { SupabaseAuthProvider, resolveSupabaseConfig } from './SupabaseAuthProvider.js';
+import { getOrCreateSaveState, updateSaveStats, updateSaveSettings, saveSaveState } from './saveState.js';
+import { crossTabSync } from '../storage/CrossTabSync.js';
+import { CloudSyncResolver } from '../storage/CloudSyncResolver.js';
 
 /**
  * AuthManager - Central singleton orchestrating identity, authentication providers, and local save states.
@@ -13,11 +16,12 @@ export class AuthManager {
     this._saveState = null;
     this._unsubProvider = null;
     this._initPromise = null;
+    this._crossTabUnsub = crossTabSync.onMessage((msg) => this._handleCrossTabMessage(msg));
   }
 
   /**
    * Initializes the authentication system with an optional custom provider.
-   * Defaults to MockAuthProvider for zero-barrier guest access.
+   * Auto-detects Supabase credentials if present, otherwise defaults to MockAuthProvider.
    * @param {import('./IAuthProvider.js').IAuthProvider} [provider]
    * @returns {Promise<{ user: object, saveState: object }>}
    */
@@ -31,6 +35,11 @@ export class AuthManager {
           this._unsubProvider = null;
         }
         this._provider = provider;
+      } else {
+        const { url, anonKey } = resolveSupabaseConfig();
+        if (url || (typeof window !== 'undefined' && window.__USE_SUPABASE__)) {
+          this._provider = new SupabaseAuthProvider();
+        }
       }
 
       // Listen to auth changes from the active provider
@@ -50,6 +59,27 @@ export class AuthManager {
     })();
 
     return this._initPromise;
+  }
+
+  /**
+   * Switches the active authentication provider at runtime.
+   * @param {import('./IAuthProvider.js').IAuthProvider} newProvider
+   * @returns {Promise<{ user: object, saveState: object }>}
+   */
+  async switchProvider(newProvider) {
+    if (!newProvider) throw new Error('switchProvider: provider cannot be null');
+    if (this._unsubProvider) {
+      this._unsubProvider();
+      this._unsubProvider = null;
+    }
+    this._provider = newProvider;
+    this._unsubProvider = this._provider.onAuthStateChanged((user) => {
+      this._onProviderAuthStateChanged(user);
+    });
+    await this._provider.init();
+    const user = this._provider.getCurrentUser();
+    this._applyUser(user);
+    return { user: this._currentUser, saveState: this._saveState };
   }
 
   get currentUser() {
@@ -184,6 +214,24 @@ export class AuthManager {
    * @param {Function} callback
    * @returns {() => void} Unsubscribe function
    */
+  /**
+   * Upgrades the current user session by linking an identity (OAuth or passkey).
+   * @param {object} credentials
+   * @returns {Promise<object>}
+   */
+  async linkIdentity(credentials) {
+    if (!this._provider) throw new Error('AuthManager: No active auth provider.');
+    if (typeof this._provider.linkIdentity !== 'function') {
+      throw new Error(`Active provider "${this.providerId}" does not support linkIdentity.`);
+    }
+    const result = await this._provider.linkIdentity(credentials);
+    const user = this._provider.getCurrentUser();
+    if (user) {
+      this._applyUser(user);
+    }
+    return result;
+  }
+
   on(event, callback) {
     return authEventBus.on(event, callback);
   }
@@ -192,7 +240,37 @@ export class AuthManager {
     this._applyUser(user);
   }
 
-  _applyUser(user) {
+  _handleCrossTabMessage(msg) {
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'AUTH_STATE_CHANGED') {
+      const incomingUser = msg.payload?.user;
+      if (incomingUser?.uid !== this._currentUser?.uid) {
+        this._applyUser(incomingUser, { fromCrossTab: true });
+      }
+    } else if (msg.type === 'SAVE_STATE_UPDATED') {
+      const incomingSave = msg.payload?.saveState;
+      if (this._currentUser && incomingSave && incomingSave.userId === this._currentUser.uid) {
+        // Monotonically merge save states to prevent multi-tab desynchronization
+        this._saveState = CloudSyncResolver.resolve(this._saveState, incomingSave);
+        saveSaveState(this._saveState, { broadcast: false });
+        if (this._saveState && this._saveState.settings) {
+          if (typeof this._saveState.settings.sens === 'number') {
+            state.sens = this._saveState.settings.sens;
+          }
+          if (typeof this._saveState.settings.invertY === 'boolean') {
+            state.invertY = this._saveState.settings.invertY;
+          }
+        }
+        authEventBus.emit(AuthEvents.PROFILE_UPDATED, {
+          user: this._currentUser,
+          saveState: this._saveState,
+          fromCrossTab: true
+        });
+      }
+    }
+  }
+
+  _applyUser(user, options = {}) {
     this._currentUser = user;
     state.currentUser = user;
 
@@ -210,10 +288,17 @@ export class AuthManager {
       this._saveState = null;
     }
 
+    if (!options.fromCrossTab) {
+      try {
+        crossTabSync.broadcastAuthState(this._currentUser);
+      } catch (_) {}
+    }
+
     authEventBus.emit(AuthEvents.STATE_CHANGED, {
       user: this._currentUser,
       saveState: this._saveState,
-      providerId: this.providerId
+      providerId: this.providerId,
+      fromCrossTab: !!options.fromCrossTab
     });
   }
 }

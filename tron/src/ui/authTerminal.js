@@ -302,6 +302,26 @@ export function initAuthTerminal() {
   if (btnRegister) {
     btnRegister.onclick = (e) => { e.stopPropagation(); handlePasskeyAuth(true); };
   }
+  const btnMagicLink = document.getElementById('btnMagicLink');
+  if (btnMagicLink) {
+    btnMagicLink.onclick = async (e) => {
+      e.stopPropagation();
+      const email = (emailInput?.value || '').trim();
+      if (!email || !email.includes('@')) {
+        SFX.errorBuzz();
+        setConsoleMessage('> ERROR: VALID COMM IDENT (EMAIL) REQUIRED FOR MAGIC LINK.', 'error');
+        return;
+      }
+      try {
+        await authManager.signInWithCredentials(email, '');
+        SFX.accessGranted();
+        setConsoleMessage(`> MAGIC LINK DISPATCHED TO ${email}. CHECK TERMINAL INBOX.`, 'success');
+      } catch (err) {
+        SFX.errorBuzz();
+        setConsoleMessage(`> MAGIC LINK ERROR: ${err.message}`, 'error');
+      }
+    };
+  }
   if (passInput) {
     passInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
@@ -311,15 +331,16 @@ export function initAuthTerminal() {
     });
   }
 
-  // Quick Sync (Google / Discord)
+  // Quick Sync (Google / Discord / GitHub)
   const btnGoogle = document.getElementById('btnSyncGoogle');
   const btnDiscord = document.getElementById('btnSyncDiscord');
+  const btnGithub = document.getElementById('btnSyncGithub');
 
   const handleFederatedSync = async (providerName) => {
     try {
       const user = await authManager.signInWithFederated(providerName);
       SFX.accessGranted();
-      setConsoleMessage(`> FEDERATED SYNC SUCCESSFUL // ${providerName.toUpperCase()} PROTOCOL LINKED AS "${user.handle}"`, 'success');
+      setConsoleMessage(`> FEDERATED SYNC SUCCESSFUL // ${providerName.toUpperCase()} PROTOCOL LINKED AS "${user?.handle || 'PROGRAM'}"`, 'success');
       populateTerminalData();
     } catch (err) {
       SFX.errorBuzz();
@@ -332,6 +353,9 @@ export function initAuthTerminal() {
   }
   if (btnDiscord) {
     btnDiscord.onclick = (e) => { e.stopPropagation(); handleFederatedSync('discord'); };
+  }
+  if (btnGithub) {
+    btnGithub.onclick = (e) => { e.stopPropagation(); handleFederatedSync('github'); };
   }
 
   // Dismiss / Close Button

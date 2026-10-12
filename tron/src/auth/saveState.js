@@ -3,6 +3,8 @@
  * Binds player statistics, settings, and progression to a specific user identity.
  */
 
+import { crossTabSync } from '../storage/CrossTabSync.js';
+
 export const SAVE_STATE_VERSION = 1;
 export const SAVE_STATE_KEY_PREFIX = 'tron_save_state_';
 
@@ -52,6 +54,11 @@ export function createDefaultSaveState(userId, handle = 'ANONYMOUS_PROGRAM') {
     handle: String(handle),
     createdAt: now,
     lastActiveAt: now,
+    bits: 0,
+    level: 1,
+    starMastery: {},
+    inventory: ['disc_default'],
+    achievements: [],
     stats: {
       matchesPlayed: 0,
       wins: 0,
@@ -73,7 +80,12 @@ export function createDefaultSaveState(userId, handle = 'ANONYMOUS_PROGRAM') {
  */
 function migrateSaveState(data) {
   if (!data || typeof data !== 'object') return null;
-  // Future migration hooks for v2, v3, etc.
+  if (typeof data.bits !== 'number') data.bits = 0;
+  if (typeof data.level !== 'number') data.level = 1;
+  if (!data.starMastery || typeof data.starMastery !== 'object') data.starMastery = {};
+  if (!Array.isArray(data.inventory)) data.inventory = ['disc_default'];
+  if (!Array.isArray(data.achievements)) data.achievements = [];
+
   if (!data.stats) data.stats = {};
   if (typeof data.stats.matchesPlayed !== 'number') data.stats.matchesPlayed = 0;
   if (typeof data.stats.wins !== 'number') data.stats.wins = 0;
@@ -112,15 +124,22 @@ export function loadSaveState(userId) {
 /**
  * Persists a TronSaveState object to storage.
  * @param {object} saveState
+ * @param {object} [options]
+ * @param {boolean} [options.broadcast=true]
  * @returns {object} The persisted save state
  */
-export function saveSaveState(saveState) {
+export function saveSaveState(saveState, options = { broadcast: true }) {
   if (!saveState || !saveState.userId) {
     throw new Error('saveSaveState: Invalid saveState object with missing userId');
   }
   saveState.lastActiveAt = Date.now();
   const key = `${SAVE_STATE_KEY_PREFIX}${saveState.userId}`;
   safeSetItem(key, JSON.stringify(saveState));
+  if (!options || options.broadcast !== false) {
+    try {
+      crossTabSync.broadcastSaveState(saveState);
+    } catch (_) {}
+  }
   return saveState;
 }
 

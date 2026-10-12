@@ -17,6 +17,10 @@ import { startMode, showModeSelect, bindMenuButtons } from '../ui/menus.js';
 import { pauseGame, resumeGame, restartMatch, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen } from '../ui/modals.js';
 import { SFX, playDeRezSound } from '../audio/sfx.js';
 import { authManager } from '../auth/AuthManager.js';
+import { SupabaseAuthProvider } from '../auth/SupabaseAuthProvider.js';
+import { CloudSyncResolver } from '../storage/CloudSyncResolver.js';
+import { offlineSyncQueue } from '../storage/OfflineSyncQueue.js';
+import { crossTabSync } from '../storage/CrossTabSync.js';
 import { initAuthTerminal, showAuthTerminal, hideAuthTerminal, isAuthTerminalOpen, updateIdentityHeader } from '../ui/authTerminal.js';
 
 
@@ -531,10 +535,28 @@ window.__dbg = {
   showAuthTerminal: () => showAuthTerminal(),
   hideAuthTerminal: () => hideAuthTerminal(),
   isAuthTerminalOpen: () => isAuthTerminalOpen(),
-  updateIdentityHeader: () => updateIdentityHeader()
+  updateIdentityHeader: () => updateIdentityHeader(),
+  SupabaseAuthProvider,
+  CloudSyncResolver,
+  offlineSyncQueue,
+  crossTabSync
 };
 
 window.__TRON__ = window.__dbg;
 
-export { requestFullScreen, toggleFullScreen, isFullScreen, exitFullScreen, authManager, showAuthTerminal, hideAuthTerminal, updateIdentityHeader, initAuthTerminal };
+export {
+  requestFullScreen,
+  toggleFullScreen,
+  isFullScreen,
+  exitFullScreen,
+  authManager,
+  showAuthTerminal,
+  hideAuthTerminal,
+  updateIdentityHeader,
+  initAuthTerminal,
+  SupabaseAuthProvider,
+  CloudSyncResolver,
+  offlineSyncQueue,
+  crossTabSync
+};
 
