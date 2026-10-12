@@ -1189,6 +1189,11 @@ const firebaseConfig = {
 // The game code looks for this specific global variable
 window.__firebase_config = JSON.stringify(firebaseConfig);
 window.__app_id = "tron-disc-arena";
+
+// Supabase live configuration bridge
+window.__ENV__ = window.__ENV__ || {};
+window.__ENV__.SUPABASE_URL = "https://dugydwohgjcuwvimxcse.supabase.co";
+window.__ENV__.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1Z3lkd29oZ2pjdXd2aW14Y3NlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MzEzOTksImV4cCI6MjEwNzQwNzM5OX0.86I5FeZzamB6Dk9i-JfDrl7ioHi-h4ahIsQdD535tVw";
 </script>
 <script type="module" src="./src/core/main.js"></script>
 </body>

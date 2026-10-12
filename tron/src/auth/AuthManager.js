@@ -4,7 +4,8 @@ import { MockAuthProvider } from './MockAuthProvider.js';
 import { SupabaseAuthProvider, resolveSupabaseConfig } from './SupabaseAuthProvider.js';
 import { getOrCreateSaveState, updateSaveStats, updateSaveSettings, saveSaveState } from './saveState.js';
 import { crossTabSync } from '../storage/CrossTabSync.js';
-import { CloudSyncResolver } from '../storage/CloudSyncResolver.js';
+import { CloudSyncResolver, fetchRemoteSaveState, upsertRemoteSaveState } from '../storage/CloudSyncResolver.js';
+import { offlineSyncQueue } from '../storage/OfflineSyncQueue.js';
 
 /**
  * AuthManager - Central singleton orchestrating identity, authentication providers, and local save states.
@@ -17,6 +18,7 @@ export class AuthManager {
     this._unsubProvider = null;
     this._initPromise = null;
     this._crossTabUnsub = crossTabSync.onMessage((msg) => this._handleCrossTabMessage(msg));
+    this._isSyncingCloud = false;
   }
 
   /**
@@ -51,6 +53,16 @@ export class AuthManager {
       await this._provider.init();
       const user = this._provider.getCurrentUser();
       this._applyUser(user);
+
+      // Register offline queue status listener for auto-flush on reconnection
+      let wasOnline = offlineSyncQueue.isOnline;
+      offlineSyncQueue.onStatusChange((status) => {
+        const justReconnected = status.isOnline && !wasOnline;
+        wasOnline = status.isOnline;
+        if (justReconnected && this._currentUser && this._provider?.client && offlineSyncQueue.size > 0) {
+          this.syncCloudSave().catch(() => {});
+        }
+      });
 
       return {
         user: this._currentUser,
@@ -158,6 +170,8 @@ export class AuthManager {
     }
     if (this._saveState) {
       this._saveState.handle = sanitized;
+      saveSaveState(this._saveState);
+      this.syncCloudSave().catch(() => {});
     }
     authEventBus.emit(AuthEvents.PROFILE_UPDATED, { user: this._currentUser, saveState: this._saveState });
     return this._currentUser;
@@ -183,6 +197,7 @@ export class AuthManager {
     if (!this._currentUser) return null;
     this._saveState = updateSaveStats(this._currentUser.uid, statsDelta);
     authEventBus.emit(AuthEvents.PROFILE_UPDATED, { user: this._currentUser, saveState: this._saveState });
+    this.syncCloudSave().catch(() => {});
     return this._saveState;
   }
 
@@ -205,6 +220,7 @@ export class AuthManager {
     }
 
     authEventBus.emit(AuthEvents.PROFILE_UPDATED, { user: this._currentUser, saveState: this._saveState });
+    this.syncCloudSave().catch(() => {});
     return this._saveState;
   }
 
@@ -270,6 +286,59 @@ export class AuthManager {
     }
   }
 
+  /**
+   * Synchronizes active save state with Supabase cloud database using Master Grid Protocol.
+   * Monotonically resolves local and remote state, pushes updates, or queues if offline.
+   * @returns {Promise<object|null>}
+   */
+  async syncCloudSave() {
+    if (!this._currentUser || !this._currentUser.uid) return null;
+    const client = this._provider?.client;
+    if (!client || typeof client.from !== 'function') return this._saveState;
+    if (this._isSyncingCloud) return this._saveState;
+
+    this._isSyncingCloud = true;
+    try {
+      // 1. Fetch remote state
+      const remoteState = await fetchRemoteSaveState(this._currentUser.uid, client);
+      if (remoteState) {
+        // 2. Monotonically resolve local and remote state
+        const merged = CloudSyncResolver.resolve(this._saveState, remoteState);
+        this._saveState = merged;
+        saveSaveState(this._saveState, { broadcast: false });
+      }
+
+      // 3. Upsert resolved state to cloud
+      if (this._saveState) {
+        await upsertRemoteSaveState(this._saveState, client);
+      }
+
+      // 4. Drain pending offline queue mutations if online
+      if (offlineSyncQueue.size > 0 && offlineSyncQueue.isOnline) {
+        await offlineSyncQueue.flush(async (payload) => {
+          if (payload && payload.userId === this._currentUser.uid) {
+            await upsertRemoteSaveState(payload, client);
+          }
+          return true;
+        });
+      }
+
+      authEventBus.emit(AuthEvents.PROFILE_UPDATED, {
+        user: this._currentUser,
+        saveState: this._saveState
+      });
+      return this._saveState;
+    } catch (err) {
+      console.warn('AuthManager: Cloud sync encountered network error, queueing mutation:', err);
+      if (this._saveState) {
+        offlineSyncQueue.enqueue(this._saveState);
+      }
+      return this._saveState;
+    } finally {
+      this._isSyncingCloud = false;
+    }
+  }
+
   _applyUser(user, options = {}) {
     this._currentUser = user;
     state.currentUser = user;
@@ -283,6 +352,13 @@ export class AuthManager {
         if (typeof this._saveState.settings.invertY === 'boolean') {
           state.invertY = this._saveState.settings.invertY;
         }
+      }
+      if (!options.fromCrossTab && this._provider?.client) {
+        setTimeout(() => {
+          this.syncCloudSave().catch(err => {
+            console.warn('AuthManager: Background cloud sync error:', err);
+          });
+        }, 0);
       }
     } else {
       this._saveState = null;

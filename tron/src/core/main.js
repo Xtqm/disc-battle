@@ -1,3 +1,4 @@
+import './env.js';
 import * as THREE from '../../vendor/three.module.js';
 import { state, player, touchState } from './state.js';
 import { config } from './config.js';
@@ -201,20 +202,21 @@ export const animate = loop;
 
 export function initApp() {
   try {
-    authManager.init().catch(err => console.warn("Auth initialization error:", err));
+    const authReady = authManager.init().catch(err => console.warn("Auth initialization error:", err));
     initGraphics();
     const canvasEl = renderer?.domElement || document.querySelector('canvas');
     initInput(canvasEl);
     bindMenuButtons();
     initAuthTerminal();
 
-
     if (state.isTouchDevice && typeof document !== 'undefined' && document.body) {
       document.body.classList.add('touch-device');
       checkOrientation();
     }
 
-    requestAnimationFrame(animate);
+    authReady.finally(() => {
+      setTimeout(() => requestAnimationFrame(animate), 50);
+    });
   } catch (err) {
     console.error("Initialization failed:", err);
   }

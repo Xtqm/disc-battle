@@ -32,6 +32,8 @@ export function resolveSupabaseConfig(opts = {}) {
   return { url, anonKey };
 }
 
+const MOCK_AUTH_STORAGE_KEY = 'tron_simulated_supabase_auth_session';
+
 /**
  * In-memory simulated Supabase Auth client for offline or unconfigured environments.
  */
@@ -40,6 +42,34 @@ class InMemorySupabaseAuth {
     this._user = null;
     this._session = null;
     this._listeners = new Set();
+    this._loadPersistedSession();
+  }
+
+  _loadPersistedSession() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        const raw = localStorage.getItem(MOCK_AUTH_STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed.user && parsed.session) {
+            this._user = parsed.user;
+            this._session = parsed.session;
+          }
+        }
+      }
+    } catch (_) {}
+  }
+
+  _persistSession() {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (this._session && this._user) {
+          localStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify({ user: this._user, session: this._session }));
+        } else {
+          localStorage.removeItem(MOCK_AUTH_STORAGE_KEY);
+        }
+      }
+    } catch (_) {}
   }
 
   onAuthStateChange(callback) {
@@ -56,6 +86,7 @@ class InMemorySupabaseAuth {
   }
 
   _emit(event, session) {
+    this._persistSession();
     for (const listener of this._listeners) {
       try {
         listener(event, session);
@@ -74,6 +105,9 @@ class InMemorySupabaseAuth {
   }
 
   async signInAnonymously() {
+    if (this._session && this._user) {
+      return { data: { user: this._user, session: this._session }, error: null };
+    }
     const randomHex = Math.random().toString(16).substring(2, 10);
     const id = `00000000-0000-4000-8000-${randomHex.padEnd(12, '0')}`;
     this._user = {
@@ -232,7 +266,7 @@ export class SupabaseAuthProvider extends IAuthProvider {
           let createClientFn = null;
           if (typeof window !== 'undefined' && window.supabase?.createClient) {
             createClientFn = window.supabase.createClient;
-          } else {
+          } else if (typeof window === 'undefined') {
             const supabaseModule = await import('@supabase/supabase-js');
             createClientFn = supabaseModule.createClient;
           }

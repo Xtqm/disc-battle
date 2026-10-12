@@ -1,2 +1,6 @@
 node_modules/
 tron_disc_arena_master_project_summary.md
+.env
+tron/.env
+*.env
+!.env.example

@@ -3,5 +3,9 @@ export {
   normalizeSaveState,
   mergeStarMastery,
   mergeSetUnion,
-  evaluateMonotonicInvariants
+  evaluateMonotonicInvariants,
+  saveStateToRow,
+  rowToSaveState,
+  fetchRemoteSaveState,
+  upsertRemoteSaveState
 } from '../../../tron/src/storage/CloudSyncResolver.js';

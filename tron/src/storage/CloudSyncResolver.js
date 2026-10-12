@@ -221,3 +221,104 @@ export class CloudSyncResolver {
     return resolved;
   }
 }
+
+/**
+ * Maps camelCase TronSaveState to Postgres snake_case save_states table row.
+ * @param {object} saveState
+ * @returns {object}
+ */
+export function saveStateToRow(saveState) {
+  if (!saveState) return null;
+  const normalized = normalizeSaveState(saveState);
+  return {
+    user_id: normalized.userId,
+    handle: normalized.handle,
+    bits: normalized.bits,
+    level: normalized.level,
+    star_mastery: normalized.starMastery,
+    inventory: normalized.inventory,
+    achievements: normalized.achievements,
+    stats: normalized.stats,
+    settings: normalized.settings,
+    created_at: new Date(normalized.createdAt || Date.now()).toISOString(),
+    last_active_at: new Date(normalized.lastActiveAt || Date.now()).toISOString(),
+    version: normalized.version
+  };
+}
+
+/**
+ * Maps Postgres snake_case save_states table row to camelCase TronSaveState.
+ * @param {object} row
+ * @returns {object}
+ */
+export function rowToSaveState(row) {
+  if (!row) return null;
+  return normalizeSaveState({
+    userId: row.user_id,
+    handle: row.handle || 'PROGRAM',
+    bits: Number(row.bits || 0),
+    level: Number(row.level || 1),
+    starMastery: typeof row.star_mastery === 'object' && row.star_mastery !== null ? row.star_mastery : {},
+    inventory: Array.isArray(row.inventory) ? row.inventory : ['disc_default'],
+    achievements: Array.isArray(row.achievements) ? row.achievements : [],
+    stats: typeof row.stats === 'object' && row.stats !== null ? row.stats : {},
+    settings: typeof row.settings === 'object' && row.settings !== null ? row.settings : {},
+    createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
+    lastActiveAt: row.last_active_at ? new Date(row.last_active_at).getTime() : Date.now(),
+    version: Number(row.version || 1)
+  });
+}
+
+/**
+ * Fetches remote save state for a user from Supabase save_states table.
+ * @param {string} userId
+ * @param {object} client Supabase client instance
+ * @returns {Promise<object|null>}
+ */
+export async function fetchRemoteSaveState(userId, client) {
+  if (!client || typeof client.from !== 'function' || !userId) return null;
+  try {
+    const { data, error } = await client
+      .from('save_states')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('CloudSyncResolver: fetchRemoteSaveState error:', error);
+      return null;
+    }
+    if (!data) return null;
+    return rowToSaveState(data);
+  } catch (err) {
+    console.warn('CloudSyncResolver: fetchRemoteSaveState exception:', err);
+    return null;
+  }
+}
+
+/**
+ * Upserts a save state into Supabase save_states table.
+ * @param {object} saveState
+ * @param {object} client Supabase client instance
+ * @returns {Promise<object|null>}
+ */
+export async function upsertRemoteSaveState(saveState, client) {
+  if (!client || typeof client.from !== 'function' || !saveState || !saveState.userId) return null;
+  const row = saveStateToRow(saveState);
+  const { data, error } = await client
+    .from('save_states')
+    .upsert(row, { onConflict: 'user_id' })
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.warn('CloudSyncResolver: upsertRemoteSaveState error:', error);
+    throw error;
+  }
+  return data ? rowToSaveState(data) : saveState;
+}
+
+CloudSyncResolver.saveStateToRow = saveStateToRow;
+CloudSyncResolver.rowToSaveState = rowToSaveState;
+CloudSyncResolver.fetchRemote = fetchRemoteSaveState;
+CloudSyncResolver.upsertRemote = upsertRemoteSaveState;
