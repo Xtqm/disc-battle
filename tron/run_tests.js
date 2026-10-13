@@ -20,7 +20,8 @@ const testFiles = [
   'test_auth_integration.js',
   'test_storage_manager.js',
   'test_economy_manager.js',
-  'test_campaign_phase1.js'
+  'test_campaign_phase1.js',
+  'test_campaign_phase2.js'
 ];
 
 async function runTestSuite() {

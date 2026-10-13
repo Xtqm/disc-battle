@@ -7,6 +7,8 @@
     "test:sync": "node tron/test_supabase_cloud_sync.js",
     "test:storage": "node tron/test_storage_manager.js",
     "test:economy": "node tron/test_economy_manager.js",
-    "test:campaign": "node tron/test_campaign_phase1.js"
+    "test:campaign": "node tron/test_campaign_phase1.js && node tron/test_campaign_phase2.js",
+    "test:campaign:phase1": "node tron/test_campaign_phase1.js",
+    "test:campaign:phase2": "node tron/test_campaign_phase2.js"
   }
 }

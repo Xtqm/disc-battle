@@ -3,6 +3,15 @@ import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { requestFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
 import { showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer } from '../network/roomManager.js';
 import { updateIdentityHeader, showAuthTerminal } from './authTerminal.js';
+import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
+
+// Setup Campaign UI navigation transitions
+gridSelectorModal.setOnSelectGrid((gridId) => levelSelectView.show(gridId));
+gridSelectorModal.setOnBackToMenu(() => showModeSelectMenu());
+levelSelectView.setOnSelectLevel((levelId) => campaignHUD.showMissionBrief(levelId));
+levelSelectView.setOnBackToGridSelector(() => gridSelectorModal.show());
+campaignHUD.setOnCancelBrief(() => levelSelectView.show());
+trialDebriefModal.setOnReturnToGrid((gridId) => levelSelectView.show(gridId));
 
 export function startMode(mode) {
   state.gameMode = (mode === 'duel' || mode === 'duel_ai') ? 'duel_ai' : mode;
@@ -40,6 +49,11 @@ export function showModeSelect() {
   if (rm) rm.style.display = 'none';
   const am = document.getElementById('authModal');
   if (am) am.style.display = 'none';
+  gridSelectorModal.hide();
+  levelSelectView.hide();
+  campaignHUD.hideMissionBrief();
+  campaignHUD.hideObjectiveHeader();
+  trialDebriefModal.hide();
   state.authModalOpen = false;
   state.paused = false;
   state.running = false;
@@ -78,6 +92,7 @@ export function getMainMenuHtml() {
     <b>PAUSE</b><span>Tap top right II button to suspend grid</span>
   </div>
   <div class="mode-select" id="mainMenuButtons">
+    <button id="campaignBtn" class="mode-btn campaign-btn">CAMPAIGN SECTORS</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
@@ -96,6 +111,11 @@ export function showModeSelectMenu() {
   if (rm) rm.style.display = 'none';
   const am = document.getElementById('authModal');
   if (am) am.style.display = 'none';
+  gridSelectorModal.hide();
+  levelSelectView.hide();
+  campaignHUD.hideMissionBrief();
+  campaignHUD.hideObjectiveHeader();
+  trialDebriefModal.hide();
   state.authModalOpen = false;
   const overlay = document.getElementById('overlay');
   if (!overlay) return;
@@ -161,6 +181,15 @@ export function bindMainMenuEvents() {
     startSoloDuel();
   };
 
+  const openCampaign = (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'none';
+    gridSelectorModal.show();
+  };
+
+  bind('campaignBtn', openCampaign);
   bind('swarmBtn', startSwarm);
   bind('hostMatchBtn', openHostModal);
   bind('joinOnlineBtn', openJoinModal);
@@ -274,4 +303,8 @@ if (typeof window !== 'undefined') {
   window.__tronShowModeSelect = showModeSelect;
   window.__tronShowModeSelectMenu = showModeSelectMenu;
   window.__tronTeardownMultiplayer = teardownMultiplayer;
+  window.__tronShowCampaignSectors = () => gridSelectorModal.show();
+  window.__tronShowLevelSelectView = (gridId) => levelSelectView.show(gridId);
+  window.__tronShowMissionBrief = (levelId) => campaignHUD.showMissionBrief(levelId);
+  window.__tronShowTrialDebrief = (result) => trialDebriefModal.show(result);
 }

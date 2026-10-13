@@ -3,7 +3,7 @@ import { updateHUD, message, el, updateCrosshair, updateKeyMonitor, updateLockSt
 import { startMode, startGame, showModeSelect, showModeSelectMenu, bindMenuButtons, bindMainMenuEvents } from './menus.js';
 import { pauseGame, resumeGame, restartMatch, showGameOver, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
 import { updateIdentityHeader, showAuthTerminal, hideAuthTerminal, initAuthTerminal } from './authTerminal.js';
-
+import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
 
 export function shake(v) {
   state.shakeAmt = Math.min(state.shakeAmt + v, 0.8);
@@ -49,6 +49,22 @@ export class UIManager {
   static bindMenuButtons() {
     bindMenuButtons();
   }
+
+  static showCampaign() {
+    gridSelectorModal.show();
+  }
+
+  static showLevelSelect(gridId) {
+    levelSelectView.show(gridId);
+  }
+
+  static showMissionBrief(levelId) {
+    campaignHUD.showMissionBrief(levelId);
+  }
+
+  static showTrialDebrief(result) {
+    trialDebriefModal.show(result);
+  }
 }
 
 export const UI = UIManager;
@@ -79,6 +95,11 @@ export {
   updateIdentityHeader,
   showAuthTerminal,
   hideAuthTerminal,
-  initAuthTerminal
+  initAuthTerminal,
+  gridSelectorModal,
+  levelSelectView,
+  campaignHUD,
+  trialDebriefModal
 };
+
 
