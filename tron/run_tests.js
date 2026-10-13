@@ -18,7 +18,8 @@ const testFiles = [
   'test_supabase_auth_provider.js',
   'test_supabase_cloud_sync.js',
   'test_auth_integration.js',
-  'test_storage_manager.js'
+  'test_storage_manager.js',
+  'test_economy_manager.js'
 ];
 
 async function runTestSuite() {

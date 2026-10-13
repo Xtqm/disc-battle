@@ -5,6 +5,7 @@
   "scripts": {
     "test": "node tron/run_tests.js",
     "test:sync": "node tron/test_supabase_cloud_sync.js",
-    "test:storage": "node tron/test_storage_manager.js"
+    "test:storage": "node tron/test_storage_manager.js",
+    "test:economy": "node tron/test_economy_manager.js"
   }
 }
