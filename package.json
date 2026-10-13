@@ -6,6 +6,7 @@
     "test": "node tron/run_tests.js",
     "test:sync": "node tron/test_supabase_cloud_sync.js",
     "test:storage": "node tron/test_storage_manager.js",
-    "test:economy": "node tron/test_economy_manager.js"
+    "test:economy": "node tron/test_economy_manager.js",
+    "test:campaign": "node tron/test_campaign_phase1.js"
   }
 }
