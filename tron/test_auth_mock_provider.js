@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { MockAuthProvider, generateUUID, generateGuestHandle } from './src/auth/MockAuthProvider.js';
+import { MockAuthProvider, generateUUID, generateGuestHandle } from '../src/auth/MockAuthProvider.js';
 
 console.log('--- Running MockAuthProvider Test Suite ---');
 

@@ -1,7 +1,7 @@
 import assert from 'assert';
-import { getIdentityHeaderHtml, calculateLevel } from './src/ui/authTerminal.js';
-import { authManager } from './src/auth/AuthManager.js';
-import { AuthEvents, authEventBus } from './src/auth/events.js';
+import { getIdentityHeaderHtml, calculateLevel } from '../src/ui/authTerminal.js';
+import { authManager } from '../src/auth/AuthManager.js';
+import { AuthEvents, authEventBus } from '../src/auth/events.js';
 
 console.log('--- Running Main Menu Identity Header Unit Tests ---');
 

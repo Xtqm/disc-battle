@@ -1,6 +1,6 @@
 import assert from 'assert';
-import { OfflineSyncQueue } from './src/storage/OfflineSyncQueue.js';
-import { updateOfflineBanner } from './src/ui/hud.js';
+import { OfflineSyncQueue } from '../src/storage/OfflineSyncQueue.js';
+import { updateOfflineBanner } from '../src/ui/hud.js';
 
 console.log('--- Running Offline Resilience & Sync Queue Test Suite ---');
 

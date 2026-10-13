@@ -1,6 +1,6 @@
 import assert from 'assert';
-import { state } from './src/core/state.js';
-import { onDown, onUp } from './src/input/keyboard.js';
+import { state } from '../src/core/state.js';
+import { onDown, onUp } from '../src/input/keyboard.js';
 
 console.log('--- Running Terminal Input Isolation & PointerLock Tests ---');
 

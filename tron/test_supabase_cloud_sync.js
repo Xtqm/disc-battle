@@ -6,10 +6,10 @@ import {
   rowToSaveState,
   fetchRemoteSaveState,
   upsertRemoteSaveState
-} from './src/storage/CloudSyncResolver.js';
-import { offlineSyncQueue } from './src/storage/OfflineSyncQueue.js';
-import { AuthManager } from './src/auth/AuthManager.js';
-import { ENV } from './src/core/env.js';
+} from '../src/storage/CloudSyncResolver.js';
+import { offlineSyncQueue } from '../src/storage/OfflineSyncQueue.js';
+import { AuthManager } from '../src/auth/AuthManager.js';
+import { ENV } from '../src/core/env.js';
 
 console.log('--- Running Supabase Cloud Sync & RLS Persistence Test Suite ---');
 

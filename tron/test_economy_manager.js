@@ -5,7 +5,7 @@
  */
 
 import assert from 'assert';
-import { StorageManager } from './src/storage/StorageManager.js';
+import { StorageManager } from '../src/storage/StorageManager.js';
 import {
   EconomyManager,
   economyManager,
@@ -13,7 +13,7 @@ import {
   DEFAULT_XP_CURVE,
   MILESTONE_REWARDS,
   MAX_AUDIT_LOG_SIZE
-} from './src/economy/EconomyManager.js';
+} from '../src/economy/EconomyManager.js';
 
 console.log('--- Running EconomyManager & Progression Engine Test Suite ---');
 

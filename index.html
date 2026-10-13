@@ -1,0 +1,1200 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2712%27 fill=%27none%27 stroke=%27%234ff2ff%27 stroke-width=%273%27/%3E%3C/svg%3E" />
+<title>TRON :: DISC ARENA</title>
+<style>
+  :root { --cyan:#4ff2ff; --orange:#ff7b1a; }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:#000; overflow:hidden;
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif; color:var(--cyan); }
+  html, body, canvas, #hud, .touch-btn, .touch-zone, #mobileControls, #orientationOverlay {
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+    overscroll-behavior: none;
+  }
+  .modal-overlay, .modal, #overlay {
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  .card {
+    text-align: center; 
+    width: 92%; 
+    max-width: 580px; 
+    padding: 32px 36px;
+    border: 1px solid rgba(79,242,255,0.45); 
+    border-radius: 12px;
+    box-shadow: 0 0 50px rgba(79,242,255,0.18), inset 0 0 24px rgba(79,242,255,0.1);
+    background: rgba(1, 14, 22, 0.88); 
+    
+    /* Critical Scrolling Fixes */
+    max-height: 85vh; /* slightly tighter to account for mobile address bars */
+    overflow-y: auto;
+    touch-action: pan-y !important; /* Forces browser to allow vertical scrolling here */
+    overscroll-behavior: contain; /* Prevents scroll chaining to the body */
+    -webkit-overflow-scrolling: touch; /* Momentum scrolling on iOS Safari */
+    pointer-events: auto;
+  }
+  .card::-webkit-scrollbar {
+    width: 6px;
+  }
+  .card::-webkit-scrollbar-track {
+    background: rgba(0, 15, 20, 0.5);
+    border-radius: 4px;
+  }
+  .card::-webkit-scrollbar-thumb {
+    background: var(--cyan);
+    border-radius: 4px;
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  .card * {
+    touch-action: pan-y;
+  }
+  canvas { display:block; }
+  #hud { position:fixed; inset:0; pointer-events:none; z-index:5; }
+  .panel { position:absolute; padding:10px 14px; border:1px solid rgba(79,242,255,.35);
+    background:rgba(0,16,22,.45); backdrop-filter:blur(2px);
+    text-transform:uppercase; letter-spacing:2px; font-size:12px;
+    box-shadow:0 0 18px rgba(79,242,255,.18) inset, 0 0 12px rgba(79,242,255,.12); }
+  #tl {
+    top: max(14px, env(safe-area-inset-top));
+    left: max(14px, env(safe-area-inset-left));
+    min-width: 240px;
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+  }
+  #tr {
+    top: max(14px, env(safe-area-inset-top));
+    right: max(14px, env(safe-area-inset-right));
+    text-align: right;
+    padding-top: max(10px, env(safe-area-inset-top));
+    padding-left: max(14px, env(safe-area-inset-left));
+    padding-right: max(14px, env(safe-area-inset-right));
+    z-index: 50;
+  }
+  .bar { height:9px; margin-top:6px; border:1px solid rgba(79,242,255,.5); background:rgba(0,0,0,.6); }
+  .bar > i { display:block; height:100%; background:var(--cyan); box-shadow:0 0 12px var(--cyan); transition:width .12s linear; }
+  #discbar > i { background:#fff; box-shadow:0 0 12px #fff; }
+  #energybar > i { background:var(--orange); box-shadow:0 0 12px var(--orange); }
+  .big { font-size:26px; letter-spacing:6px; }
+  /* reticle: the disc flies at whatever sits under this */
+  #crosshair { position:absolute; left:50%; top:50%; width:34px; height:34px; margin:-17px 0 0 -17px;
+    transition:transform .1s ease, opacity .1s; }
+  #crosshair .ring { position:absolute; inset:0; border:1px solid rgba(79,242,255,.75); border-radius:50%;
+    box-shadow:0 0 10px rgba(79,242,255,.5), inset 0 0 8px rgba(79,242,255,.25); }
+  #crosshair .dot { position:absolute; left:50%; top:50%; width:3px; height:3px; margin:-1.5px 0 0 -1.5px;
+    background:#fff; border-radius:50%; box-shadow:0 0 8px #fff; }
+  #crosshair .tick { position:absolute; background:var(--cyan); box-shadow:0 0 6px var(--cyan); }
+  #crosshair .t1 { left:50%; top:-9px; width:1px; height:6px; margin-left:-.5px; }
+  #crosshair .t2 { left:50%; bottom:-9px; width:1px; height:6px; margin-left:-.5px; }
+  #crosshair .t3 { top:50%; left:-9px; height:1px; width:6px; margin-top:-.5px; }
+  #crosshair .t4 { top:50%; right:-9px; height:1px; width:6px; margin-top:-.5px; }
+  /* locked onto a program */
+  #crosshair.hot { transform:scale(1.25) rotate(45deg); }
+  #crosshair.hot .ring { border-color:var(--orange); box-shadow:0 0 16px var(--orange), inset 0 0 10px rgba(255,106,16,.4); }
+  #crosshair.hot .tick { background:var(--orange); box-shadow:0 0 8px var(--orange); }
+  /* disc is in flight - nothing to throw */
+  #crosshair.empty { opacity:.28; }
+  #crosshair.empty .ring { border-style:dashed; }
+  #crosshair.bank .ring { border-color:#fff; box-shadow:0 0 18px #fff, inset 0 0 10px rgba(255,255,255,.4); }
+  #crosshair.bank .tick { background:#fff; box-shadow:0 0 8px #fff; }
+  /* curve indicator brackets */
+  #crosshair .curve-bracket { position:absolute; top:50%; width:5px; height:20px; margin-top:-10px;
+    border:1.5px solid transparent; opacity:0; pointer-events:none;
+    transition:opacity .12s ease, transform .12s ease, border-color .12s, box-shadow .12s; }
+  #crosshair .cb-left { left:-15px; border-left-color:var(--cyan);
+    border-top:1.5px solid rgba(79,242,255,.4); border-bottom:1.5px solid rgba(79,242,255,.4); border-radius:4px 0 0 4px; }
+  #crosshair .cb-right { right:-15px; border-right-color:var(--cyan);
+    border-top:1.5px solid rgba(79,242,255,.4); border-bottom:1.5px solid rgba(79,242,255,.4); border-radius:0 4px 4px 0; }
+  #crosshair.curve-l .cb-left { opacity:1; border-left-color:#fff; border-top-color:#fff; border-bottom-color:#fff;
+    box-shadow:-3px 0 10px var(--cyan), inset -1px 0 6px var(--cyan); transform:translateX(-2px) scale(1.15); }
+  #crosshair.curve-r .cb-right { opacity:1; border-right-color:#fff; border-top-color:#fff; border-bottom-color:#fff;
+    box-shadow:3px 0 10px var(--cyan), inset 1px 0 6px var(--cyan); transform:translateX(2px) scale(1.15); }
+  #lockstate { position:absolute; left:50%; bottom:54px; transform:translateX(-50%);
+    font-size:10px; letter-spacing:3px; padding:6px 14px; text-transform:uppercase;
+    border:1px solid rgba(255,106,16,.5); color:#ffb37a; background:rgba(30,10,0,.5); display:none; }
+  #range { position:absolute; left:50%; top:26px; transform:translateX(-50%); font-size:10px;
+    letter-spacing:2px; opacity:.6; }
+  #sens { position:absolute; left:50%; top:62%; transform:translateX(-50%); font-size:11px;
+    letter-spacing:4px; opacity:0; transition:opacity .25s; }
+  #msg { position:absolute; left:50%; top:24%; transform:translateX(-50%); text-align:center;
+    font-size:38px; letter-spacing:10px; text-shadow:0 0 22px var(--cyan); opacity:0; transition:opacity .3s; z-index:200; }
+  #countdownText {
+    position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    font-size: 88px; font-weight: 800; letter-spacing: 8px; color: #fff;
+    text-shadow: 0 0 20px var(--cyan), 0 0 40px var(--cyan), 0 0 80px var(--cyan);
+    pointer-events: none; z-index: 100; text-align: center; user-select: none;
+    display: none; transition: transform 0.08s ease-out, opacity 0.25s ease;
+  }
+  #hint { position:absolute; left:50%; bottom:22px; transform:translateX(-50%); font-size:11px;
+    letter-spacing:3px; opacity:.55; text-transform:uppercase; }
+  #mobileHint {
+    position:absolute; left:50%; bottom:max(14px, env(safe-area-inset-bottom)); transform:translateX(-50%);
+    font-size:10px; letter-spacing:2px; opacity:.75; text-transform:uppercase; white-space:nowrap;
+    pointer-events:none; color:var(--cyan); text-shadow:0 0 8px rgba(79,242,255,.4); display:none;
+  }
+  #overlay { position:fixed; inset:0; z-index:10; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 50%, rgba(0,30,40,.9), rgba(0,0,0,.97)); cursor:default;
+    touch-action: pan-y; overscroll-behavior: contain; }
+  h1 { margin:0 0 6px; font-size:54px; letter-spacing:18px; text-shadow:0 0 30px var(--cyan); }
+  h2 { margin:0 0 26px; font-size:13px; letter-spacing:8px; font-weight:400; color:#9fe9f2; }
+  .keys { display:grid; grid-template-columns:auto auto; gap:8px 18px; font-size:13px; text-align:left;
+    margin:0 auto 26px; width:max-content; color:#bff4fb; }
+  .keys b { color:#fff; font-weight:600; }
+  .start { display:inline-block; padding:12px 34px; border:1px solid var(--cyan); letter-spacing:6px;
+    font-size:14px; animation:pulse 1.8s infinite; }
+  @keyframes pulse { 50% { background:rgba(79,242,255,.18); } }
+  .dead h1 { color:var(--orange); text-shadow:0 0 30px var(--orange); }
+
+  /* HUD Pause Button */
+  .hud-btn {
+    pointer-events:auto; cursor:pointer; background:rgba(0,16,24,.65);
+    border:1px solid var(--cyan); color:var(--cyan); font-family:inherit;
+    font-size:11px; letter-spacing:2px; padding:6px 12px; text-transform:uppercase;
+    box-shadow:0 0 10px rgba(79,242,255,.25), inset 0 0 6px rgba(79,242,255,.12);
+    transition:all .18s ease; outline:none;
+    min-width:44px; min-height:44px;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .hud-btn:hover {
+    background:rgba(79,242,255,.22); color:#fff;
+    box-shadow:0 0 16px rgba(79,242,255,.65), inset 0 0 10px rgba(79,242,255,.3);
+  }
+
+  /* Fullscreen & Top Controls Visibility Guarantee */
+  #fullscreenBtn {
+    display: inline-block !important; /* Force visibility */
+    pointer-events: auto;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  #hudFullscreenBtn {
+    display: inline-block !important; /* Force visibility */
+    pointer-events: auto;
+    text-align: center;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  #topControls {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 50;
+    pointer-events: auto;
+  }
+
+  /* Boss health bar */
+  #bossbar > i { background:var(--orange); box-shadow:0 0 12px var(--orange); }
+
+  /* Mode selection buttons on Main Menu */
+  .mode-select {
+    display:flex; gap:18px; justify-content:center; flex-wrap:wrap; margin-top:8px;
+  }
+  .mode-btn {
+    background:rgba(0,16,24,.75); font-family:inherit; font-size:13px;
+    letter-spacing:4px; padding:14px 26px; cursor:pointer; text-transform:uppercase;
+    transition:all .2s ease; outline:none;
+    min-width:140px; min-height:48px;
+    display:inline-flex; align-items:center; justify-content:center;
+  }
+  .duel-btn {
+    border:1px solid var(--orange); color:#ffb37a;
+    box-shadow:0 0 14px rgba(255,123,26,.35), inset 0 0 10px rgba(255,123,26,.18);
+  }
+  .duel-btn:hover {
+    background:rgba(255,123,26,.24); color:#fff;
+    box-shadow:0 0 24px rgba(255,123,26,.75), inset 0 0 16px rgba(255,123,26,.4);
+    transform:translateY(-2px);
+  }
+  .swarm-btn {
+    border:1px solid var(--cyan); color:#a5f7ff;
+    box-shadow:0 0 14px rgba(79,242,255,.35), inset 0 0 10px rgba(79,242,255,.18);
+  }
+  .swarm-btn:hover {
+    background:rgba(79,242,255,.24); color:#fff;
+    box-shadow:0 0 24px rgba(79,242,255,.75), inset 0 0 16px rgba(79,242,255,.4);
+    transform:translateY(-2px);
+  }
+  .multi-btn {
+    border:1px solid #b026ff; color:#d896ff;
+    box-shadow:0 0 14px rgba(176,38,255,.35), inset 0 0 10px rgba(176,38,255,.18);
+  }
+  .multi-btn:hover {
+    background:rgba(176,38,255,.24); color:#fff;
+    box-shadow:0 0 24px rgba(176,38,255,.75), inset 0 0 16px rgba(176,38,255,.4);
+    transform:translateY(-2px);
+  }
+  .btn.purple {
+    border-color:#b026ff; color:#d896ff;
+    box-shadow:0 0 14px rgba(176,38,255,.35), inset 0 0 10px rgba(176,38,255,.18);
+  }
+  .btn.purple:hover {
+    background:rgba(176,38,255,.24); color:#fff;
+    box-shadow:0 0 24px rgba(176,38,255,.75), inset 0 0 16px rgba(176,38,255,.4);
+    transform:translateY(-2px);
+  }
+  .modal-overlay {
+    position:fixed; inset:0; z-index:25; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 50%, rgba(0,20,30,.92), rgba(0,0,0,.98));
+    backdrop-filter:blur(6px);
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  .room-code-display {
+    font-size:52px; letter-spacing:14px; font-weight:700; color:#fff;
+    text-shadow:0 0 24px #b026ff, 0 0 44px #b026ff, 0 0 8px #fff;
+    margin:14px 0 20px 14px; font-family:"Courier New", Courier, monospace, inherit;
+  }
+  .waiting-indicator {
+    font-size:13px; letter-spacing:4px; color:#d896ff;
+    animation:pulse 1.6s infinite; text-shadow:0 0 14px rgba(176,38,255,.6);
+    margin-bottom:8px;
+  }
+  .room-input {
+    background:rgba(0,16,24,.85); border:1.5px solid #b026ff; color:#fff;
+    font-family:inherit; font-size:26px; letter-spacing:10px; text-align:center;
+    padding:10px 16px; margin:0 auto 16px; width:220px; display:block;
+    text-transform:uppercase; outline:none;
+    box-shadow:0 0 16px rgba(176,38,255,.3) inset, 0 0 12px rgba(176,38,255,.2);
+  }
+  .room-input:focus {
+    border-color:#fff; box-shadow:0 0 24px rgba(176,38,255,.7) inset, 0 0 16px rgba(176,38,255,.5);
+  }
+
+  /* Pause Menu Modal */
+  .modal {
+    position:fixed; inset:0; z-index:20; display:flex; align-items:center; justify-content:center;
+    background:radial-gradient(circle at 50% 50%, rgba(0,25,35,.88), rgba(0,0,0,.96));
+    backdrop-filter:blur(4px);
+    touch-action: pan-y;
+    overscroll-behavior: contain;
+  }
+  .modal h1, .modal .card h1 { font-size:40px; letter-spacing:14px; margin:0 0 6px; }
+  .modal h2, .modal .card h2 { font-size:12px; letter-spacing:6px; margin:0 0 22px; }
+  .menu-actions {
+    display:flex; flex-direction:column; gap:12px; margin-top:20px;
+  }
+  .btn {
+    background:rgba(0,16,24,.75); border:1px solid var(--cyan); color:var(--cyan);
+    font-family:inherit; font-size:13px; letter-spacing:5px; padding:13px 24px;
+    cursor:pointer; text-transform:uppercase;
+    box-shadow:0 0 14px rgba(79,242,255,.2), inset 0 0 10px rgba(79,242,255,.1);
+    transition:all .2s ease; outline:none;
+    min-height:44px; min-width:44px;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .btn:hover {
+    background:rgba(79,242,255,.22); color:#fff;
+    box-shadow:0 0 22px rgba(79,242,255,.6), inset 0 0 12px rgba(79,242,255,.25);
+    transform:translateY(-2px);
+  }
+  #restartBtn {
+    border-color:var(--orange); color:#ffb37a;
+    box-shadow:0 0 14px rgba(255,123,26,.22), inset 0 0 10px rgba(255,123,26,.1);
+  }
+  #restartBtn:hover {
+    background:rgba(255,123,26,.22); color:#fff;
+    box-shadow:0 0 22px rgba(255,123,26,.65), inset 0 0 12px rgba(255,123,26,.3);
+  }
+
+  /* ───────────────────────── Mobile Touch Controls ───────────────────────── */
+  #mobileControls {
+    display: none;
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  /* Virtual Joystick (Left 45%) */
+  #touchJoystick {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+  #joystickBase {
+    position: absolute;
+    width: 120px;
+    height: 120px;
+    margin-left: -60px;
+    margin-top: -60px;
+    border-radius: 50%;
+    border: 2px solid rgba(79, 242, 255, 0.45);
+    background: radial-gradient(circle, rgba(0, 32, 44, 0.6) 0%, rgba(0, 16, 24, 0.25) 70%, transparent 100%);
+    box-shadow: 0 0 20px rgba(79, 242, 255, 0.25), inset 0 0 14px rgba(79, 242, 255, 0.15);
+    pointer-events: none;
+    opacity: 0;
+    transform: scale(0.9);
+    transition: opacity 0.15s ease-out, transform 0.15s ease-out;
+  }
+  #joystickThumb {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 48px;
+    height: 48px;
+    margin-left: -24px;
+    margin-top: -24px;
+    border-radius: 50%;
+    background: rgba(79, 242, 255, 0.4);
+    border: 2px solid var(--cyan);
+    box-shadow: 0 0 16px var(--cyan), inset 0 0 8px #fff;
+    pointer-events: none;
+    transform: translate3d(0, 0, 0);
+  }
+
+  /* Right-Side Action Cluster */
+  #actionCluster {
+    position: absolute;
+    right: max(16px, env(safe-area-inset-right));
+    bottom: max(16px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    pointer-events: auto;
+    z-index: 15;
+  }
+  .cluster-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  /* Touch Action Buttons */
+  .touch-btn {
+    pointer-events: auto;
+    border-radius: 50%;
+    font-family: inherit;
+    font-weight: 700;
+    text-transform: uppercase;
+    outline: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.08s ease, background 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    touch-action: none;
+  }
+  .touch-btn:active, .touch-btn.pressed {
+    transform: scale(0.92);
+  }
+
+  /* THROW Button (Largest, Primary) */
+  .btn-throw {
+    width: 68px;
+    height: 68px;
+    font-size: 11px;
+    letter-spacing: 2px;
+    background: rgba(0, 32, 44, 0.65);
+    border: 2px solid var(--cyan);
+    color: #fff;
+    box-shadow: 0 0 18px rgba(79, 242, 255, 0.45), inset 0 0 12px rgba(79, 242, 255, 0.25);
+  }
+  .btn-throw:active, .btn-throw.pressed {
+    background: rgba(79, 242, 255, 0.4);
+    box-shadow: 0 0 28px rgba(79, 242, 255, 0.8), inset 0 0 18px rgba(255, 255, 255, 0.6);
+  }
+
+  /* CURVE Buttons (L and R) */
+  .btn-curve {
+    width: 46px;
+    height: 46px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    background: rgba(0, 20, 28, 0.6);
+    border: 1.5px solid rgba(79, 242, 255, 0.5);
+    color: var(--cyan);
+    box-shadow: 0 0 10px rgba(79, 242, 255, 0.2), inset 0 0 6px rgba(79, 242, 255, 0.1);
+  }
+  .btn-curve.active {
+    background: rgba(79, 242, 255, 0.35);
+    border-color: #fff;
+    color: #fff;
+    box-shadow: 0 0 18px var(--cyan), inset 0 0 10px var(--cyan);
+  }
+
+  /* JUMP Button */
+  .btn-jump {
+    width: 56px;
+    height: 56px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    background: rgba(0, 24, 34, 0.65);
+    border: 1.5px solid var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 12px rgba(79, 242, 255, 0.3), inset 0 0 8px rgba(79, 242, 255, 0.15);
+  }
+  .btn-jump:active, .btn-jump.pressed {
+    background: rgba(79, 242, 255, 0.35);
+    color: #fff;
+    box-shadow: 0 0 22px var(--cyan), inset 0 0 14px rgba(79, 242, 255, 0.4);
+  }
+
+  /* DASH Button */
+  .btn-dash {
+    width: 54px;
+    height: 54px;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    background: rgba(32, 14, 0, 0.65);
+    border: 1.5px solid var(--orange);
+    color: #ffb37a;
+    box-shadow: 0 0 12px rgba(255, 123, 26, 0.3), inset 0 0 8px rgba(255, 123, 26, 0.15);
+  }
+  .btn-dash:active, .btn-dash.pressed {
+    background: rgba(255, 123, 26, 0.35);
+    color: #fff;
+    box-shadow: 0 0 22px var(--orange), inset 0 0 14px rgba(255, 123, 26, 0.4);
+  }
+
+  /* BLOCK / SHIELD Button */
+  .btn-block {
+    width: 54px;
+    height: 54px;
+    font-size: 10px;
+    letter-spacing: 1px;
+    background: rgba(0, 24, 34, 0.65);
+    border: 1.5px solid rgba(79, 242, 255, 0.7);
+    color: var(--cyan);
+    box-shadow: 0 0 12px rgba(79, 242, 255, 0.25), inset 0 0 8px rgba(79, 242, 255, 0.15);
+  }
+  .btn-block:active, .btn-block.pressed {
+    background: rgba(79, 242, 255, 0.35);
+    border-color: #fff;
+    color: #fff;
+    box-shadow: 0 0 22px var(--cyan), inset 0 0 14px rgba(79, 242, 255, 0.4);
+  }
+
+  /* ───────────────────────── Orientation Helper Overlay ───────────────────────── */
+  #orientationOverlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 50% 50%, rgba(0, 25, 35, 0.96), rgba(0, 0, 0, 0.98));
+    backdrop-filter: blur(8px);
+    text-align: center;
+    padding: 24px;
+  }
+  .orientation-card {
+    border: 1px solid var(--cyan);
+    box-shadow: 0 0 40px rgba(79, 242, 255, 0.3), inset 0 0 20px rgba(79, 242, 255, 0.15);
+    background: rgba(0, 16, 24, 0.85);
+    padding: 36px 28px;
+    max-width: 440px;
+    border-radius: 4px;
+  }
+  .rotate-icon {
+    margin-bottom: 20px;
+    animation: rotatePhone 2.4s infinite ease-in-out;
+  }
+  @keyframes rotatePhone {
+    0%, 15% { transform: rotate(0deg); }
+    50%, 65% { transform: rotate(-90deg); }
+    90%, 100% { transform: rotate(0deg); }
+  }
+  .orientation-msg {
+    font-size: 15px;
+    letter-spacing: 3px;
+    line-height: 1.5;
+    color: var(--cyan);
+    text-shadow: 0 0 14px var(--cyan);
+    font-weight: 600;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .orientation-sub {
+    font-size: 11px;
+    letter-spacing: 2px;
+    color: #9fe9f2;
+    opacity: 0.8;
+    text-transform: uppercase;
+  }
+
+  /* Conditional Mobile View Rules */
+  body.touch-device #mobileControls {
+    display: block;
+  }
+  body.touch-device #mobileHint {
+    display: block;
+  }
+  body.touch-device #hint,
+  body.touch-device #sens,
+  body.touch-device #keymon {
+    display: none !important;
+  }
+  body.touch-device .desktop-keys {
+    display: none !important;
+  }
+  body.touch-device .mobile-keys {
+    display: grid !important;
+  }
+  body.touch-device #fullscreenBtn,
+  body.touch-device #hudFullscreenBtn {
+    display: inline-block !important;
+    pointer-events: auto !important;
+  }
+  body.touch-device #topControls {
+    display: inline-flex !important;
+    pointer-events: auto !important;
+  }
+  @media screen and (orientation: portrait) {
+    body.touch-device #orientationOverlay {
+      display: flex;
+    }
+  }
+
+  /* ───────────────────────── Identity Header & Grid Terminal ───────────────────────── */
+  .identity-header {
+    position: absolute;
+    top: max(16px, env(safe-area-inset-top));
+    right: max(16px, env(safe-area-inset-right));
+    z-index: 25;
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    user-select: none;
+    pointer-events: auto;
+  }
+  @media (max-width: 640px) {
+    .identity-header {
+      top: 8px;
+      right: 8px;
+      font-size: 10px;
+      gap: 6px;
+    }
+  }
+  .id-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 14px;
+    border-radius: 6px;
+    background: rgba(0, 16, 24, 0.75);
+    backdrop-filter: blur(4px);
+    transition: all 0.2s ease;
+  }
+  .id-badge.amber-wireframe {
+    border: 1px dashed rgba(255, 123, 26, 0.65);
+    color: #ffb37a;
+    box-shadow: 0 0 14px rgba(255, 123, 26, 0.2), inset 0 0 8px rgba(255, 123, 26, 0.1);
+  }
+  .id-badge.cyan-glow {
+    border: 1px solid rgba(79, 242, 255, 0.75);
+    color: var(--cyan);
+    box-shadow: 0 0 16px rgba(79, 242, 255, 0.3), inset 0 0 10px rgba(79, 242, 255, 0.15);
+  }
+  .id-icon {
+    color: var(--orange);
+    font-size: 13px;
+  }
+  .status-circuit {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .status-circuit.green-circuit {
+    background: #00ff66;
+    box-shadow: 0 0 8px #00ff66, 0 0 14px #00ff66;
+    animation: circuitPulse 2s infinite ease-in-out;
+  }
+  @keyframes circuitPulse {
+    0%, 100% { opacity: 0.8; transform: scale(0.95); }
+    50% { opacity: 1; transform: scale(1.15); box-shadow: 0 0 12px #00ff66, 0 0 20px #00ff66; }
+  }
+  .id-btn {
+    pointer-events: auto;
+    cursor: pointer;
+    background: rgba(0, 16, 24, 0.85);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 7px 14px;
+    text-transform: uppercase;
+    border-radius: 6px;
+    outline: none;
+    transition: all 0.18s ease;
+  }
+  .id-btn.pulse-amber {
+    border: 1px solid var(--orange);
+    color: #ffb37a;
+    animation: pulseAmber 1.8s infinite ease-in-out;
+  }
+  @keyframes pulseAmber {
+    0%, 100% {
+      box-shadow: 0 0 8px rgba(255, 123, 26, 0.4);
+      border-color: rgba(255, 123, 26, 0.6);
+    }
+    50% {
+      box-shadow: 0 0 20px rgba(255, 123, 26, 0.95), inset 0 0 10px rgba(255, 123, 26, 0.4);
+      border-color: #ffaa00;
+      color: #fff;
+    }
+  }
+  .id-btn.cyan-btn {
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 10px rgba(79, 242, 255, 0.25);
+  }
+  .id-btn.cyan-btn:hover {
+    background: rgba(79, 242, 255, 0.2);
+    color: #fff;
+    box-shadow: 0 0 18px var(--cyan);
+  }
+
+  /* ───────────────────────── Grid Authorization Terminal Card ───────────────────────── */
+  .auth-terminal-card {
+    position: relative;
+    max-width: 520px;
+    background: rgba(1, 12, 18, 0.95) !important;
+    border: 1px solid var(--cyan) !important;
+    box-shadow: 0 0 50px rgba(79, 242, 255, 0.35), inset 0 0 28px rgba(0, 24, 36, 0.75) !important;
+    overflow: hidden;
+    text-align: left !important;
+    padding: 28px 32px !important;
+  }
+  .terminal-scanlines {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+    background-size: 100% 3px, 4px 100%;
+    opacity: 0.85;
+    z-index: 2;
+  }
+  .terminal-header {
+    border-bottom: 1px solid rgba(79, 242, 255, 0.3);
+    padding-bottom: 12px;
+    margin-bottom: 16px;
+  }
+  .terminal-title {
+    font-size: 22px;
+    letter-spacing: 6px;
+    color: var(--cyan);
+    text-shadow: 0 0 14px var(--cyan);
+    font-weight: 700;
+  }
+  .terminal-ver {
+    font-size: 10px;
+    letter-spacing: 3px;
+    color: #9fe9f2;
+    opacity: 0.75;
+    margin-top: 4px;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .terminal-status-banner {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin-bottom: 18px;
+    border-radius: 4px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    background: rgba(0, 24, 32, 0.5);
+  }
+  .terminal-status-banner.state-guest {
+    border: 1px dashed rgba(255, 123, 26, 0.5);
+    color: #ffb37a;
+  }
+  .terminal-status-banner.state-auth {
+    border: 1px solid rgba(79, 242, 255, 0.5);
+    color: var(--cyan);
+  }
+  .terminal-field-group {
+    margin-bottom: 14px;
+  }
+  .terminal-field-group label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #9fe9f2;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .terminal-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .terminal-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: rgba(0, 8, 14, 0.85);
+    border: 1px solid rgba(79, 242, 255, 0.45);
+    color: #fff;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 13px;
+    letter-spacing: 2px;
+    outline: none;
+    border-radius: 4px;
+    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
+    transition: all 0.15s ease;
+  }
+  .terminal-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px rgba(79, 242, 255, 0.5), inset 0 0 8px rgba(79, 242, 255, 0.2);
+    color: var(--cyan);
+  }
+  .terminal-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 18px 0 14px 0;
+    border-bottom: 1px solid rgba(79, 242, 255, 0.25);
+    padding-bottom: 8px;
+  }
+  .tab-btn {
+    flex: 1;
+    background: rgba(0, 16, 24, 0.6);
+    border: 1px solid rgba(79, 242, 255, 0.3);
+    color: #9fe9f2;
+    padding: 8px 12px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    text-align: center;
+  }
+  .tab-btn.active {
+    background: rgba(79, 242, 255, 0.2);
+    border-color: var(--cyan);
+    color: #fff;
+    box-shadow: 0 0 14px rgba(79, 242, 255, 0.4);
+    font-weight: 700;
+  }
+  .terminal-btn {
+    cursor: pointer;
+    background: rgba(0, 24, 34, 0.8);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 10px 18px;
+    border-radius: 4px;
+    transition: all 0.15s ease;
+    text-transform: uppercase;
+  }
+  .terminal-btn:hover {
+    background: rgba(79, 242, 255, 0.25);
+    color: #fff;
+    box-shadow: 0 0 16px var(--cyan);
+  }
+  .terminal-actions-row {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+  }
+  .terminal-actions-row .terminal-btn {
+    flex: 1;
+    text-align: center;
+  }
+  .sync-desc {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: #9fe9f2;
+    margin-bottom: 14px;
+    text-align: center;
+    font-family: "Courier New", Courier, monospace;
+  }
+  .sync-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .sync-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    width: 100%;
+    padding: 12px;
+  }
+  .sync-btn.google-sync {
+    border-color: #4285F4;
+    color: #8ab4f8;
+  }
+  .sync-btn.google-sync:hover {
+    background: rgba(66, 133, 244, 0.25);
+    box-shadow: 0 0 16px #4285F4;
+    color: #fff;
+  }
+  .sync-btn.discord-sync {
+    border-color: #5865F2;
+    color: #949cf7;
+  }
+  .sync-btn.discord-sync:hover {
+    background: rgba(88, 101, 242, 0.25);
+    box-shadow: 0 0 16px #5865F2;
+    color: #fff;
+  }
+  .terminal-console {
+    margin-top: 16px;
+    padding: 8px 12px;
+    background: rgba(0, 5, 8, 0.9);
+    border: 1px solid rgba(79, 242, 255, 0.2);
+    border-radius: 4px;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    min-height: 32px;
+    display: flex;
+    align-items: center;
+  }
+  .terminal-console.msg-info { color: #9fe9f2; }
+  .terminal-console.msg-success { color: #00ff66; text-shadow: 0 0 8px #00ff66; border-color: rgba(0, 255, 102, 0.4); }
+  .terminal-console.msg-error { color: var(--orange); text-shadow: 0 0 8px var(--orange); border-color: rgba(255, 123, 26, 0.4); }
+
+  /* Offline Sync Resilience Banner */
+  .offline-sync-banner {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    background: rgba(30, 10, 0, 0.92);
+    border-bottom: 1px solid var(--orange);
+    color: #ffb37a;
+    font-family: "Courier New", Courier, monospace;
+    font-size: 11px;
+    letter-spacing: 2px;
+    padding: 7px 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    text-transform: uppercase;
+    box-shadow: 0 2px 14px rgba(255, 106, 16, 0.35);
+    animation: offlineFlicker 3s infinite;
+  }
+  .offline-pulse-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 8px var(--orange);
+    animation: pulseDot 1.2s infinite ease-in-out;
+  }
+  @keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 0.6; }
+    50% { transform: scale(1.3); opacity: 1; }
+  }
+  @keyframes offlineFlicker {
+    0%, 100% { opacity: 1; }
+    92% { opacity: 0.85; }
+    94% { opacity: 1; }
+    96% { opacity: 0.9; }
+  }
+  .sync-btn.github-sync:hover {
+    border-color: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+    color: #fff;
+  }
+</style>
+<script>
+  // Compatibility alias for hudFullscreenBtn
+  const _origGetElementById = document.getElementById.bind(document);
+  document.getElementById = function(id) {
+    if (id === 'hudFullscreenBtn') {
+      return _origGetElementById('hudFullscreenBtn') || _origGetElementById('fullscreenBtn');
+    }
+    return _origGetElementById(id);
+  };
+</script>
+</head>
+<body>
+<div id="offlineSyncBanner" class="offline-sync-banner" style="display:none;">
+  <span class="offline-pulse-dot"></span>
+  <span id="offlineBannerText">[GRID OFFLINE] SYNC BUFFER ACTIVE // PROGRESS SAFEGUARDED</span>
+</div>
+<div id="hud">
+  <div class="panel" id="tl">
+    <div>Program Integrity</div>
+    <div class="bar" id="hpbar"><i style="width:100%"></i></div>
+    <div style="margin-top:10px">Identity Disc</div>
+    <div class="bar" id="discbar"><i style="width:100%"></i></div>
+    <div style="margin-top:10px">Energy</div>
+    <div class="bar" id="energybar"><i style="width:100%"></i></div>
+  </div>
+  <div class="panel" id="tr">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:6px">
+      <div id="roundLabel">Cycle <span id="wave" class="big">1</span></div>
+      <div id="topControls" style="display:flex;align-items:center;gap:6px;pointer-events:auto;z-index:50;">
+        <button id="fullscreenBtn" data-id="hudFullscreenBtn" class="hud-btn" title="Toggle Fullscreen" aria-label="Toggle Fullscreen">⛶ FULLSCREEN</button>
+        <button id="pauseBtn" class="hud-btn">II PAUSE</button>
+      </div>
+    </div>
+    <div style="margin-top:4px">Score <span id="score">0</span></div>
+    <div id="subLabel" style="margin-top:4px">Hostiles <span id="foes">0</span></div>
+    <div id="bossBarWrap" style="display:none;margin-top:8px">
+      <div style="font-size:10px;letter-spacing:2px;color:var(--orange);margin-bottom:3px">RIVAL SHIELD</div>
+      <div class="bar" id="bossbar"><i style="width:100%"></i></div>
+    </div>
+  </div>
+  <div id="crosshair">
+    <div class="ring"></div><div class="dot"></div>
+    <span class="tick t1"></span><span class="tick t2"></span>
+    <span class="tick t3"></span><span class="tick t4"></span>
+    <div class="curve-bracket cb-left"></div>
+    <div class="curve-bracket cb-right"></div>
+    <div id="range"></div>
+  </div>
+  <div id="sens"></div>
+  <div class="panel" id="keymon" style="display:none;left:18px;bottom:18px;font-size:11px;line-height:1.7"></div>
+  <div id="lockstate">Cursor not captured — click the arena to lock · move mouse off-centre to turn · open preview in a new tab for full mouse lock</div>
+  <div id="msg"></div>
+  <div id="countdownText"></div>
+  <div id="hint">WASD move / strafe &nbsp;·&nbsp; Q / E hook / curve disc &nbsp;·&nbsp; MOUSE look/aim &nbsp;·&nbsp; WHEEL sensitivity &nbsp;·&nbsp; ARC previews ricochets &nbsp;·&nbsp; LMB throw disc &nbsp;·&nbsp; RMB block &nbsp;·&nbsp; SPACE jump / double-jump &nbsp;·&nbsp; SHIFT dash &nbsp;·&nbsp; P / ESC pause &nbsp;·&nbsp; F1 input monitor</div>
+  <div id="mobileHint">DRAG LEFT TO MOVE &nbsp;·&nbsp; DRAG RIGHT TO AIM &nbsp;·&nbsp; TAP BUTTONS TO ENGAGE</div>
+</div>
+
+<!-- Virtual Mobile Controls -->
+<div id="mobileControls">
+  <div id="touchJoystick" class="touch-zone">
+    <div id="joystickBase">
+      <div id="joystickThumb"></div>
+    </div>
+  </div>
+  <div id="actionCluster">
+    <div class="cluster-row top-row">
+      <button id="btnCurveL" class="touch-btn btn-curve" aria-label="Hook Left">↶ L</button>
+      <button id="btnThrow" class="touch-btn btn-throw" aria-label="Throw Disc">THROW</button>
+      <button id="btnCurveR" class="touch-btn btn-curve" aria-label="Hook Right">R ↷</button>
+    </div>
+    <div class="cluster-row bottom-row">
+      <button id="btnBlock" class="touch-btn btn-block" aria-label="Block Shield">SHIELD</button>
+      <button id="btnJump" class="touch-btn btn-jump" aria-label="Jump">JUMP</button>
+      <button id="btnDash" class="touch-btn btn-dash" aria-label="Dash">DASH</button>
+    </div>
+  </div>
+</div>
+
+<!-- Orientation Helper Overlay -->
+<div id="orientationOverlay" class="orientation-modal">
+  <div class="card orientation-card">
+    <div class="rotate-icon">
+      <svg width="56" height="56" viewBox="0 0 24 24" fill="none">
+        <rect x="5" y="2" width="14" height="20" rx="3" stroke="#4ff2ff" stroke-width="1.8" />
+        <circle cx="12" cy="18" r="1" fill="#4ff2ff" />
+        <path d="M9 7l3-3 3 3" stroke="#ff7b1a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+        <path d="M12 4v8" stroke="#ff7b1a" stroke-width="2" stroke-linecap="round" />
+      </svg>
+    </div>
+    <div class="orientation-msg">ROTATE DEVICE TO LANDSCAPE FOR OPTIMAL GRID COMBAT</div>
+    <div class="orientation-sub">GRID SIMULATION REQUIRES WIDESCREEN TACTICAL DISPLAY</div>
+  </div>
+</div>
+
+<div id="pauseModal" style="display:contents;">
+<div id="pauseMenu" class="modal" style="display:none;">
+  <div class="card">
+    <h1>SYSTEM PAUSED</h1>
+    <h2>GRID SIMULATION SUSPENDED</h2>
+    <div class="menu-actions">
+      <button id="resumeBtn" class="btn">RESUME</button>
+      <button id="pauseFullscreenBtn" class="btn fullscreen-btn" title="Toggle Fullscreen">FULLSCREEN</button>
+      <button id="restartBtn" class="btn">RESTART MATCH</button>
+      <button id="modeSelectBtn" class="btn">MODE SELECT</button>
+    </div>
+  </div>
+</div>
+</div>
+
+<div id="hostModal" class="modal-overlay" style="display:none;">
+  <div class="card">
+    <h1>HOST MATCH</h1>
+    <h2>SELECT COMBAT MODE</h2>
+    <div class="menu-actions" style="max-width:340px;margin:20px auto 0;gap:12px;">
+      <button id="practiceBtn" class="mode-btn duel-btn" style="width:100%;">PRACTICE (SOLO AI)</button>
+      <button id="host1v1Btn" class="mode-btn multi-btn" style="width:100%;">1v1 DUEL (ONLINE)</button>
+      <button id="host2v2Btn" class="mode-btn multi-btn" style="width:100%;">2v2 DUOS (ONLINE)</button>
+      <button id="cancelHostBtn" class="btn" style="margin-top:8px;border-color:var(--orange);color:#ffb37a;width:100%;">RETURN TO MENU</button>
+    </div>
+  </div>
+</div>
+
+<div id="roomModal" class="modal-overlay" style="display:none;">
+  <div class="card">
+    <h1 id="roomTitle">DUEL ROOM</h1>
+    <h2 id="roomSubtitle">SHARE THIS CODE WITH YOUR FRIEND</h2>
+    <div id="roomCodeDisplay" class="room-code-display">----</div>
+    
+    <!-- Host waiting view -->
+    <div id="hostWaitBlock">
+      <button class="btn" id="btnCopyCode" style="margin:0 auto 14px; width:100%; max-width:280px;">COPY ROOM CODE</button>
+      <div class="waiting-indicator">WAITING FOR CHALLENGER...</div>
+    </div>
+
+    <!-- Guest join input view -->
+    <div id="joinInputBlock" style="display:none;">
+      <input type="text" id="joinRoomInput" class="room-input" maxlength="4" placeholder="CODE" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" />
+      <button class="btn purple" id="btnConfirmJoin" style="margin:0 auto; width:100%; max-width:280px;">CONNECT TO ROOM</button>
+    </div>
+
+    <button class="btn" id="btnCancelRoom" style="margin:16px auto 0; width:100%; max-width:280px; border-color:var(--orange); color:#ffb37a;">RETURN TO MENU</button>
+  </div>
+</div>
+
+<div id="authModal" class="modal-overlay" style="display:none;">
+  <div class="card auth-terminal-card">
+    <div class="terminal-scanlines"></div>
+    <div class="terminal-header">
+      <div class="terminal-title">GRID AUTHORIZATION TERMINAL</div>
+      <div class="terminal-ver">// SYSTEM PROTOCOL v2.04</div>
+    </div>
+
+    <!-- Active Identity Overview -->
+    <div class="terminal-status-banner" id="terminalStatusBanner">
+      <span class="status-indicator-dot"></span>
+      <span id="terminalIdentityReadout">IDENTITY: GUEST // SUB-ROUTINE</span>
+    </div>
+
+    <!-- Callsign Customization -->
+    <div class="terminal-field-group">
+      <label for="authCallsignInput">GRID CALLSIGN // DISPLAY NAME</label>
+      <div class="terminal-input-row">
+        <input type="text" id="authCallsignInput" class="terminal-input" maxlength="16" placeholder="ENTER CALLSIGN" autocomplete="off" spellcheck="false" />
+        <button id="btnSaveCallsign" class="terminal-btn">COMMIT</button>
+      </div>
+    </div>
+
+    <!-- Dual Tab Selector -->
+    <div class="terminal-tabs">
+      <button id="tabDirectPasskey" class="tab-btn active">DIRECT PASSKEY</button>
+      <button id="tabQuickSync" class="tab-btn">QUICK SYNC</button>
+    </div>
+
+    <!-- Tab 1: Direct Passkey -->
+    <div id="panelDirectPasskey" class="tab-panel active">
+      <div class="terminal-field-group">
+        <label for="authEmailInput">GRID COMM IDENT // EMAIL</label>
+        <input type="email" id="authEmailInput" class="terminal-input" placeholder="USER@GRID.TRON" autocomplete="email" spellcheck="false" />
+      </div>
+      <div class="terminal-field-group">
+        <label for="authPasswordInput">ENCRYPTED PASSKEY // SECURITY PHRASE</label>
+        <input type="password" id="authPasswordInput" class="terminal-input" placeholder="MIN 6 CHARACTERS" autocomplete="current-password" />
+      </div>
+      <div class="terminal-actions-row">
+        <button id="btnAuthorizePasskey" class="terminal-btn primary-btn">AUTHORIZE PASSKEY</button>
+        <button id="btnRegisterPasskey" class="terminal-btn secondary-btn">REGISTER NEW IDENT</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button id="btnMagicLink" class="terminal-btn secondary-btn" style="width:100%; border-color:var(--cyan); color:#9fe9f2;">DISPATCH MAGIC LINK OTP</button>
+      </div>
+    </div>
+
+    <!-- Tab 2: Quick Sync -->
+    <div id="panelQuickSync" class="tab-panel" style="display:none;">
+      <div class="sync-desc">FEDERATED GRID CREDENTIAL HARMONIZATION</div>
+      <div class="sync-buttons">
+        <button id="btnSyncGoogle" class="terminal-btn sync-btn google-sync">
+          <span class="sync-icon">G</span> LINK GOOGLE SUITE
+        </button>
+        <button id="btnSyncDiscord" class="terminal-btn sync-btn discord-sync">
+          <span class="sync-icon">D</span> LINK DISCORD PROTOCOL
+        </button>
+        <button id="btnSyncGithub" class="terminal-btn sync-btn github-sync">
+          <span class="sync-icon">GH</span> LINK GITHUB PROTOCOL
+        </button>
+      </div>
+    </div>
+
+    <!-- Console Readout -->
+    <div id="terminalConsoleMsg" class="terminal-console">&gt; TERMINAL READY. SECURE IDENTITY TO PRESERVE COMBAT STATS.</div>
+
+    <!-- Modal Dismiss Button -->
+    <button id="btnCloseTerminal" class="btn" style="margin-top:20px; width:100%; border-color:var(--orange); color:#ffb37a;">DISMISS TERMINAL</button>
+  </div>
+</div>
+
+<div id="overlay">
+  <div id="identityHeader" class="identity-header"></div>
+  <div class="card" id="mainMenu">
+  <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
+  <div class="keys desktop-keys">
+    <b>W A S D</b><span>Move &amp; strafe across the grid</span>
+    <b>Q / E</b><span>Apply curve spin — hook discs around pillars &amp; obstacles</span>
+    <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
+    <b>Wheel</b><span>Adjust look sensitivity</span>
+    <b>Arc</b><span>A live dotted trajectory shows every bounce before you throw</span>
+    <b>Left Click</b><span>Throw identity disc (it ricochets &amp; returns)</span>
+    <b>Right Click</b><span>Raise disc shield — deflects incoming</span>
+    <b>Space</b><span>Jump — tap twice to air-jump, hold for height</span>
+    <b>Shift</b><span>Dash (costs energy)</span>
+    <b>P / ESC</b><span>Pause simulation &amp; release cursor</span>
+  </div>
+  <div class="keys mobile-keys" style="display:none">
+    <b>DRAG LEFT</b><span>Virtual Analog Stick — Move &amp; strafe</span>
+    <b>DRAG RIGHT</b><span>Swipe anywhere to turn &amp; aim camera</span>
+    <b>THROW</b><span>Launch identity disc (ricochets &amp; returns)</span>
+    <b>L / R</b><span>Curve spin — hook disc around obstacles</span>
+    <b>SHIELD</b><span>Raise disc shield — deflect incoming attacks</span>
+    <b>JUMP</b><span>Tap to air-jump, hold for maximum height</span>
+    <b>DASH</b><span>Instant directional sprint impulse</span>
+    <b>PAUSE</b><span>Tap top right II button to suspend grid</span>
+  </div>
+  <div class="mode-select" id="mainMenuButtons">
+    <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
+    <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
+    <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
+    <!-- Legacy compatibility elements for tests -->
+    <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="btnSwarmSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="btnDuelSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+    <button id="joinRoomBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
+  </div>
+</div></div>
+
+<div id="unlockedMenu" class="modal" style="display:none; background:rgba(0,5,10,0.45); backdrop-filter:none; cursor:crosshair;">
+  <div class="card" style="background:transparent; border:none; box-shadow:none; pointer-events:none;">
+    <h1 style="font-size:24px; user-select:none;">CURSOR UNLOCKED - CLICK ARENA TO RESUME</h1>
+    <div class="menu-actions">
+      <button id="leaveMatchBtn" class="btn" style="border-color:var(--orange); color:#ffb37a; margin: 0 auto; pointer-events:auto; cursor:pointer;">LEAVE MATCH</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// Your web app's Firebase configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyCIBKJYQX3I0Pk2eOxsERzlBqXNjTJOksM",
+  authDomain: "tron-disc-arena.firebaseapp.com",
+  projectId: "tron-disc-arena",
+  storageBucket: "tron-disc-arena.firebasestorage.app",
+  messagingSenderId: "158687029695",
+  appId: "1:158687029695:web:e9e82762f998801ed4990a"
+};
+
+// The game code looks for this specific global variable
+window.__firebase_config = JSON.stringify(firebaseConfig);
+window.__app_id = "tron-disc-arena";
+
+// Supabase live configuration bridge
+window.__ENV__ = window.__ENV__ || {};
+window.__ENV__.SUPABASE_URL = "https://dugydwohgjcuwvimxcse.supabase.co";
+window.__ENV__.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImR1Z3lkd29oZ2pjdXd2aW14Y3NlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE4MzEzOTksImV4cCI6MjEwNzQwNzM5OX0.86I5FeZzamB6Dk9i-JfDrl7ioHi-h4ahIsQdD535tVw";
+</script>
+<script type="module" src="./src/core/main.js"></script>
+</body>
+</html>

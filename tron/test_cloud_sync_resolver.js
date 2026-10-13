@@ -5,7 +5,7 @@ import {
   mergeStarMastery,
   mergeSetUnion,
   evaluateMonotonicInvariants
-} from './src/storage/CloudSyncResolver.js';
+} from '../src/storage/CloudSyncResolver.js';
 
 console.log('--- Running CloudSyncResolver (Master Grid Protocol) Test Suite ---');
 

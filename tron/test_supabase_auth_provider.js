@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { SupabaseAuthProvider, generateGuestHandle, resolveSupabaseConfig } from './src/auth/SupabaseAuthProvider.js';
+import { SupabaseAuthProvider, generateGuestHandle, resolveSupabaseConfig } from '../src/auth/SupabaseAuthProvider.js';
 
 console.log('--- Running SupabaseAuthProvider Test Suite ---');
 

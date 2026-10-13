@@ -1,12 +1,12 @@
 import assert from 'assert';
-import { state } from './src/core/state.js';
+import { state } from '../src/core/state.js';
 import {
   playTerminalOpenSound,
   playTerminalKeySound,
   playAccessGrantedSound,
   playErrorBuzzSound,
   SFX
-} from './src/audio/sfx.js';
+} from '../src/audio/sfx.js';
 
 console.log('--- Running Terminal SFX Procedural Synthesis Tests ---');
 

@@ -1,6 +1,6 @@
 import assert from 'assert';
-import { CrossTabSync, crossTabSync } from './src/storage/CrossTabSync.js';
-import { CloudSyncResolver } from './src/storage/CloudSyncResolver.js';
+import { CrossTabSync, crossTabSync } from '../src/storage/CrossTabSync.js';
+import { CloudSyncResolver } from '../src/storage/CloudSyncResolver.js';
 
 console.log('--- Running CrossTabSync Test Suite ---');
 

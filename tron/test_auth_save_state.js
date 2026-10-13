@@ -8,10 +8,10 @@ import {
   updateSaveSettings,
   clearSaveState,
   SAVE_STATE_VERSION
-} from './src/auth/saveState.js';
-import { authManager } from './src/auth/AuthManager.js';
-import { state } from './src/core/state.js';
-import { AuthEvents } from './src/auth/events.js';
+} from '../src/auth/saveState.js';
+import { authManager } from '../src/auth/AuthManager.js';
+import { state } from '../src/core/state.js';
+import { AuthEvents } from '../src/auth/events.js';
 
 console.log('--- Running TronSaveState & AuthManager Test Suite ---');
 

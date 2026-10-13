@@ -13,8 +13,8 @@ import {
   createDefaultSaveState,
   isValidSaveState,
   validateSaveState
-} from './src/storage/schema.js';
-import { StorageManager, storageManager } from './src/storage/StorageManager.js';
+} from '../src/storage/schema.js';
+import { StorageManager, storageManager } from '../src/storage/StorageManager.js';
 
 console.log('--- Running StorageManager & TronSaveState Test Suite ---');
 
