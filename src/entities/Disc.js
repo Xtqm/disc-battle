@@ -54,7 +54,9 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
 
 export function updateDiscs(dt) {
   for (let i = state.discs.length - 1; i >= 0; i--) {
+    if (i >= state.discs.length) continue;
     const D = state.discs[i];
+    if (!D) continue;
     D.t += dt;
     D.spin += dt * 26;
 

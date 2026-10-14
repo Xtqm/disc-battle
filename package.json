@@ -3,14 +3,16 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node tron/run_tests.js",
-    "test:sync": "node tron/test_supabase_cloud_sync.js",
-    "test:storage": "node tron/test_storage_manager.js",
-    "test:economy": "node tron/test_economy_manager.js",
-    "test:armory": "node tron/test_armory_manager.js",
-    "test:campaign": "node tron/test_campaign_phase1.js && node tron/test_campaign_phase2.js && node tron/test_campaign_phase3.js",
-    "test:campaign:phase1": "node tron/test_campaign_phase1.js",
-    "test:campaign:phase2": "node tron/test_campaign_phase2.js",
-    "test:campaign:phase3": "node tron/test_campaign_phase3.js"
+    "test": "node test/runner.js",
+    "test:auth": "node test/runner.js auth",
+    "test:storage": "node test/runner.js storage",
+    "test:economy": "node test/runner.js economy",
+    "test:armory": "node test/runner.js armory",
+    "test:campaign": "node test/runner.js campaign",
+    "test:gameplay": "node test/runner.js gameplay"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.117.3",
+    "puppeteer": "^23.11.1"
   }
 }

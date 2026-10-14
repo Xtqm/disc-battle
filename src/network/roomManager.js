@@ -465,6 +465,13 @@ export function onRoomSnapshot(snap) {
   }
 
   if (data.status === 'closed') {
+    if (state.running) {
+      state.running = false;
+      showMultiplayerVictory(data);
+    }
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'flex';
+
     const voteBtn = document.getElementById('voteRematchBtn');
     if (voteBtn) {
       voteBtn.disabled = true;
@@ -475,10 +482,6 @@ export function onRoomSnapshot(snap) {
       voteLabel.textContent = 'OPPONENT RETURNED TO MENU';
     }
     message('OPPONENT LEFT THE MATCH');
-    if (state.running) {
-      state.running = false;
-      showMultiplayerVictory(data);
-    }
     return;
   }
 
@@ -548,6 +551,14 @@ export function onRoomSnapshot(snap) {
 }
 
 export function renderGameOverActions(data = null) {
+  if (data && data.status === 'closed') {
+    return `
+      <button id="voteRematchBtn" class="btn" style="border-color:var(--cyan);color:var(--cyan);margin-bottom:12px;" disabled>OPPONENT LEFT</button>
+      <div id="rematchVoteLabel" style="font-size:12px;letter-spacing:2px;margin-bottom:20px;">OPPONENT RETURNED TO MENU</div>
+      <button id="multiMenuBtn" class="btn purple">RETURN TO MENU</button>
+    `;
+  }
+
   let vCount = 0;
   let pCount = 0;
   let hasVoted = false;

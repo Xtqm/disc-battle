@@ -23,7 +23,8 @@ export {
 import {
   selectArenaMap,
   updateArenaSelectControls,
-  applySectorArena
+  applySectorArena,
+  getUnlockedArenaMaps
 } from './arenaSelector.js';
 
 function teardownSectorArena() {
