@@ -13,46 +13,64 @@ export function discGeo() {
 
 export function makeDisc(color) {
   const g = new THREE.Group();
+  g.userData.part = 'disc_root';
   const outer = new THREE.Mesh(discGeo(), new THREE.MeshBasicMaterial({ color }));
+  outer.userData.part = 'disc_outer';
   const face = new THREE.Mesh(
     new THREE.CircleGeometry(config.DISC_R - .06, 32),
     new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .22, side: THREE.DoubleSide })
   );
+  face.userData.part = 'disc_face';
   const hub = new THREE.Mesh(new THREE.TorusGeometry(.2, .05, 6, 20), new THREE.MeshBasicMaterial({ color: config.WHITE }));
+  hub.userData.part = 'disc_hub';
   g.add(outer, face, hub);
-  g.add(new THREE.PointLight(color, 2.4, 10));
+  const light = new THREE.PointLight(color, 2.4, 10);
+  light.userData.part = 'disc_light';
+  g.add(light);
+  g.userData.outerMesh = outer;
+  g.userData.faceMesh = face;
+  g.userData.hubMesh = hub;
+  g.userData.pointLight = light;
   return g;
 }
 
 export function makeProgram(color) {
   const g = new THREE.Group();
+  g.userData.part = 'chassis_root';
   const suit = new THREE.MeshStandardMaterial({ color: 0x07090c, roughness: .35, metalness: .9 });
   const lit = new THREE.MeshBasicMaterial({ color });
+  g.userData.suitMaterial = suit;
+  g.userData.litMaterial = lit;
   const torso = new THREE.Mesh(new THREE.CapsuleGeometry(.55, 1.0, 6, 12), suit);
-  torso.position.y = 1.5; torso.castShadow = true; g.add(torso);
+  torso.position.y = 1.5; torso.castShadow = true; torso.userData.part = 'chassis_suit'; g.add(torso);
   const head = new THREE.Mesh(new THREE.SphereGeometry(.38, 16, 12), suit);
-  head.position.y = 2.42; head.castShadow = true; g.add(head);
+  head.position.y = 2.42; head.castShadow = true; head.userData.part = 'chassis_suit'; g.add(head);
   const visor = new THREE.Mesh(new THREE.BoxGeometry(.5, .14, .1), lit);
-  visor.position.set(0, 2.45, .33); g.add(visor);
+  visor.position.set(0, 2.45, .33); visor.userData.part = 'chassis_visor'; g.add(visor);
   for (const s of [-1, 1]) {
     const leg = new THREE.Mesh(new THREE.CapsuleGeometry(.2, .75, 4, 8), suit);
-    leg.position.set(s * .26, .55, 0); leg.castShadow = true; g.add(leg);
+    leg.position.set(s * .26, .55, 0); leg.castShadow = true; leg.userData.part = 'chassis_suit'; g.add(leg);
     const arm = new THREE.Mesh(new THREE.CapsuleGeometry(.16, .7, 4, 8), suit);
-    arm.position.set(s * .72, 1.6, 0); arm.castShadow = true; g.add(arm);
+    arm.position.set(s * .72, 1.6, 0); arm.castShadow = true; arm.userData.part = 'chassis_suit'; g.add(arm);
     const strip = new THREE.Mesh(new THREE.BoxGeometry(.06, 1.5, .06), lit);
-    strip.position.set(s * .58, 1.5, .16); g.add(strip);
+    strip.position.set(s * .58, 1.5, .16); strip.userData.part = 'chassis_trim'; g.add(strip);
     const shin = new THREE.Mesh(new THREE.BoxGeometry(.05, .8, .05), lit);
-    shin.position.set(s * .26, .55, .2); g.add(shin);
+    shin.position.set(s * .26, .55, .2); shin.userData.part = 'chassis_trim'; g.add(shin);
   }
   const belt = new THREE.Mesh(new THREE.TorusGeometry(.56, .045, 6, 24), lit);
-  belt.rotation.x = Math.PI / 2; belt.position.y = 1.0; g.add(belt);
+  belt.rotation.x = Math.PI / 2; belt.position.y = 1.0; belt.userData.part = 'chassis_trim'; g.add(belt);
   const chest = new THREE.Mesh(new THREE.BoxGeometry(.5, .06, .06), lit);
-  chest.position.set(0, 1.85, .5); g.add(chest);
+  chest.position.set(0, 1.85, .5); chest.userData.part = 'chassis_trim'; g.add(chest);
   // back-mounted disc
   const disc = new THREE.Mesh(discGeo(), new THREE.MeshBasicMaterial({ color }));
-  disc.position.set(0, 1.8, -.45); disc.rotation.x = Math.PI / 2; g.add(disc);
+  disc.position.set(0, 1.8, -.45); disc.rotation.x = Math.PI / 2;
+  disc.userData.part = 'chassis_back_disc';
+  g.add(disc);
   g.userData.backDisc = disc;
-  const halo = new THREE.PointLight(color, 1.6, 9); halo.position.y = 1.5; g.add(halo);
+  const halo = new THREE.PointLight(color, 1.6, 9); halo.position.y = 1.5;
+  halo.userData.part = 'chassis_halo';
+  g.add(halo);
+  g.userData.halo = halo;
   return g;
 }
 

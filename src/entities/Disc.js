@@ -11,6 +11,7 @@ import { onTileDestabilizedByHost } from '../network/sync.js';
 import { damagePlayer } from './Player.js';
 import { SFX } from '../audio/sfx.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
+import { cosmeticMaterialEngine, disposeHierarchy } from '../armory/CosmeticMaterialEngine.js';
 
 export function applyDamageToTarget(f, dmg, D) {
   if (f.bossController) {
@@ -31,6 +32,11 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
   const obj = makeDisc(color);
   obj.position.copy(pos);
   scene.add(obj);
+  let cosmetics = null;
+  if (owner === 'player') {
+    cosmetics = cosmeticMaterialEngine.getTrailConfig();
+    cosmeticMaterialEngine.applyDiscSkin(obj, cosmeticMaterialEngine.activeDiscSkinId);
+  }
   const d = {
     obj,
     pos: pos.clone(),
@@ -38,6 +44,7 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
     owner,
     originalOwner: owner,
     color,
+    cosmetics,
     bounces: 0,
     deflectBounces: 0,
     deflectTime: 0,
@@ -71,6 +78,7 @@ export function updateDiscs(dt) {
 
     if (!holderAlive) {
       scene.remove(D.obj);
+      disposeHierarchy(D.obj);
       state.discs.splice(i, 1);
       continue;
     }
@@ -111,6 +119,7 @@ export function updateDiscs(dt) {
           }
         }
         scene.remove(D.obj);
+        disposeHierarchy(D.obj);
         state.discs.splice(i, 1);
         continue;
       }
@@ -139,6 +148,10 @@ export function updateDiscs(dt) {
     if (D.pos.y > config.DISC_R) {
       D.pos.y += (1.7 - D.pos.y) * Math.min(1, dt * 2.2);
     }
+    if (D.cosmetics && !D.returning && Math.random() < 0.3) {
+      const trailHex = Math.random() > 0.4 ? D.cosmetics.primaryHex : D.cosmetics.secondaryEmissiveHex;
+      burst(D.pos.clone(), trailHex, 2, 2.0);
+    }
 
     // Floor collision & void plunge
     const yFloor = config.DISC_R;
@@ -163,7 +176,8 @@ export function updateDiscs(dt) {
           if (significant && !D.returning) {
             D.bounces++;
             if (D.hitFoes) D.hitFoes.clear();
-            burst(D.pos.clone(), D.color, 10, 6);
+            const burstColor = (D.cosmetics && D.cosmetics.primaryHex) ? D.cosmetics.primaryHex : D.color;
+            burst(D.pos.clone(), burstColor, 10, 6);
             shake(.06);
           }
         }
@@ -209,7 +223,8 @@ export function updateDiscs(dt) {
         D.bounces++;
         if (D.hitFoes) D.hitFoes.clear();
         D.curve = -D.curve * 0.5;
-        burst(D.pos.clone(), D.color, 10, 6);
+        const burstColor = (D.cosmetics && D.cosmetics.primaryHex) ? D.cosmetics.primaryHex : D.color;
+        burst(D.pos.clone(), burstColor, 10, 6);
         shake(.06);
       }
     }
@@ -466,6 +481,7 @@ export function updateDiscs(dt) {
               }
             }
             scene.remove(D.obj);
+            disposeHierarchy(D.obj);
             state.discs.splice(i, 1);
             discCaught = true;
             SFX.catchDisc();

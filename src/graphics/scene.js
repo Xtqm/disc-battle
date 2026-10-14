@@ -2,6 +2,7 @@ import * as THREE from '../../vendor/three.module.js';
 import { state } from '../core/state.js';
 import { config } from '../core/config.js';
 import { makeProgram } from './materials.js';
+import { cosmeticMaterialEngine } from '../armory/CosmeticMaterialEngine.js';
 
 export const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, state.isTouchDevice ? 1.5 : 2));
@@ -125,6 +126,9 @@ export function initGraphics() {
   if (!state.player.obj) {
     state.player.obj = makeProgram(config.CYAN);
     scene.add(state.player.obj);
+    cosmeticMaterialEngine.init({ playerObj: state.player.obj });
+  } else {
+    cosmeticMaterialEngine.setPlayerRig(state.player.obj);
   }
   if (typeof window !== 'undefined' && window.__tronInitPhysicsVisuals) {
     window.__tronInitPhysicsVisuals(scene);

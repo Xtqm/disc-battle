@@ -27,7 +27,8 @@ const TEST_DOMAINS = {
     'economy/economy_manager.test.js'
   ],
   armory: [
-    'armory/armory_manager.test.js'
+    'armory/armory_manager.test.js',
+    'armory/cosmetic_material_engine.test.js'
   ],
   campaign: [
     'campaign/campaign_phase1.test.js',
