@@ -63,6 +63,7 @@ export function createDefaultSaveState(userId, handle = 'ANONYMOUS_PROGRAM') {
       matchesPlayed: 0,
       wins: 0,
       highestWave: 1,
+      swarmHighestWave: 1,
       highestTier: 1,
       totalScore: 0
     },
@@ -90,6 +91,7 @@ function migrateSaveState(data) {
   if (typeof data.stats.matchesPlayed !== 'number') data.stats.matchesPlayed = 0;
   if (typeof data.stats.wins !== 'number') data.stats.wins = 0;
   if (typeof data.stats.highestWave !== 'number') data.stats.highestWave = 1;
+  if (typeof data.stats.swarmHighestWave !== 'number') data.stats.swarmHighestWave = data.stats.highestWave;
   if (typeof data.stats.highestTier !== 'number') data.stats.highestTier = 1;
   if (typeof data.stats.totalScore !== 'number') data.stats.totalScore = 0;
 

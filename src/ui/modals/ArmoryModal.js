@@ -109,25 +109,33 @@ export class ArmoryModal {
    * Hides the Armory modal and cleanly disposes WebGL preview resources.
    */
   hide() {
+    const wasOpen = state.armoryModalOpen;
     state.armoryModalOpen = false;
 
-    if (this.previewScene) {
-      try {
-        this.previewScene.dispose();
-      } catch (err) {
-        console.warn('[ArmoryModal] Error disposing preview scene:', err);
+    if (this._isHiding) return;
+    this._isHiding = true;
+
+    try {
+      if (this.previewScene) {
+        try {
+          this.previewScene.dispose();
+        } catch (err) {
+          console.warn('[ArmoryModal] Error disposing preview scene:', err);
+        }
+        this.previewScene = null;
       }
-      this.previewScene = null;
-    }
 
-    const el = this.container;
-    if (el) {
-      el.style.display = 'none';
-      el.innerHTML = '';
-    }
+      const el = this.container;
+      if (el) {
+        el.style.display = 'none';
+        el.innerHTML = '';
+      }
 
-    if (typeof this._onBackToMenu === 'function') {
-      this._onBackToMenu();
+      if (wasOpen && typeof this._onBackToMenu === 'function') {
+        this._onBackToMenu();
+      }
+    } finally {
+      this._isHiding = false;
     }
   }
 

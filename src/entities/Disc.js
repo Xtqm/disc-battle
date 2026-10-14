@@ -12,6 +12,7 @@ import { damagePlayer } from './Player.js';
 import { SFX } from '../audio/sfx.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
 import { cosmeticMaterialEngine, disposeHierarchy } from '../armory/CosmeticMaterialEngine.js';
+import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 
 export function applyDamageToTarget(f, dmg, D) {
   if (f.bossController) {
@@ -53,6 +54,7 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
     returning: false,
     spin: 0,
     curve,
+    initialCurve: Math.abs(curve || 0),
     hitFoes: new Set()
   };
   state.discs.push(d);
@@ -374,11 +376,18 @@ export function updateDiscs(dt) {
             shake(.15);
           }
 
+          if (D.bounces >= 2) {
+            duelEconomyBridge.rewardRicochetHit(D.bounces);
+          }
+
           const isDead = applyDamageToTarget(f, dmg, D);
           f.hurt = .25;
           state.score += 25;
           D.returning = true;
           if (isDead) {
+            if (Math.abs(D.initialCurve || 0) > 0.05 || Math.abs(D.curve || 0) > 0.05) {
+              duelEconomyBridge.rewardCurveElimination(Math.abs(D.initialCurve || D.curve || 0));
+            }
             if (typeof window !== 'undefined' && window.__tronKillFoe) {
               window.__tronKillFoe(f);
             }
@@ -408,6 +417,7 @@ export function updateDiscs(dt) {
           burst(D.pos.clone(), config.WHITE, 30, 12);
           shake(.25);
           state.score += 50;
+          duelEconomyBridge.rewardParry();
           D.originalOwner = (D.owner !== 'player') ? D.owner : (D.originalOwner || state.foes[0]);
           D.owner = 'player';
           D.color = config.WHITE;

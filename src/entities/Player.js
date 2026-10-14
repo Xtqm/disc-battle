@@ -13,6 +13,7 @@ import { touchMove, updateCurveButtons, updateTouchMomentum } from '../input/tou
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
 import { showMultiplayerDefeat } from '../network/roomManager.js';
 import { updateHUD } from '../ui/hud.js';
+import { swarmEconomyBridge } from '../modes/SwarmEconomyBridge.js';
 
 export function updatePlayer(dt) {
   if (!state.player.alive) return;
@@ -314,12 +315,14 @@ export function damagePlayer(amount, from) {
         setTimeout(showMultiplayerDefeat, 900);
       }
     } else {
+      swarmEconomyBridge.resetStreak();
       setTimeout(showGameOver, 900);
     }
   }
 }
 
 export function resetRound(spawnX = 0, spawnZ = 14, yaw = Math.PI) {
+  state.multiplayerPayoutProcessed = false;
   state.player.hp = 100;
   state.player.energy = 100;
   state.player.hasDisc = true;
@@ -360,6 +363,7 @@ export function resetRound(spawnX = 0, spawnZ = 14, yaw = Math.PI) {
 }
 
 export function resetGame() {
+  swarmEconomyBridge.resetStreak();
   state.score = 0;
   state.gameOverT = 0;
   state.running = true;

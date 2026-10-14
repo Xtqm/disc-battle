@@ -77,6 +77,7 @@ export const DEFAULT_SAVE_STATE = Object.freeze({
     discsDeflected: 0,
     tilesDestroyed: 0,
     highestWave: 1,
+    swarmHighestWave: 1,
     highestScore: 0,
     totalPlaytimeSec: 0
   })
@@ -131,7 +132,8 @@ export function createDefaultSaveState(overrides = {}) {
       discsThrown: overrides?.stats?.discsThrown ?? 0,
       discsDeflected: overrides?.stats?.discsDeflected ?? 0,
       tilesDestroyed: overrides?.stats?.tilesDestroyed ?? 0,
-      highestWave: overrides?.stats?.highestWave ?? 1,
+      highestWave: overrides?.stats?.highestWave ?? overrides?.stats?.swarmHighestWave ?? 1,
+      swarmHighestWave: overrides?.stats?.swarmHighestWave ?? overrides?.stats?.highestWave ?? 1,
       highestScore: overrides?.stats?.highestScore ?? 0,
       totalPlaytimeSec: overrides?.stats?.totalPlaytimeSec ?? 0
     }
@@ -190,7 +192,11 @@ export function validateSaveState(data) {
     errors.push('"inventory.unlockedMaps" must be an array');
   }
   if (!Array.isArray(data.achievements)) errors.push('Missing or invalid "achievements" array');
-  if (!data.stats || typeof data.stats !== 'object') errors.push('Missing or invalid "stats" object');
+  if (!data.stats || typeof data.stats !== 'object') {
+    errors.push('Missing or invalid "stats" object');
+  } else if (data.stats.swarmHighestWave !== undefined && typeof data.stats.swarmHighestWave !== 'number') {
+    errors.push('"stats.swarmHighestWave" must be a number');
+  }
 
   return {
     valid: errors.length === 0,

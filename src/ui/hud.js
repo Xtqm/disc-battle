@@ -122,3 +122,98 @@ export function updateOfflineBanner(isOnline, pendingCount = 0) {
   }
 }
 
+/**
+ * Spawns an animated kinetic floating neon +Bits indicator on the HUD.
+ * @param {number} amount
+ * @param {string} [label=''] e.g. "PARRY", "BANK SHOT", "CURVE KILL"
+ * @param {object} [options]
+ * @returns {object|null}
+ */
+export function showFloatingNeonBits(amount, label = '', options = {}) {
+  if (typeof document === 'undefined') return null;
+
+  let container = document.getElementById('floatingEconomyLayer');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'floatingEconomyLayer';
+    container.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:9999;overflow:hidden;';
+    if (document.body) {
+      document.body.appendChild(container);
+    }
+
+    if (document.head && !document.getElementById('floatingNeonBitsStyle')) {
+      const style = document.createElement('style');
+      style.id = 'floatingNeonBitsStyle';
+      style.textContent = `
+        @keyframes neonFloatRise {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, 0) scale(0.85);
+          }
+          18% {
+            opacity: 1;
+            transform: translate(-50%, -16px) scale(1.12);
+          }
+          75% {
+            opacity: 1;
+            transform: translate(-50%, -46px) scale(1.0);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -70px) scale(0.9);
+          }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }
+
+  const badge = document.createElement('div');
+  badge.className = 'floating-neon-bits';
+  const labelText = label ? ` // ${label}` : '';
+  badge.textContent = `+${amount} BITS${labelText}`;
+
+  const jitterX = (Math.random() - 0.5) * 80;
+  const posX = options.x !== undefined ? options.x : (typeof window !== 'undefined' && window.innerWidth ? window.innerWidth / 2 + jitterX : 200);
+  const posY = options.y !== undefined ? options.y : (typeof window !== 'undefined' && window.innerHeight ? window.innerHeight * 0.38 : 150);
+
+  const accentColor = options.color || '#00f3ff';
+  const glowColor = options.glow || '#0066ff';
+
+  badge.style.cssText = `
+    position: absolute;
+    left: ${posX}px;
+    top: ${posY}px;
+    color: ${accentColor};
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 800;
+    letter-spacing: 2.5px;
+    text-shadow: 0 0 10px ${accentColor}, 0 0 20px ${glowColor}, 0 0 35px #ffffff;
+    pointer-events: none;
+    user-select: none;
+    animation: neonFloatRise 0.9s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+    white-space: nowrap;
+    z-index: 10000;
+  `;
+
+  container.appendChild(badge);
+
+  const timer = setTimeout(() => {
+    if (badge.parentNode) {
+      badge.parentNode.removeChild(badge);
+    }
+  }, 950);
+
+  return {
+    element: badge,
+    container,
+    cleanup: () => {
+      clearTimeout(timer);
+      if (badge.parentNode) {
+        badge.parentNode.removeChild(badge);
+      }
+    }
+  };
+}
+

@@ -11,6 +11,7 @@ import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { shake } from '../ui/UIManager.js';
 import { updateHUD, message, el } from '../ui/hud.js';
 import { requestFullScreen } from '../ui/modals.js';
+import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 
 export function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -642,6 +643,10 @@ export function bindGameOverActions() {
 
 export function showMultiplayerVictory(data = null) {
   state.running = false;
+  if (!state.multiplayerPayoutProcessed) {
+    state.multiplayerPayoutProcessed = true;
+    duelEconomyBridge.processMatchOutcome('victory', 'multiplayer');
+  }
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'flex';
 
@@ -682,6 +687,10 @@ export function showMultiplayerVictory(data = null) {
 
 export function showMultiplayerDefeat(data = null) {
   state.running = false;
+  if (!state.multiplayerPayoutProcessed) {
+    state.multiplayerPayoutProcessed = true;
+    duelEconomyBridge.processMatchOutcome('defeat', 'multiplayer');
+  }
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'flex';
   const subtitle = state.gameOverReason || 'YOU WERE ELIMINATED IN THE ARENA';

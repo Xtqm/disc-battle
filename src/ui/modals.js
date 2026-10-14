@@ -1,6 +1,7 @@
 import { state } from '../core/state.js';
 import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { el } from './hud.js';
+import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 
 export function requestFullScreen() {
   const elem = document.documentElement;
@@ -157,6 +158,9 @@ if (typeof window !== 'undefined') {
 }
 
 export function showGameOver(customTitle, customSubtitle) {
+  if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
+    duelEconomyBridge.processMatchOutcome('defeat', 'ai');
+  }
   const overlayEl = document.getElementById('overlay');
   if (overlayEl) overlayEl.style.display = 'flex';
   const title = customTitle || (state.gameMode === 'duel' || state.gameMode === 'duel_ai' ? 'DUEL ELIMINATED' : 'DEREZZED');

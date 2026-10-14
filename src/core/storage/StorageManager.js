@@ -171,7 +171,8 @@ export class StorageManager {
     if (legacy.stats && typeof legacy.stats === 'object') {
       base.stats.matchesPlayed = legacy.stats.matchesPlayed ?? 0;
       base.stats.wins = legacy.stats.wins ?? 0;
-      base.stats.highestWave = legacy.stats.highestWave ?? 1;
+      base.stats.highestWave = legacy.stats.highestWave ?? legacy.stats.swarmHighestWave ?? 1;
+      base.stats.swarmHighestWave = legacy.stats.swarmHighestWave ?? legacy.stats.highestWave ?? 1;
       base.stats.highestScore = legacy.stats.totalScore ?? 0;
     }
 
@@ -318,6 +319,15 @@ export class StorageManager {
 
     if (parsed && parsed.inventory && !Array.isArray(parsed.inventory.unlockedMaps)) {
       parsed.inventory.unlockedMaps = ['arena_grid_01'];
+    }
+
+    if (parsed && parsed.stats) {
+      if (typeof parsed.stats.swarmHighestWave !== 'number') {
+        parsed.stats.swarmHighestWave = typeof parsed.stats.highestWave === 'number' ? parsed.stats.highestWave : 1;
+      }
+      if (typeof parsed.stats.highestWave !== 'number') {
+        parsed.stats.highestWave = parsed.stats.swarmHighestWave;
+      }
     }
 
     const validation = validateSaveState(parsed);

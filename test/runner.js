@@ -24,7 +24,10 @@ const TEST_DOMAINS = {
     'storage/supabase_cloud_sync.test.js'
   ],
   economy: [
-    'economy/economy_manager.test.js'
+    'economy/economy_manager.test.js',
+    'economy/swarm_economy_bridge.test.js',
+    'economy/duel_economy_bridge.test.js',
+    'ui/duel_map_selector.test.js'
   ],
   armory: [
     'armory/armory_manager.test.js',
@@ -43,7 +46,8 @@ const TEST_DOMAINS = {
     'gameplay/mobile_modal_scrolling.test.js',
     'gameplay/multiplayer.test.js',
     'gameplay/rematch.test.js',
-    'gameplay/unified_flow.test.js'
+    'gameplay/unified_flow.test.js',
+    'ui/duel_map_selector.test.js'
   ]
 };
 

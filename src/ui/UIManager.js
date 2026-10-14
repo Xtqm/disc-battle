@@ -1,9 +1,11 @@
 import { state } from '../core/state.js';
-import { updateHUD, message, el, updateCrosshair, updateKeyMonitor, updateLockStateBanner } from './hud.js';
+import { updateHUD, message, el, updateCrosshair, updateKeyMonitor, updateLockStateBanner, showFloatingNeonBits } from './hud.js';
+export { showFloatingNeonBits };
 import { startMode, startGame, showModeSelect, showModeSelectMenu, bindMenuButtons, bindMainMenuEvents } from './menus.js';
 import { pauseGame, resumeGame, restartMatch, showGameOver, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
 import { updateIdentityHeader, showAuthTerminal, hideAuthTerminal, initAuthTerminal } from './authTerminal.js';
 import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
+import { armoryModal } from './modals/ArmoryModal.js';
 
 export function shake(v) {
   state.shakeAmt = Math.min(state.shakeAmt + v, 0.8);

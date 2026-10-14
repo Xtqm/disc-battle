@@ -12,6 +12,8 @@ import { updateHUD } from '../ui/hud.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
 import { showMultiplayerVictory } from '../network/roomManager.js';
 import { ArbiterBossController, ARBITER_CONFIGS } from '../ai/ArbiterBossController.js';
+import { swarmEconomyBridge } from '../modes/SwarmEconomyBridge.js';
+import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 export { ArbiterBossController, ARBITER_CONFIGS };
 
 export function getPillarCoverPoint(pillar, playerPos, out) {
@@ -178,6 +180,7 @@ export function killFoe(f) {
   state.score += 150;
 
   if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
+    duelEconomyBridge.processMatchOutcome('victory', 'ai');
     state.tier = (state.tier || state.duelTier || 1) + 1;
     state.duelTier = state.tier;
     message('TIER ' + state.tier + ' REACHED');
@@ -197,6 +200,7 @@ export function killFoe(f) {
       message('OPPONENT DEREZZED');
       return;
     }
+    duelEconomyBridge.processMatchOutcome('victory', 'multiplayer');
     message('VICTORY — OPPONENT DEREZZED');
     if (state.db && state.currentRoomId && state.playerRole) {
       const roomRef = getRoomRef(state.currentRoomId);
@@ -226,6 +230,8 @@ export function killFoe(f) {
   if (state.gameMode === 'swarm') {
     state.score += 100 + state.wave * 10;
     if (state.foes.length === 0) {
+      const completedWave = state.wave;
+      swarmEconomyBridge.processWaveCompletion(completedWave);
       state.wave++;
       message('CYCLE ' + state.wave);
       if (typeof window !== 'undefined' && window.__tronResetRound) {

@@ -6,6 +6,7 @@
 import { state } from '../core/state.js';
 import { defaultStorageManager } from '../core/storage/StorageManager.js';
 import { SECTOR_THEMES } from '../arena/hazards/SectorHazardBuilder.js';
+import { duelMapSelector } from './duel/DuelMapSelector.js';
 
 export function applySectorArena(gridId) {
   if (typeof window !== 'undefined' && typeof window.__tronApplySectorArena === 'function') {
@@ -37,6 +38,18 @@ export const ARENA_MAP_METADATA = Object.freeze({
     gridId: 'grid_04',
     name: 'The Core Pinnacle',
     label: 'Grid 04: The Core Pinnacle'
+  },
+  arena_zero_g_nexus: {
+    mapId: 'arena_zero_g_nexus',
+    gridId: 'grid_01',
+    name: 'Zero-G Nexus',
+    label: 'Exotic: Zero-G Nexus'
+  },
+  arena_derez_chasm: {
+    mapId: 'arena_derez_chasm',
+    gridId: 'grid_01',
+    name: 'De-rez Chasm',
+    label: 'Exotic: De-rez Chasm'
   }
 });
 
@@ -93,6 +106,7 @@ export function updateArenaSelectControls(root = (typeof document !== 'undefined
         <label for="arenaSelect" style="display:block;font-size:11px;letter-spacing:2px;color:var(--cyan);margin-bottom:6px;">SELECT ARENA SECTOR</label>
         <select id="arenaSelect" class="arena-select" style="width:100%;padding:10px;background:rgba(4,20,28,0.9);border:1px solid var(--cyan);color:#fff;font-family:inherit;font-size:12px;letter-spacing:1px;outline:none;border-radius:2px;cursor:pointer;">
         </select>
+        <div id="duelMapCardMount" class="duel-map-card-mount" style="margin-top:8px;"></div>
       `;
       menuActions.insertBefore(container, practiceBtn);
     }
@@ -110,7 +124,7 @@ export function updateArenaSelectControls(root = (typeof document !== 'undefined
   const doc = root.ownerDocument || (typeof document !== 'undefined' ? document : null);
   for (const mapId of unlockedMaps) {
     const meta = ARENA_MAP_METADATA[mapId] || { mapId, label: mapId };
-    if (doc) {
+    if (doc && typeof doc.createElement === 'function') {
       const opt = doc.createElement('option');
       opt.value = mapId;
       opt.textContent = meta.label || mapId;
@@ -122,9 +136,41 @@ export function updateArenaSelectControls(root = (typeof document !== 'undefined
   }
 
   select.value = currentSelection;
+
+  // Mount or refresh the interactive DuelMapSelector cards
+  let cardMount = container.querySelector ? container.querySelector('#duelMapCardMount') : null;
+  if (!cardMount && doc && typeof doc.createElement === 'function') {
+    cardMount = doc.createElement('div');
+    cardMount.id = 'duelMapCardMount';
+    cardMount.className = 'duel-map-card-mount';
+    cardMount.style.cssText = 'margin-top:8px;';
+    container.appendChild(cardMount);
+  }
+
+  if (cardMount && typeof duelMapSelector?.mount === 'function') {
+    duelMapSelector.mount(cardMount, {
+      storage,
+      onSelect: (chosenMapId) => {
+        if (select) {
+          select.value = chosenMapId;
+        }
+      }
+    });
+  }
+
   select.onchange = (e) => {
     const val = e.target.value;
     selectArenaMap(val);
+    if (cardMount && typeof duelMapSelector?.mount === 'function') {
+      duelMapSelector.mount(cardMount, {
+        storage,
+        onSelect: (chosenMapId) => {
+          if (select) {
+            select.value = chosenMapId;
+          }
+        }
+      });
+    }
   };
 
   return select;
