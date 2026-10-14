@@ -13,8 +13,33 @@ levelSelectView.setOnBackToGridSelector(() => gridSelectorModal.show());
 campaignHUD.setOnCancelBrief(() => levelSelectView.show());
 trialDebriefModal.setOnReturnToGrid((gridId) => levelSelectView.show(gridId));
 
+export {
+  ARENA_MAP_METADATA,
+  getGridIdForMap,
+  getUnlockedArenaMaps,
+  selectArenaMap,
+  updateArenaSelectControls
+} from './arenaSelector.js';
+import {
+  selectArenaMap,
+  updateArenaSelectControls,
+  applySectorArena
+} from './arenaSelector.js';
+
+function teardownSectorArena() {
+  if (typeof window !== 'undefined' && typeof window.__tronTeardownSectorArena === 'function') {
+    return window.__tronTeardownSectorArena();
+  }
+  state.activeGridId = null;
+}
+
 export function startMode(mode) {
   state.gameMode = (mode === 'duel' || mode === 'duel_ai') ? 'duel_ai' : mode;
+  if (state.gameMode === 'swarm') {
+    teardownSectorArena();
+  } else if (state.gameMode === 'duel_ai' && state.activeGridId) {
+    applySectorArena(state.activeGridId);
+  }
   const overlay = document.getElementById('overlay');
   if (overlay) overlay.style.display = 'none';
   const hm = document.getElementById('hostModal');
@@ -127,10 +152,14 @@ export function showModeSelectMenu() {
 }
 
 export function startSoloSwarm() {
+  teardownSectorArena();
   startMode('swarm');
 }
 
-export function startSoloDuel() {
+export function startSoloDuel(mapId = null) {
+  const selectElem = typeof document !== 'undefined' ? document.getElementById('arenaSelect') : null;
+  const chosenMap = mapId || (selectElem && selectElem.value) || state.selectedArenaMap || 'arena_grid_01';
+  selectArenaMap(chosenMap);
   startMode('duel_ai');
 }
 
@@ -163,6 +192,7 @@ export function bindMainMenuEvents() {
       hm.style.display = 'flex';
       const card = hm.querySelector('.card');
       if (card) card.scrollTop = 0;
+      updateArenaSelectControls(hm);
     }
   };
   const openJoinModal = (e) => {
@@ -215,6 +245,9 @@ export function bindMainMenuEvents() {
         requestFullScreen();
       }
       if (hm) hm.style.display = 'none';
+      const selectElem = document.getElementById('arenaSelect');
+      const chosenMap = (selectElem && selectElem.value) ? selectElem.value : (state.selectedArenaMap || 'arena_grid_01');
+      selectArenaMap(chosenMap);
       startMode('duel_ai');
     };
   }
@@ -307,4 +340,7 @@ if (typeof window !== 'undefined') {
   window.__tronShowLevelSelectView = (gridId) => levelSelectView.show(gridId);
   window.__tronShowMissionBrief = (levelId) => campaignHUD.showMissionBrief(levelId);
   window.__tronShowTrialDebrief = (result) => trialDebriefModal.show(result);
+  window.__tronUpdateArenaSelectControls = updateArenaSelectControls;
+  window.__tronSelectArenaMap = selectArenaMap;
+  window.__tronGetUnlockedArenaMaps = getUnlockedArenaMaps;
 }

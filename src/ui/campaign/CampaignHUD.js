@@ -11,6 +11,7 @@ import { campaignManager as defaultManager, CampaignEvents } from '../../campaig
 import { SFX } from '../../audio/sfx.js';
 import { state, player } from '../../core/state.js';
 import { tryLock, focusGame, setCursor } from '../../input/InputManager.js';
+import { ARBITER_CONFIGS } from '../../ai/ArbiterBossController.js';
 
 export class CampaignHUD {
   /**
@@ -25,6 +26,7 @@ export class CampaignHUD {
     this._briefContainerId = 'missionBriefModal';
     this._headerContainerId = 'campaignObjectiveHeader';
     this._floatingContainerId = 'floatingIndicators';
+    this._bossBarContainerId = 'campaignBossBar';
 
     this._activeLevelId = null;
     this._activeLevelConfig = null;
@@ -44,6 +46,19 @@ export class CampaignHUD {
 
   get floatingContainer() {
     return typeof document !== 'undefined' ? document.getElementById(this._floatingContainerId) : null;
+  }
+
+  get bossBarContainer() {
+    if (typeof document === 'undefined') return null;
+    let el = document.getElementById(this._bossBarContainerId);
+    if (!el && document.body) {
+      el = document.createElement('div');
+      el.id = this._bossBarContainerId;
+      el.className = 'campaign-boss-bar-container';
+      el.style.display = 'none';
+      document.body.appendChild(el);
+    }
+    return el;
   }
 
   /**
@@ -238,6 +253,12 @@ export class CampaignHUD {
 
     const level = this.registry.getLevel(levelId);
     this._activeLevelConfig = level;
+    state.activeGridId = level ? level.gridId : 'grid_01';
+
+    // Apply sector arena theme & hazards
+    if (typeof window !== 'undefined' && window.__tronApplySectorArena && level) {
+      window.__tronApplySectorArena(level.gridId);
+    }
 
     // Reset Three.js arena / round for campaign mode
     if (typeof window !== 'undefined' && window.__tronResetCampaignRound) {
@@ -286,16 +307,133 @@ export class CampaignHUD {
 
     el.innerHTML = this.renderObjectiveHeader(level);
     el.style.display = 'flex';
+
+    if (level && (level.type === 'arbiter' || level.difficultyTier === 'ARBITER')) {
+      const cfg = ARBITER_CONFIGS[levelId] || ARBITER_CONFIGS.level_01_06;
+      this.showBossHealthBar({
+        name: cfg.name,
+        title: cfg.title,
+        gridId: cfg.gridId,
+        levelId,
+        hp: cfg.maxHp,
+        maxHp: cfg.maxHp,
+        shields: cfg.maxShields,
+        maxShields: cfg.maxShields,
+        primaryColor: cfg.primaryColor
+      });
+    } else {
+      this.hideBossHealthBar();
+    }
   }
 
   /**
-   * Hides the in-combat objective header.
+   * Hides the in-combat objective header and boss bar.
    */
   hideObjectiveHeader() {
     const el = this.headerContainer;
     if (el) {
       el.style.display = 'none';
     }
+    this.hideBossHealthBar();
+  }
+
+  // ==========================================
+  // Dedicated Boss Health Bar HUD
+  // ==========================================
+
+  /**
+   * Displays the Boss Health Bar overlay for Arbiter boss encounters.
+   * @param {object} telemetry
+   */
+  showBossHealthBar(telemetry) {
+    const el = this.bossBarContainer;
+    if (!el) return;
+
+    el.innerHTML = this.renderBossHealthBar(telemetry);
+    el.style.display = 'flex';
+  }
+
+  /**
+   * Updates the Boss Health Bar with live telemetry.
+   * @param {object} telemetry
+   */
+  updateBossHealthBar(telemetry) {
+    if (typeof document === 'undefined') return;
+    const el = this.bossBarContainer;
+    if (!el || el.style.display === 'none') return;
+
+    // Update shield pips
+    const pips = el.querySelectorAll('.shield-pip');
+    pips.forEach((pip, idx) => {
+      if (idx < telemetry.shields) {
+        pip.classList.remove('pip-depleted');
+        pip.classList.add('pip-active');
+        pip.style.background = '#00e5ff';
+      } else {
+        pip.classList.remove('pip-active');
+        pip.classList.add('pip-depleted');
+        pip.style.background = 'rgba(255,255,255,0.15)';
+      }
+    });
+
+    // Update HP bar fill
+    const fill = el.querySelector('#bossHpFill');
+    if (fill) {
+      const pct = Math.max(0, Math.min(100, (telemetry.hp / telemetry.maxHp) * 100));
+      fill.style.width = `${pct}%`;
+    }
+
+    // Update HP label
+    const text = el.querySelector('#bossHpText');
+    if (text) {
+      text.textContent = `${Math.max(0, Math.ceil(telemetry.hp))} / ${telemetry.maxHp} HP`;
+    }
+  }
+
+  /**
+   * Hides the Boss Health Bar overlay.
+   */
+  hideBossHealthBar() {
+    const el = this.bossBarContainer;
+    if (el) {
+      el.style.display = 'none';
+    }
+  }
+
+  /**
+   * Renders markup for the Boss Health Bar overlay.
+   * @param {object} telemetry
+   * @returns {string}
+   */
+  renderBossHealthBar(telemetry) {
+    const pipsHtml = Array.from({ length: telemetry.maxShields }).map((_, i) => `
+      <div class="shield-pip ${i < telemetry.shields ? 'pip-active' : 'pip-depleted'}" data-pip="${i + 1}" style="width:14px; height:8px; margin:0 3px; border-radius:2px; display:inline-block; border:1px solid rgba(255,255,255,0.4); background:${i < telemetry.shields ? '#00e5ff' : 'rgba(255,255,255,0.15)'};"></div>
+    `).join('');
+
+    const hpPct = Math.max(0, Math.min(100, (telemetry.hp / telemetry.maxHp) * 100));
+
+    return `
+      <div class="boss-health-card sector-theme-${telemetry.gridId || 'grid_01'}" style="position:fixed; top:42px; left:50%; transform:translateX(-50%); width:min(90vw, 520px); background:rgba(0,10,18,0.85); border:1px solid rgba(255,255,255,0.25); border-radius:8px; padding:8px 14px; z-index:1100; box-shadow:0 4px 20px rgba(0,0,0,0.6); backdrop-filter:blur(8px);">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+          <div>
+            <span style="font-family:'Courier New',Courier,monospace; font-weight:bold; font-size:12px; letter-spacing:1px; color:#ffffff;">${telemetry.name}</span>
+            <span style="font-size:10px; color:#8ac0d0; margin-left:6px;">${telemetry.title || ''}</span>
+          </div>
+          <div style="display:flex; align-items:center;">
+            <span style="font-size:9px; color:#8ac0d0; font-family:'Courier New',Courier,monospace; margin-right:4px;">SHIELDS:</span>
+            <div id="bossShieldsContainer" style="display:flex;">
+              ${pipsHtml}
+            </div>
+          </div>
+        </div>
+        <div style="width:100%; height:10px; background:rgba(255,255,255,0.1); border-radius:4px; overflow:hidden; border:1px solid rgba(255,255,255,0.2);">
+          <div id="bossHpFill" style="width:${hpPct}%; height:100%; background:linear-gradient(90deg, #ff0055, #ffaa00); transition:width 0.2s ease;"></div>
+        </div>
+        <div style="display:flex; justify-content:flex-end; margin-top:3px;">
+          <span id="bossHpText" style="font-family:'Courier New',Courier,monospace; font-size:10px; color:#8ac0d0;">${telemetry.hp} / ${telemetry.maxHp} HP</span>
+        </div>
+      </div>
+    `;
   }
 
   /**

@@ -11,6 +11,8 @@ import { spawnDisc } from './Disc.js';
 import { updateHUD } from '../ui/hud.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
 import { showMultiplayerVictory } from '../network/roomManager.js';
+import { ArbiterBossController, ARBITER_CONFIGS } from '../ai/ArbiterBossController.js';
+export { ArbiterBossController, ARBITER_CONFIGS };
 
 export function getPillarCoverPoint(pillar, playerPos, out) {
   const dx = pillar.x - playerPos.x;
@@ -91,6 +93,57 @@ export function spawnDuelBoss(tier = 1) {
   state.foes.push(boss);
 }
 
+export function spawnArbiterBoss(levelId = 'level_01_06') {
+  for (const f of state.foes) scene.remove(f.obj);
+  state.foes = [];
+
+  const cfg = ARBITER_CONFIGS[levelId] || ARBITER_CONFIGS.level_01_06;
+  const obj = makeProgram(cfg.primaryColor || config.ORANGE);
+  obj.scale.setScalar(1.22);
+  const halo = new THREE.PointLight(cfg.primaryColor || config.ORANGE, 3.5, 16);
+  halo.position.y = 1.6;
+  obj.add(halo);
+  scene.add(obj);
+
+  const boss = {
+    obj,
+    pos: new THREE.Vector3(0, 0, -28),
+    vel: new THREE.Vector3(),
+    hp: cfg.maxHp,
+    maxHp: cfg.maxHp,
+    hasDisc: true,
+    cd: 1.2,
+    baseCd: 1.2,
+    strafe: Math.random() < 0.5 ? 1 : -1,
+    strafeT: 0.8,
+    strafeRate: 1.2,
+    hurt: 0,
+    skill: cfg.skill,
+    isBoss: true,
+    isArbiter: true,
+    speed: 11.0,
+    jumpChance: 0.5,
+    tier: 4,
+    y: 0,
+    vy: 0,
+    grounded: true,
+    jumps: 0,
+    dashCd: 0,
+    didRecover: false,
+    coverTarget: new THREE.Vector3(),
+    coverPillar: null,
+    state: 'ATTACK',
+    aerialThrow: false,
+    peekDir: Math.random() < 0.5 ? 1 : -1
+  };
+
+  const controller = new ArbiterBossController(boss, levelId);
+  boss.bossController = controller;
+  state.foes.push(boss);
+  state.activeArbiterBoss = boss;
+  return boss;
+}
+
 export function spawnWave() {
   const n = Math.min(2 + Math.floor(state.wave * 0.8), 8);
   for (let i = 0; i < n; i++) {
@@ -160,6 +213,16 @@ export function killFoe(f) {
     return;
   }
 
+  if (state.gameMode === 'campaign') {
+    state.score += 250;
+    if (state.foes.length === 0) {
+      if (typeof window !== 'undefined' && window.__tronCompleteCampaignTrial) {
+        window.__tronCompleteCampaignTrial();
+      }
+    }
+    return;
+  }
+
   if (state.gameMode === 'swarm') {
     state.score += 100 + state.wave * 10;
     if (state.foes.length === 0) {
@@ -190,6 +253,7 @@ export function killFoe(f) {
 
 if (typeof window !== 'undefined') {
   window.__tronSpawnDuelBoss = spawnDuelBoss;
+  window.__tronSpawnArbiterBoss = spawnArbiterBoss;
   window.__tronSpawnWave = spawnWave;
   window.__tronKillFoe = killFoe;
 }
@@ -572,7 +636,10 @@ export function updateFoes(dt) {
 
   for (let fi = state.foes.length - 1; fi >= 0; fi--) {
     const f = state.foes[fi];
-    if ((state.gameMode === 'duel' || state.gameMode === 'duel_ai') && f.isBoss) {
+    if (f.isArbiter && f.bossController) {
+      f.bossController.update(dt, state.player, state.discs, spawnDisc);
+    }
+    if (((state.gameMode === 'duel' || state.gameMode === 'duel_ai') && f.isBoss) || (state.gameMode === 'campaign' && f.isBoss)) {
       updateDuelFoe(f, dt);
       continue;
     }

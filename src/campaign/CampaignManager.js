@@ -16,7 +16,15 @@ export const CampaignEvents = Object.freeze({
   TRIAL_FAILED: 'CAMPAIGN_TRIAL_FAILED',
   METRIC_RECORDED: 'CAMPAIGN_METRIC_RECORDED',
   GRID_UNLOCKED: 'CAMPAIGN_GRID_UNLOCKED',
-  STARS_UPDATED: 'CAMPAIGN_STARS_UPDATED'
+  STARS_UPDATED: 'CAMPAIGN_STARS_UPDATED',
+  ARENA_MAP_UNLOCKED: 'CAMPAIGN_ARENA_MAP_UNLOCKED'
+});
+
+export const ARBITER_MAP_IDS = Object.freeze({
+  level_01_06: 'arena_grid_01',
+  level_02_07: 'arena_solar_sail',
+  level_03_07: 'arena_sea_sim',
+  level_04_08: 'arena_core_pinnacle'
 });
 
 export class CampaignManager {
@@ -68,6 +76,11 @@ export class CampaignManager {
     const unlockedNodes = this.storage.get('campaign.unlockedNodes');
     if (!Array.isArray(unlockedNodes) || unlockedNodes.length === 0) {
       this.storage.set('campaign.unlockedNodes', ['level_01_01'], { autoSave: false });
+    }
+
+    const unlockedMaps = this.storage.get('inventory.unlockedMaps');
+    if (!Array.isArray(unlockedMaps) || unlockedMaps.length === 0) {
+      this.storage.set('inventory.unlockedMaps', ['arena_grid_01'], { autoSave: false });
     }
   }
 
@@ -332,6 +345,23 @@ export class CampaignManager {
     this.storage.set('campaign.unlockedGrids', Array.from(unlockedGrids), { autoSave: false });
     this.storage.set('campaign.unlockedNodes', Array.from(unlockedNodes), { autoSave: false });
 
+    // Check Arena Map unlock for Arbiter first-time clears
+    let newlyUnlockedMap = null;
+    const arbiterMapId = ARBITER_MAP_IDS[levelId];
+    if (arbiterMapId) {
+      const currentUnlockedMaps = new Set(this.storage.get('inventory.unlockedMaps', ['arena_grid_01']));
+      if (!currentUnlockedMaps.has(arbiterMapId)) {
+        currentUnlockedMaps.add(arbiterMapId);
+        this.storage.set('inventory.unlockedMaps', Array.from(currentUnlockedMaps), { autoSave: false });
+        newlyUnlockedMap = arbiterMapId;
+        this.emit(CampaignEvents.ARENA_MAP_UNLOCKED, {
+          mapId: arbiterMapId,
+          levelId,
+          gridId: levelConfig.gridId
+        });
+      }
+    }
+
     // Persist all state updates immediately
     this.storage.save({ immediate: true });
 
@@ -351,6 +381,7 @@ export class CampaignManager {
       },
       evaluation,
       newlyUnlockedGrids,
+      newlyUnlockedMap,
       totalStars: newTotalStars
     };
 
@@ -542,6 +573,15 @@ export class CampaignManager {
       earnedStars,
       maxStars: levels.length * 3
     };
+  }
+
+  /**
+   * Retrieves unlocked arena map IDs.
+   * @returns {string[]}
+   */
+  getUnlockedMaps() {
+    this._ensureStorageInitialized();
+    return this.storage.get('inventory.unlockedMaps', ['arena_grid_01']);
   }
 }
 

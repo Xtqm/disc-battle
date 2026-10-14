@@ -65,7 +65,8 @@ export const DEFAULT_SAVE_STATE = Object.freeze({
   inventory: Object.freeze({
     discs: Object.freeze(['disc_identity_default']),
     cosmetics: Object.freeze(['trail_cyan_default', 'visor_classic']),
-    consumables: Object.freeze({})
+    consumables: Object.freeze({}),
+    unlockedMaps: Object.freeze(['arena_grid_01'])
   }),
   achievements: Object.freeze([]),
   stats: Object.freeze({
@@ -119,7 +120,8 @@ export function createDefaultSaveState(overrides = {}) {
     inventory: {
       discs: Array.isArray(overrides?.inventory?.discs) ? [...overrides.inventory.discs] : ['disc_identity_default'],
       cosmetics: Array.isArray(overrides?.inventory?.cosmetics) ? [...overrides.inventory.cosmetics] : ['trail_cyan_default', 'visor_classic'],
-      consumables: overrides?.inventory?.consumables ? { ...overrides.inventory.consumables } : {}
+      consumables: overrides?.inventory?.consumables ? { ...overrides.inventory.consumables } : {},
+      unlockedMaps: Array.isArray(overrides?.inventory?.unlockedMaps) ? [...overrides.inventory.unlockedMaps] : ['arena_grid_01']
     },
     achievements: Array.isArray(overrides?.achievements) ? deepClone(overrides.achievements) : [],
     stats: {
@@ -182,7 +184,11 @@ export function validateSaveState(data) {
   }
   if (!data.loadout || typeof data.loadout !== 'object') errors.push('Missing or invalid "loadout" object');
   if (!data.campaign || typeof data.campaign !== 'object') errors.push('Missing or invalid "campaign" object');
-  if (!data.inventory || typeof data.inventory !== 'object') errors.push('Missing or invalid "inventory" object');
+  if (!data.inventory || typeof data.inventory !== 'object') {
+    errors.push('Missing or invalid "inventory" object');
+  } else if (data.inventory.unlockedMaps && !Array.isArray(data.inventory.unlockedMaps)) {
+    errors.push('"inventory.unlockedMaps" must be an array');
+  }
   if (!Array.isArray(data.achievements)) errors.push('Missing or invalid "achievements" array');
   if (!data.stats || typeof data.stats !== 'object') errors.push('Missing or invalid "stats" object');
 

@@ -89,6 +89,12 @@ export class TrialDebriefModal {
     if (result.success && result.stars > 0) {
       this.animateStarIgnition(result.stars);
     }
+
+    if (result.newlyUnlockedMap) {
+      try {
+        SFX.accessGranted();
+      } catch (_) {}
+    }
   }
 
   /**
@@ -194,9 +200,24 @@ export class TrialDebriefModal {
           </div>
         </div>
 
-        <div style="font-family:'Courier New',Courier,monospace; font-size:11px; color:#8ac0d0; margin-bottom:20px;">
+        <div style="font-family:'Courier New',Courier,monospace; font-size:11px; color:#8ac0d0; margin-bottom:16px;">
           CAMPAIGN PROGRESSION: <b style="color:var(--star-gold);">${totalStars} STARS TOTAL</b>
         </div>
+
+        <!-- Celebratory Arena Map Unlock Banner -->
+        ${result.newlyUnlockedMap ? `
+          <div id="debriefArenaUnlockBanner" class="debrief-unlock-banner" style="background:rgba(255,215,0,0.12); border:1px solid #ffd700; border-radius:6px; padding:12px 16px; margin-bottom:18px; text-align:center;">
+            <div style="font-family:'Courier New',Courier,monospace; font-size:11px; color:#ffd700; letter-spacing:2px; font-weight:bold; margin-bottom:4px;">
+              ★ SECTOR ARENA UNLOCKED ★
+            </div>
+            <div style="font-size:13px; color:#ffffff; font-weight:bold; letter-spacing:1px;">
+              ${this._getMapDisplayName(result.newlyUnlockedMap)}
+            </div>
+            <div style="font-size:11px; color:#8ac0d0; margin-top:4px;">
+              NOW DEPLOYABLE IN PRACTICE &amp; SOLO DUEL MODES
+            </div>
+          </div>
+        ` : ''}
 
         <!-- Navigation Action Buttons -->
         <div class="debrief-actions" style="display:flex; justify-content:center; gap:12px; flex-wrap:wrap;">
@@ -330,6 +351,16 @@ export class TrialDebriefModal {
         }
       });
     }
+  }
+
+  _getMapDisplayName(mapId) {
+    const mapNames = {
+      arena_grid_01: 'GRID 01: OUTLANDS BOOT-SECTOR',
+      arena_solar_sail: 'GRID 02: SOLAR SAIL JUNCTION',
+      arena_sea_sim: 'GRID 03: SEA OF SIMULATION',
+      arena_core_pinnacle: 'GRID 04: THE CORE PINNACLE'
+    };
+    return mapNames[mapId] || 'SECTOR ARENA';
   }
 }
 

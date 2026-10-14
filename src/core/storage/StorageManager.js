@@ -159,6 +159,7 @@ export class StorageManager {
         .map((item) => (item === 'disc_default' ? 'disc_identity_default' : item));
       if (base.inventory.discs.length === 0) base.inventory.discs = ['disc_identity_default'];
       base.inventory.cosmetics = legacy.inventory.filter((item) => !String(item).startsWith('disc_'));
+      base.inventory.unlockedMaps = ['arena_grid_01'];
     }
 
     if (Array.isArray(legacy.achievements)) {
@@ -313,6 +314,10 @@ export class StorageManager {
       parsed = this._applyMigrations(parsed);
     } catch (err) {
       return this._handleCorruption(raw, err);
+    }
+
+    if (parsed && parsed.inventory && !Array.isArray(parsed.inventory.unlockedMaps)) {
+      parsed.inventory.unlockedMaps = ['arena_grid_01'];
     }
 
     const validation = validateSaveState(parsed);
@@ -582,3 +587,4 @@ export class StorageManager {
 
 // Export singleton instance as default runtime orchestrator
 export const storageManager = new StorageManager();
+export const defaultStorageManager = storageManager;

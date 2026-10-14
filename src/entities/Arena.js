@@ -7,6 +7,8 @@ export { tileMatIntact, tileEdgeMatIntact };
 import { burst } from '../graphics/particles.js';
 import { playWarningSound, playTileDropSound } from '../audio/sfx.js';
 import { shake } from '../ui/UIManager.js';
+import { sectorHazardBuilder } from '../arena/hazards/SectorHazardBuilder.js';
+export { sectorHazardBuilder };
 
 // Map: key `${ix}_${iz}` -> { mesh, slabMesh, edgeMesh, state, timer, origY, ix, iz, center, regenTimer, warningColor }
 export const tiles = new Map();
@@ -229,6 +231,7 @@ export function updateTiles(dt) {
       }
     }
   }
+  sectorHazardBuilder.update(dt, { player: state.player, foes: state.foes });
 }
 
 export function rebuildArenaTiles() {
@@ -245,4 +248,23 @@ export function rebuildArenaTiles() {
       tile.edgeMesh.material = tileEdgeMatIntact;
     }
   }
+  if (state.activeGridId) {
+    applySectorArena(state.activeGridId);
+  }
+}
+
+export function applySectorArena(gridId) {
+  state.activeGridId = gridId;
+  sectorHazardBuilder.applySectorTheme(gridId, tiles, walls);
+  sectorHazardBuilder.buildSectorHazards(gridId, scene, tiles);
+}
+
+export function teardownSectorArena() {
+  state.activeGridId = null;
+  sectorHazardBuilder.teardown(scene);
+}
+
+if (typeof window !== 'undefined') {
+  window.__tronApplySectorArena = applySectorArena;
+  window.__tronTeardownSectorArena = teardownSectorArena;
 }

@@ -6,11 +6,26 @@ import { makeDisc, tmp, _discMat, _fwd, _r0, _u0, _uBank, _rBank, _localX, _loca
 import { burst } from '../graphics/particles.js';
 import { shake, message } from '../ui/UIManager.js';
 import { lineOfSight } from '../physics/collision.js';
-import { getTileAt, triggerTileWarning, pillars } from './Arena.js';
+import { getTileAt, triggerTileWarning, pillars, sectorHazardBuilder } from './Arena.js';
 import { onTileDestabilizedByHost } from '../network/sync.js';
 import { damagePlayer } from './Player.js';
 import { SFX } from '../audio/sfx.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
+
+export function applyDamageToTarget(f, dmg, D) {
+  if (f.bossController) {
+    const res = f.bossController.onHit(dmg, D);
+    if (res.absorbed) {
+      burst(D.pos.clone(), f.bossController.primaryColor || config.ORANGE, 24, 8);
+      shake(0.2);
+      message(res.invulnerable ? 'EVADED // I-FRAME' : `SHIELD HIT // ${res.remainingShields} REMAINING`);
+      return f.hp <= 0;
+    }
+  } else {
+    f.hp -= dmg;
+  }
+  return f.hp <= 0;
+}
 
 export function spawnDisc(pos, vel, owner, color, curve = 0) {
   const obj = makeDisc(color);
@@ -181,6 +196,9 @@ export function updateDiscs(dt) {
         bounced = true;
       }
     }
+    if (sectorHazardBuilder && sectorHazardBuilder.checkDiscCollision(D)) {
+      bounced = true;
+    }
     if (bounced) {
       if (D.isDeflected) {
         D.deflectBounces = (D.deflectBounces || 0) + 1;
@@ -239,7 +257,7 @@ export function updateDiscs(dt) {
               if (!D.hitFoes) D.hitFoes = new Set();
               D.hitFoes.add(f);
               const critDmg = 85 + D.bounces * 20;
-              f.hp -= critDmg;
+              const isDead = applyDamageToTarget(f, critDmg, D);
               f.hurt = 0.8;
               f.cd = Math.max(f.cd, 0.8);
               state.score += 150;
@@ -247,7 +265,7 @@ export function updateDiscs(dt) {
               burst(D.pos.clone(), config.WHITE, 32, 12);
               burst(D.pos.clone(), config.ORANGE, 20, 8);
               shake(0.25);
-              if (f.hp <= 0) {
+              if (isDead) {
                 if (typeof window !== 'undefined' && window.__tronKillFoe) {
                   window.__tronKillFoe(f);
                 }
@@ -277,7 +295,7 @@ export function updateDiscs(dt) {
 
           if (D.isDeflected) {
             const critDmg = 85 + D.bounces * 20;
-            f.hp -= critDmg;
+            const isDead = applyDamageToTarget(f, critDmg, D);
             f.hurt = 0.8;
             f.cd = Math.max(f.cd, 0.8);
             state.score += 150;
@@ -285,7 +303,7 @@ export function updateDiscs(dt) {
             burst(D.pos.clone(), config.WHITE, 32, 12);
             burst(D.pos.clone(), config.ORANGE, 20, 8);
             shake(0.25);
-            if (f.hp <= 0) {
+            if (isDead) {
               if (typeof window !== 'undefined' && window.__tronKillFoe) {
                 window.__tronKillFoe(f);
               }
@@ -339,11 +357,11 @@ export function updateDiscs(dt) {
             shake(.15);
           }
 
-          f.hp -= dmg;
+          const isDead = applyDamageToTarget(f, dmg, D);
           f.hurt = .25;
           state.score += 25;
           D.returning = true;
-          if (f.hp <= 0) {
+          if (isDead) {
             if (typeof window !== 'undefined' && window.__tronKillFoe) {
               window.__tronKillFoe(f);
             }

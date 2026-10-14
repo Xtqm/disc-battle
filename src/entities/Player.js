@@ -389,7 +389,29 @@ export function resetGame() {
   updateHUD();
 }
 
+export function resetCampaignRound(levelConfig) {
+  state.score = 0;
+  state.gameOverT = 0;
+  state.running = true;
+  state.spawnTimer = 0;
+  state.gameOverReason = '';
+  resetRound(0, 14, Math.PI);
+  state.onCountdownEnd = () => {
+    if (levelConfig && (levelConfig.type === 'arbiter' || levelConfig.difficultyTier === 'ARBITER')) {
+      if (typeof window !== 'undefined' && window.__tronSpawnArbiterBoss) {
+        window.__tronSpawnArbiterBoss(levelConfig.id);
+      }
+    } else {
+      if (typeof window !== 'undefined' && window.__tronSpawnWave) {
+        window.__tronSpawnWave();
+      }
+    }
+  };
+  updateHUD();
+}
+
 if (typeof window !== 'undefined') {
   window.__tronResetGame = resetGame;
   window.__tronResetRound = resetRound;
+  window.__tronResetCampaignRound = resetCampaignRound;
 }
