@@ -22,6 +22,8 @@ export const state = {
   db: null,
   auth: null,
   currentUser: null,
+  authModalOpen: false,
+  armoryModalOpen: false,
   currentRoomId: null,
   playerRole: null,
   roomUnsubscribe: null,

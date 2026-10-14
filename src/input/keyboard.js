@@ -32,10 +32,25 @@ export function onDown(e) {
     return;
   }
 
+  // Handle Escape dismissal for Armory Modal
+  if (c === 'Escape' && state.armoryModalOpen) {
+    e.preventDefault();
+    if (typeof window !== 'undefined' && typeof window.__tronCloseArmory === 'function') {
+      window.__tronCloseArmory();
+    } else {
+      const arm = document.getElementById('armoryModal');
+      if (arm) arm.style.display = 'none';
+      state.armoryModalOpen = false;
+      const overlay = document.getElementById('overlay');
+      if (overlay) overlay.style.display = 'flex';
+    }
+    return;
+  }
+
   const isInputTarget = typeof document !== 'undefined' && document.activeElement && 
      (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
 
-  if (isInputTarget || state.authModalOpen) {
+  if (isInputTarget || state.authModalOpen || state.armoryModalOpen) {
     return;
   }
 

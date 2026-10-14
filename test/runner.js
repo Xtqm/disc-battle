@@ -28,7 +28,8 @@ const TEST_DOMAINS = {
   ],
   armory: [
     'armory/armory_manager.test.js',
-    'armory/cosmetic_material_engine.test.js'
+    'armory/cosmetic_material_engine.test.js',
+    'armory/armory_modal.test.js'
   ],
   campaign: [
     'campaign/campaign_phase1.test.js',

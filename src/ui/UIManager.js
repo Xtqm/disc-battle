@@ -65,6 +65,10 @@ export class UIManager {
   static showTrialDebrief(result) {
     trialDebriefModal.show(result);
   }
+
+  static showArmory(category) {
+    armoryModal.show(category);
+  }
 }
 
 export const UI = UIManager;
@@ -99,7 +103,8 @@ export {
   gridSelectorModal,
   levelSelectView,
   campaignHUD,
-  trialDebriefModal
+  trialDebriefModal,
+  armoryModal
 };
 
 

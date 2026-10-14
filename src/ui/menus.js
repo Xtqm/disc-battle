@@ -4,6 +4,7 @@ import { requestFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEve
 import { showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer } from '../network/roomManager.js';
 import { updateIdentityHeader, showAuthTerminal } from './authTerminal.js';
 import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
+import { armoryModal } from './modals/ArmoryModal.js';
 
 // Setup Campaign UI navigation transitions
 gridSelectorModal.setOnSelectGrid((gridId) => levelSelectView.show(gridId));
@@ -12,6 +13,9 @@ levelSelectView.setOnSelectLevel((levelId) => campaignHUD.showMissionBrief(level
 levelSelectView.setOnBackToGridSelector(() => gridSelectorModal.show());
 campaignHUD.setOnCancelBrief(() => levelSelectView.show());
 trialDebriefModal.setOnReturnToGrid((gridId) => levelSelectView.show(gridId));
+armoryModal.setOnBackToMenu(() => showModeSelectMenu());
+
+export { armoryModal };
 
 export {
   ARENA_MAP_METADATA,
@@ -49,7 +53,9 @@ export function startMode(mode) {
   if (rm) rm.style.display = 'none';
   const am = document.getElementById('authModal');
   if (am) am.style.display = 'none';
+  armoryModal.hide();
   state.authModalOpen = false;
+  state.armoryModalOpen = false;
   if (typeof window !== 'undefined' && window.__tronResetGame) {
     window.__tronResetGame();
   }
@@ -80,7 +86,9 @@ export function showModeSelect() {
   campaignHUD.hideMissionBrief();
   campaignHUD.hideObjectiveHeader();
   trialDebriefModal.hide();
+  armoryModal.hide();
   state.authModalOpen = false;
+  state.armoryModalOpen = false;
   state.paused = false;
   state.running = false;
   teardownMultiplayer();
@@ -119,6 +127,7 @@ export function getMainMenuHtml() {
   </div>
   <div class="mode-select" id="mainMenuButtons">
     <button id="campaignBtn" class="mode-btn campaign-btn">CAMPAIGN SECTORS</button>
+    <button id="armoryBtn" class="mode-btn armory-btn" style="border-color:#ffaa00;color:#ffaa00;box-shadow:0 0 12px rgba(255,170,0,0.3);">ARMORY</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
@@ -142,7 +151,9 @@ export function showModeSelectMenu() {
   campaignHUD.hideMissionBrief();
   campaignHUD.hideObjectiveHeader();
   trialDebriefModal.hide();
+  armoryModal.hide();
   state.authModalOpen = false;
+  state.armoryModalOpen = false;
   const overlay = document.getElementById('overlay');
   if (!overlay) return;
   overlay.style.display = 'flex';
@@ -220,7 +231,16 @@ export function bindMainMenuEvents() {
     gridSelectorModal.show();
   };
 
+  const openArmory = (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    const overlay = document.getElementById('overlay');
+    if (overlay) overlay.style.display = 'none';
+    armoryModal.show();
+  };
+
   bind('campaignBtn', openCampaign);
+  bind('armoryBtn', openArmory);
   bind('swarmBtn', startSwarm);
   bind('hostMatchBtn', openHostModal);
   bind('joinOnlineBtn', openJoinModal);

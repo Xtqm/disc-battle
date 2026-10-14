@@ -248,6 +248,86 @@ export function playMissionBriefSweepSound() {
   } catch (_) {}
 }
 
+export function playFabricateSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    // Stage 1: Laser compilation sweep (sawtooth)
+    const sweepOsc = ctx.createOscillator();
+    const sweepGain = ctx.createGain();
+    sweepOsc.type = 'sawtooth';
+    sweepOsc.frequency.setValueAtTime(220, now);
+    sweepOsc.frequency.exponentialRampToValueAtTime(1760, now + 0.28);
+
+    sweepGain.gain.setValueAtTime(0.01, now);
+    sweepGain.gain.linearRampToValueAtTime(0.18, now + 0.08);
+    sweepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+    sweepOsc.connect(sweepGain);
+    sweepGain.connect(ctx.destination);
+    sweepOsc.start(now);
+    sweepOsc.stop(now + 0.32);
+
+    // Stage 2: Resonant crystalline lock-in chime triad (F#5, A#5, C#6)
+    const freqs = [739.99, 932.33, 1108.73];
+    freqs.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const startTime = now + 0.18 + (idx * 0.03);
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.02, startTime + 0.35);
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.linearRampToValueAtTime(0.12, startTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + 0.35);
+    });
+  } catch (_) {}
+}
+
+export function playEquipSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    // Transient mechanical click
+    const clickOsc = ctx.createOscillator();
+    const clickGain = ctx.createGain();
+    clickOsc.type = 'square';
+    clickOsc.frequency.setValueAtTime(1200, now);
+
+    clickGain.gain.setValueAtTime(0.12, now);
+    clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
+
+    clickOsc.connect(clickGain);
+    clickGain.connect(ctx.destination);
+    clickOsc.start(now);
+    clickOsc.stop(now + 0.035);
+
+    // Harmonic confirmation tone
+    const chimeOsc = ctx.createOscillator();
+    const chimeGain = ctx.createGain();
+    chimeOsc.type = 'sine';
+    chimeOsc.frequency.setValueAtTime(1046.50, now + 0.02);
+    chimeOsc.frequency.exponentialRampToValueAtTime(1318.51, now + 0.18);
+
+    chimeGain.gain.setValueAtTime(0.001, now + 0.02);
+    chimeGain.gain.linearRampToValueAtTime(0.18, now + 0.04);
+    chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+    chimeOsc.connect(chimeGain);
+    chimeGain.connect(ctx.destination);
+    chimeOsc.start(now + 0.02);
+    chimeOsc.stop(now + 0.22);
+  } catch (_) {}
+}
+
 export const SFX = {
   catchDisc: (pitch = 1.0) => playCatchDiscSound(pitch),
   countdownTick: () => playCatchDiscSound(0.65), // pitched down
@@ -258,10 +338,13 @@ export const SFX = {
   errorBuzz: () => playErrorBuzzSound(),
   starIgnite: (tier = 1) => playStarIgniteSound(tier),
   bitAccrual: () => playBitAccrualSound(),
-  missionBriefSweep: () => playMissionBriefSweepSound()
+  missionBriefSweep: () => playMissionBriefSweepSound(),
+  fabricate: () => playFabricateSound(),
+  equip: () => playEquipSound()
 };
 
 if (typeof window !== 'undefined') {
   window.derezAudioHook = playDeRezSound;
 }
+
 
