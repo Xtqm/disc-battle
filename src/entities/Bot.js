@@ -14,6 +14,7 @@ import { showMultiplayerVictory } from '../network/roomManager.js';
 import { ArbiterBossController, ARBITER_CONFIGS } from '../ai/ArbiterBossController.js';
 import { swarmEconomyBridge } from '../modes/SwarmEconomyBridge.js';
 import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
+import { storageManager } from '../core/storage/StorageManager.js';
 export { ArbiterBossController, ARBITER_CONFIGS };
 
 export function getPillarCoverPoint(pillar, playerPos, out) {
@@ -178,6 +179,12 @@ export function killFoe(f) {
   scene.remove(f.obj);
   state.foes = state.foes.filter(x => x !== f);
   state.score += 150;
+
+  // Record combat telemetry for total derezzes
+  try {
+    const currentDerezzes = Number(storageManager.get('stats.totalDerezzes', 0));
+    storageManager.set('stats.totalDerezzes', currentDerezzes + 1);
+  } catch (_) {}
 
   if (state.gameMode === 'duel' || state.gameMode === 'duel_ai') {
     duelEconomyBridge.processMatchOutcome('victory', 'ai');

@@ -39,6 +39,13 @@ const TEST_DOMAINS = {
     'campaign/campaign_phase2.test.js',
     'campaign/campaign_phase3.test.js'
   ],
+  achievements: [
+    'achievements/achievement_registry.test.js',
+    'achievements/achievement_manager.test.js',
+    'audio/achievement_sfx.test.js',
+    'ui/achievement_toast.test.js',
+    'ui/achievements_modal.test.js'
+  ],
   gameplay: [
     'gameplay/physics_and_combat.test.js',
     'gameplay/fullscreen_mode.test.js',

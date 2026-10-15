@@ -104,6 +104,13 @@ export class DuelEconomyBridge {
       this.economy.awardXP(xp, 'maneuver_parry');
     }
 
+    if (this.storage && typeof this.storage.get === 'function') {
+      try {
+        const curParries = Number(this.storage.get('stats.parriesExecuted', 0));
+        this.storage.set('stats.parriesExecuted', curParries + 1);
+      } catch (_) {}
+    }
+
     if (typeof this.floatingIndicatorFn === 'function') {
       try {
         this.floatingIndicatorFn(bits, 'PARRY', {
@@ -173,6 +180,13 @@ export class DuelEconomyBridge {
     }
     if (this.economy && typeof this.economy.awardXP === 'function') {
       this.economy.awardXP(xp, 'maneuver_curve_kill');
+    }
+
+    if (this.storage && typeof this.storage.get === 'function') {
+      try {
+        const curCurves = Number(this.storage.get('stats.curveEliminations', 0));
+        this.storage.set('stats.curveEliminations', curCurves + 1);
+      } catch (_) {}
     }
 
     if (typeof this.floatingIndicatorFn === 'function') {

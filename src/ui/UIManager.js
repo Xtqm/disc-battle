@@ -6,6 +6,7 @@ import { pauseGame, resumeGame, restartMatch, showGameOver, checkOrientation, re
 import { updateIdentityHeader, showAuthTerminal, hideAuthTerminal, initAuthTerminal } from './authTerminal.js';
 import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
 import { armoryModal } from './modals/ArmoryModal.js';
+import { achievementsModal } from './modals/AchievementsModal.js';
 
 export function shake(v) {
   state.shakeAmt = Math.min(state.shakeAmt + v, 0.8);
@@ -71,11 +72,16 @@ export class UIManager {
   static showArmory(category) {
     armoryModal.show(category);
   }
+
+  static showAchievements() {
+    achievementsModal.show();
+  }
 }
 
 export const UI = UIManager;
 
 export {
+  achievementsModal,
   el,
   message,
   updateHUD,

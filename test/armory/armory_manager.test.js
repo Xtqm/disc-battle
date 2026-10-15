@@ -149,6 +149,11 @@ assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.DISC_SKINS, 'disc_corrupt
 testStorage.set('achievements', [{ id: 'corrupted_void_mastery' }, { id: 'grid_01_mastery' }]);
 assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.DISC_SKINS, 'disc_corrupted_void'), true);
 
+// 2.6b Achievement alias tests (ach_swarm_survivor / ach_grid_one_master)
+testStorage.set('achievements', ['ach_swarm_survivor', 'ach_grid_one_master']);
+assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.DISC_SKINS, 'disc_corrupted_void'), true);
+assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.CHASSIS_SKINS, 'chassis_arbiter'), true);
+
 // 2.7 Invalid categories or item IDs return false
 assert.strictEqual(armory.isUnlocked('invalid', 'disc_default'), false);
 assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.DISC_SKINS, 'invalid_id'), false);
@@ -252,6 +257,19 @@ assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.UNLOCKED_MAPS, 'arena_zer
 
 const storedMaps = testStorage.get('inventory.unlockedMaps', []);
 assert.ok(storedMaps.includes('arena_zero_g_nexus'), 'Map must be saved to inventory.unlockedMaps');
+
+// 4.5 Directly unlocking reward items via unlockRewardItem
+let rewardUnlockPayload = null;
+const unsubRewardUnlock = armory.on(ArmoryEvents.ITEM_UNLOCKED, (p) => {
+  rewardUnlockPayload = p;
+});
+const rewardSuccess = armory.unlockRewardItem(ARMORY_CATEGORIES.DISC_SKINS, 'disc_corrupted_void');
+assert.strictEqual(rewardSuccess, true);
+assert.strictEqual(armory.isUnlocked(ARMORY_CATEGORIES.DISC_SKINS, 'disc_corrupted_void'), true);
+assert.ok(rewardUnlockPayload);
+assert.strictEqual(rewardUnlockPayload.reward, true);
+assert.strictEqual(rewardUnlockPayload.itemId, 'disc_corrupted_void');
+unsubRewardUnlock();
 
 unsubscribeUnlock();
 console.log('✓ Group 4: Atomic purchase execution, balances, and inventory persistence validated.');

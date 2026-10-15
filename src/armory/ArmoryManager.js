@@ -201,9 +201,16 @@ export class ArmoryManager {
       const achievements = this.storage.get('achievements', []);
       if (Array.isArray(achievements)) {
         // Can be stored as array of strings or array of objects with id
-        const hasAchievement = achievements.some((a) =>
-          typeof a === 'string' ? a === item.achievementId : a?.id === item.achievementId
-        );
+        const hasAchievement = achievements.some((a) => {
+          const achId = typeof a === 'string' ? a : a?.id;
+          if (!achId) return false;
+          if (achId === item.achievementId) return true;
+          if (item.achievementId === 'corrupted_void_mastery' && achId === 'ach_swarm_survivor') return true;
+          if (item.achievementId === 'ach_swarm_survivor' && achId === 'corrupted_void_mastery') return true;
+          if (item.achievementId === 'grid_01_mastery' && achId === 'ach_grid_one_master') return true;
+          if (item.achievementId === 'ach_grid_one_master' && achId === 'grid_01_mastery') return true;
+          return false;
+        });
         if (hasAchievement) {
           return true;
         }
@@ -336,6 +343,69 @@ export class ArmoryManager {
       itemId: item.id,
       item: { ...item },
       cost: item.cost,
+      timestamp: Date.now()
+    };
+    this.emit(ArmoryEvents.ITEM_UNLOCKED, eventPayload);
+
+    return true;
+  }
+
+  /**
+   * Directly unlocks and awards a cosmetic catalog item (e.g. from an achievement milestone).
+   * Appends to persistent inventory, saves state, and dispatches ARMORY_ITEM_UNLOCKED.
+   * @param {string} category Category key (e.g. 'discSkins', 'chassisSkins', 'unlockedMaps')
+   * @param {string} itemId Item identifier
+   * @returns {boolean} True if successfully unlocked or already unlocked, false if invalid
+   */
+  unlockRewardItem(category, itemId) {
+    if (!category || !itemId || typeof itemId !== 'string') {
+      return false;
+    }
+
+    const item = this.getItem(itemId);
+    if (!item) {
+      return false;
+    }
+
+    const effectiveCategory = isValidCategory(category) ? category : item.category;
+    if (item.category !== effectiveCategory) {
+      return false;
+    }
+
+    this._ensureStorageReady();
+
+    // 1. Append item to primary inventory array
+    const inventoryPath = CATEGORY_INVENTORY_PATHS[effectiveCategory] || `inventory.${effectiveCategory}`;
+    const currentList = this.storage.get(inventoryPath, []);
+    const updatedSet = new Set(Array.isArray(currentList) ? currentList : []);
+    updatedSet.add(item.id);
+    this.storage.set(inventoryPath, Array.from(updatedSet), { immediate: true });
+
+    // 2. Keep parallel legacy inventory arrays in sync if applicable
+    if (effectiveCategory === ARMORY_CATEGORIES.DISC_SKINS) {
+      const discsList = this.storage.get('inventory.discs', []);
+      const discsSet = new Set(Array.isArray(discsList) ? discsList : []);
+      discsSet.add(item.id);
+      this.storage.set('inventory.discs', Array.from(discsSet), { immediate: true });
+    } else if (effectiveCategory === ARMORY_CATEGORIES.CHASSIS_SKINS) {
+      const cosmeticsList = this.storage.get('inventory.cosmetics', []);
+      const cosmeticsSet = new Set(Array.isArray(cosmeticsList) ? cosmeticsList : []);
+      cosmeticsSet.add(item.id);
+      this.storage.set('inventory.cosmetics', Array.from(cosmeticsSet), { immediate: true });
+    } else if (effectiveCategory === ARMORY_CATEGORIES.UNLOCKED_MAPS) {
+      const mapsList = this.storage.get('inventory.unlockedMaps', []);
+      const mapsSet = new Set(Array.isArray(mapsList) ? mapsList : []);
+      mapsSet.add(item.id);
+      this.storage.set('inventory.unlockedMaps', Array.from(mapsSet), { immediate: true });
+    }
+
+    // 3. Emit ARMORY_ITEM_UNLOCKED event
+    const eventPayload = {
+      category: effectiveCategory,
+      itemId: item.id,
+      item: { ...item },
+      cost: 0,
+      reward: true,
       timestamp: Date.now()
     };
     this.emit(ArmoryEvents.ITEM_UNLOCKED, eventPayload);

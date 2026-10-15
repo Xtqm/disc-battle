@@ -174,6 +174,9 @@ export class StorageManager {
       base.stats.highestWave = legacy.stats.highestWave ?? legacy.stats.swarmHighestWave ?? 1;
       base.stats.swarmHighestWave = legacy.stats.swarmHighestWave ?? legacy.stats.highestWave ?? 1;
       base.stats.highestScore = legacy.stats.totalScore ?? 0;
+      base.stats.totalDerezzes = legacy.stats.totalDerezzes ?? 0;
+      base.stats.parriesExecuted = legacy.stats.parriesExecuted ?? 0;
+      base.stats.curveEliminations = legacy.stats.curveEliminations ?? 0;
     }
 
     base.version = '1.0.0';
@@ -327,6 +330,15 @@ export class StorageManager {
       }
       if (typeof parsed.stats.highestWave !== 'number') {
         parsed.stats.highestWave = parsed.stats.swarmHighestWave;
+      }
+      if (typeof parsed.stats.totalDerezzes !== 'number') {
+        parsed.stats.totalDerezzes = 0;
+      }
+      if (typeof parsed.stats.parriesExecuted !== 'number') {
+        parsed.stats.parriesExecuted = 0;
+      }
+      if (typeof parsed.stats.curveEliminations !== 'number') {
+        parsed.stats.curveEliminations = 0;
       }
     }
 

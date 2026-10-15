@@ -328,6 +328,35 @@ export function playEquipSound() {
   } catch (_) {}
 }
 
+export function playAchievementFanfare() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    // 4-note ascending synth arpeggio: F#5 (739.99), A#5 (932.33), C#6 (1108.73), F#6 (1479.98)
+    const notes = [739.99, 932.33, 1108.73, 1479.98];
+    notes.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = idx === notes.length - 1 ? 'triangle' : 'sine';
+      const startTime = now + idx * 0.08;
+      const duration = 0.55;
+
+      osc.frequency.setValueAtTime(freq, startTime);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.01, startTime + duration);
+
+      gain.gain.setValueAtTime(0.001, startTime);
+      gain.gain.linearRampToValueAtTime(0.22, startTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    });
+  } catch (_) {}
+}
+
 export const SFX = {
   catchDisc: (pitch = 1.0) => playCatchDiscSound(pitch),
   countdownTick: () => playCatchDiscSound(0.65), // pitched down
@@ -340,7 +369,8 @@ export const SFX = {
   bitAccrual: () => playBitAccrualSound(),
   missionBriefSweep: () => playMissionBriefSweepSound(),
   fabricate: () => playFabricateSound(),
-  equip: () => playEquipSound()
+  equip: () => playEquipSound(),
+  achievementFanfare: () => playAchievementFanfare()
 };
 
 if (typeof window !== 'undefined') {

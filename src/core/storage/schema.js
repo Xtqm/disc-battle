@@ -79,7 +79,10 @@ export const DEFAULT_SAVE_STATE = Object.freeze({
     highestWave: 1,
     swarmHighestWave: 1,
     highestScore: 0,
-    totalPlaytimeSec: 0
+    totalPlaytimeSec: 0,
+    totalDerezzes: 0,
+    parriesExecuted: 0,
+    curveEliminations: 0
   })
 });
 
@@ -135,7 +138,10 @@ export function createDefaultSaveState(overrides = {}) {
       highestWave: overrides?.stats?.highestWave ?? overrides?.stats?.swarmHighestWave ?? 1,
       swarmHighestWave: overrides?.stats?.swarmHighestWave ?? overrides?.stats?.highestWave ?? 1,
       highestScore: overrides?.stats?.highestScore ?? 0,
-      totalPlaytimeSec: overrides?.stats?.totalPlaytimeSec ?? 0
+      totalPlaytimeSec: overrides?.stats?.totalPlaytimeSec ?? 0,
+      totalDerezzes: overrides?.stats?.totalDerezzes ?? 0,
+      parriesExecuted: overrides?.stats?.parriesExecuted ?? 0,
+      curveEliminations: overrides?.stats?.curveEliminations ?? 0
     }
   };
 
@@ -194,8 +200,19 @@ export function validateSaveState(data) {
   if (!Array.isArray(data.achievements)) errors.push('Missing or invalid "achievements" array');
   if (!data.stats || typeof data.stats !== 'object') {
     errors.push('Missing or invalid "stats" object');
-  } else if (data.stats.swarmHighestWave !== undefined && typeof data.stats.swarmHighestWave !== 'number') {
-    errors.push('"stats.swarmHighestWave" must be a number');
+  } else {
+    if (data.stats.swarmHighestWave !== undefined && typeof data.stats.swarmHighestWave !== 'number') {
+      errors.push('"stats.swarmHighestWave" must be a number');
+    }
+    if (data.stats.totalDerezzes !== undefined && typeof data.stats.totalDerezzes !== 'number') {
+      errors.push('"stats.totalDerezzes" must be a number');
+    }
+    if (data.stats.parriesExecuted !== undefined && typeof data.stats.parriesExecuted !== 'number') {
+      errors.push('"stats.parriesExecuted" must be a number');
+    }
+    if (data.stats.curveEliminations !== undefined && typeof data.stats.curveEliminations !== 'number') {
+      errors.push('"stats.curveEliminations" must be a number');
+    }
   }
 
   return {

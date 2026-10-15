@@ -23,6 +23,7 @@ import { CloudSyncResolver } from '../storage/CloudSyncResolver.js';
 import { offlineSyncQueue } from '../storage/OfflineSyncQueue.js';
 import { crossTabSync } from '../storage/CrossTabSync.js';
 import { initAuthTerminal, showAuthTerminal, hideAuthTerminal, isAuthTerminalOpen, updateIdentityHeader } from '../ui/authTerminal.js';
+import { achievementManager } from '../achievements/AchievementManager.js';
 
 
 export const clock = new THREE.Clock();
@@ -208,6 +209,7 @@ export function initApp() {
     initInput(canvasEl);
     bindMenuButtons();
     initAuthTerminal();
+    achievementManager.init();
 
     if (state.isTouchDevice && typeof document !== 'undefined' && document.body) {
       document.body.classList.add('touch-device');
