@@ -23,12 +23,9 @@ export function codeOf(e) {
 export function onDown(e) {
   const c = codeOf(e);
 
-  // Handle Escape dismissal for Grid Authorization Terminal
+  // Handle Escape isolation for Grid Authorization Terminal (dismissal restricted to [X] button)
   if (c === 'Escape' && state.authModalOpen) {
     e.preventDefault();
-    const am = document.getElementById('authModal');
-    if (am) am.style.display = 'none';
-    state.authModalOpen = false;
     return;
   }
 

@@ -4,6 +4,9 @@ import { AuthEvents } from '../auth/events.js';
 import { SFX } from '../audio/sfx.js';
 import { setCursor } from '../input/InputManager.js';
 
+let activeStep = 1;
+let activeMode = 'signin'; // 'signin' | 'create'
+
 /**
  * Calculates current level tier from player save state.
  * @param {object|null} saveState 
@@ -74,6 +77,57 @@ export function updateIdentityHeader() {
 }
 
 /**
+ * Sets the active step and mode in the auth terminal wizard.
+ * @param {number} step - 1 or 2
+ * @param {'signin'|'create'} [mode]
+ */
+export function setTerminalStep(step, mode = activeMode) {
+  activeStep = step;
+  activeMode = mode;
+
+  const step1 = document.getElementById('authStep1');
+  const step2 = document.getElementById('authStep2');
+  const tabSignIn = document.getElementById('tabSignIn');
+  const tabCreate = document.getElementById('tabCreateAccount');
+  const btnAuthorize = document.getElementById('btnAuthorizePasskey');
+  const btnContinue = document.getElementById('btnContinueToCallsign');
+
+  if (tabSignIn && tabCreate) {
+    if (activeMode === 'signin') {
+      tabSignIn.classList.add('active');
+      tabCreate.classList.remove('active');
+    } else {
+      tabCreate.classList.add('active');
+      tabSignIn.classList.remove('active');
+    }
+  }
+
+  if (btnAuthorize && btnContinue) {
+    if (activeMode === 'signin') {
+      btnAuthorize.style.display = 'block';
+      btnContinue.style.display = 'none';
+    } else {
+      btnAuthorize.style.display = 'none';
+      btnContinue.style.display = 'block';
+    }
+  }
+
+  if (step1 && step2) {
+    if (activeStep === 1) {
+      step1.style.display = 'block';
+      step2.style.display = 'none';
+    } else {
+      step1.style.display = 'none';
+      step2.style.display = 'block';
+      const callsignInput = document.getElementById('authCallsignInput');
+      if (callsignInput) {
+        setTimeout(() => callsignInput.focus(), 60);
+      }
+    }
+  }
+}
+
+/**
  * Shows the Grid Authorization Terminal modal.
  */
 export function showAuthTerminal() {
@@ -91,17 +145,17 @@ export function showAuthTerminal() {
   // Play terminal boot sound
   SFX.terminalOpen();
 
-  // Populate identity state
+  // Populate identity state and reset to Step 1 Sign In
   populateTerminalData();
+  setTerminalStep(1, 'signin');
 
   modal.style.display = 'flex';
   const card = modal.querySelector('.card');
   if (card) card.scrollTop = 0;
 
-  // Focus callsign input
-  const callsignInput = document.getElementById('authCallsignInput');
-  if (callsignInput) {
-    setTimeout(() => callsignInput.focus(), 60);
+  const emailInput = document.getElementById('authEmailInput');
+  if (emailInput) {
+    setTimeout(() => emailInput.focus(), 60);
   }
 }
 
@@ -154,7 +208,7 @@ function populateTerminalData() {
     banner.className = `terminal-status-banner ${user && !user.isAnonymous ? 'state-auth' : 'state-guest'}`;
   }
 
-  setConsoleMessage('> TERMINAL READY. AWAITING COMMAND INPUT...', 'info');
+  setConsoleMessage('> TERMINAL READY. AWAITING INPUT...', 'info');
 }
 
 /**
@@ -189,39 +243,83 @@ export function initAuthTerminal() {
   const modal = document.getElementById('authModal');
   if (!modal) return;
 
-  // Stop click-through to Three.js canvas
+  // Prevent click-through to Three.js canvas; strict modal dismissal via [X] only
   modal.addEventListener('mousedown', (e) => e.stopPropagation());
-  modal.addEventListener('click', (e) => {
-    if (e.target === modal) hideAuthTerminal();
-    e.stopPropagation();
-  });
+  modal.addEventListener('click', (e) => e.stopPropagation());
 
-  // Tab switching
-  const tabDirect = document.getElementById('tabDirectPasskey');
-  const tabQuick = document.getElementById('tabQuickSync');
-  const panelDirect = document.getElementById('panelDirectPasskey');
-  const panelQuick = document.getElementById('panelQuickSync');
-
-  if (tabDirect && tabQuick && panelDirect && panelQuick) {
-    tabDirect.onclick = (e) => {
+  // Close Button [X]
+  const btnClose = document.getElementById('btnCloseTerminal');
+  if (btnClose) {
+    btnClose.onclick = (e) => {
       e.stopPropagation();
-      tabDirect.classList.add('active');
-      tabQuick.classList.remove('active');
-      panelDirect.style.display = 'block';
-      panelQuick.style.display = 'none';
-      SFX.terminalKey();
-    };
-    tabQuick.onclick = (e) => {
-      e.stopPropagation();
-      tabQuick.classList.add('active');
-      tabDirect.classList.remove('active');
-      panelDirect.style.display = 'none';
-      panelQuick.style.display = 'block';
-      SFX.terminalKey();
+      hideAuthTerminal();
     };
   }
 
-  // Keyboard clicks on all terminal inputs
+  // Mode Tabs: Sign In vs Create Account
+  const tabSignIn = document.getElementById('tabSignIn');
+  const tabCreate = document.getElementById('tabCreateAccount');
+  if (tabSignIn && tabCreate) {
+    tabSignIn.onclick = (e) => {
+      e.stopPropagation();
+      setTerminalStep(1, 'signin');
+      SFX.terminalKey();
+      setConsoleMessage('> SIGN IN MODE ACTIVE.', 'info');
+    };
+    tabCreate.onclick = (e) => {
+      e.stopPropagation();
+      setTerminalStep(1, 'create');
+      SFX.terminalKey();
+      setConsoleMessage('> CREATE ACCOUNT MODE ACTIVE. CONNECT CREDENTIALS.', 'info');
+    };
+  }
+
+  // Navigation between Step 1 and Step 2
+  const btnContinue = document.getElementById('btnContinueToCallsign');
+  const btnBack = document.getElementById('btnBackToStep1');
+  const emailInput = document.getElementById('authEmailInput');
+  const passInput = document.getElementById('authPasswordInput');
+  const callsignInput = document.getElementById('authCallsignInput');
+
+  if (btnContinue) {
+    btnContinue.onclick = (e) => {
+      e.stopPropagation();
+      const email = (emailInput?.value || '').trim();
+      const password = passInput?.value || '';
+
+      if (!email || !email.includes('@')) {
+        SFX.errorBuzz();
+        setConsoleMessage('> ERROR: VALID EMAIL ADDRESS REQUIRED.', 'error');
+        return;
+      }
+      if (password.length < 6) {
+        SFX.errorBuzz();
+        setConsoleMessage('> ERROR: PASSKEY REQUIRES MINIMUM 6 CHARACTERS.', 'error');
+        return;
+      }
+
+      // Pre-fill smart callsign if not explicitly set
+      if (callsignInput && (!callsignInput.value || callsignInput.value.startsWith('GUEST_'))) {
+        const derived = email.split('@')[0].toUpperCase().replace(/[^A-Z0-9_]/g, '').slice(0, 16);
+        callsignInput.value = derived || (authManager.currentUser?.handle || 'PROGRAM_01');
+      }
+
+      setTerminalStep(2, 'create');
+      SFX.terminalKey();
+      setConsoleMessage('> STEP 2: CHOOSE YOUR COMBAT CALLSIGN.', 'info');
+    };
+  }
+
+  if (btnBack) {
+    btnBack.onclick = (e) => {
+      e.stopPropagation();
+      setTerminalStep(1, 'create');
+      SFX.terminalKey();
+      setConsoleMessage('> STEP 1: CREDENTIALS.', 'info');
+    };
+  }
+
+  // Keyboard sound effects on inputs
   const inputs = modal.querySelectorAll('.terminal-input');
   inputs.forEach(input => {
     input.addEventListener('keydown', (e) => {
@@ -231,10 +329,8 @@ export function initAuthTerminal() {
     });
   });
 
-  // Callsign Commitment
+  // Callsign Commitment / Save handler
   const btnSaveCallsign = document.getElementById('btnSaveCallsign');
-  const callsignInput = document.getElementById('authCallsignInput');
-
   const commitCallsign = async () => {
     if (!callsignInput) return;
     const raw = callsignInput.value.trim();
@@ -258,25 +354,24 @@ export function initAuthTerminal() {
     callsignInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        commitCallsign();
+        if (activeStep === 2) {
+          handleRegister();
+        } else {
+          commitCallsign();
+        }
       }
     });
   }
 
-  // Direct Passkey (Email / Password)
+  // Step 1: Direct Passkey Sign In (Single-Step Bypass)
   const btnAuthorize = document.getElementById('btnAuthorizePasskey');
-  const btnRegister = document.getElementById('btnRegisterPasskey');
-  const emailInput = document.getElementById('authEmailInput');
-  const passInput = document.getElementById('authPasswordInput');
-
-  const handlePasskeyAuth = async (isNew = false) => {
+  const handleSignIn = async () => {
     const email = (emailInput?.value || '').trim();
     const password = passInput?.value || '';
-    const desiredHandle = (callsignInput?.value || '').trim();
 
     if (!email || !email.includes('@')) {
       SFX.errorBuzz();
-      setConsoleMessage('> ERROR: INVALID COMM IDENT FORMAT (EMAIL REQUIRED).', 'error');
+      setConsoleMessage('> ERROR: VALID EMAIL REQUIRED.', 'error');
       return;
     }
     if (password.length < 6) {
@@ -286,10 +381,11 @@ export function initAuthTerminal() {
     }
 
     try {
-      const user = await authManager.signInWithCredentials(email, password, desiredHandle);
+      const user = await authManager.signInWithCredentials(email, password);
       SFX.accessGranted();
       setConsoleMessage(`> ACCESS GRANTED // USER AUTHORIZED AS "${user.handle}" [PROV: PASSKEY]`, 'success');
       populateTerminalData();
+      setTimeout(() => hideAuthTerminal(), 600);
     } catch (err) {
       SFX.errorBuzz();
       setConsoleMessage(`> AUTH ERROR: ${err.message}`, 'error');
@@ -297,11 +393,39 @@ export function initAuthTerminal() {
   };
 
   if (btnAuthorize) {
-    btnAuthorize.onclick = (e) => { e.stopPropagation(); handlePasskeyAuth(false); };
+    btnAuthorize.onclick = (e) => { e.stopPropagation(); handleSignIn(); };
   }
+
+  // Step 2: Final Account Creation & Callsign Registration
+  const btnRegister = document.getElementById('btnRegisterPasskey');
+  const handleRegister = async () => {
+    const email = (emailInput?.value || '').trim();
+    const password = passInput?.value || '';
+    const desiredHandle = (callsignInput?.value || '').trim();
+
+    if (!desiredHandle || desiredHandle.length < 3) {
+      SFX.errorBuzz();
+      setConsoleMessage('> ERROR: CALLSIGN REQUIRES AT LEAST 3 CHARACTERS.', 'error');
+      return;
+    }
+
+    try {
+      const user = await authManager.signInWithCredentials(email, password, desiredHandle);
+      SFX.accessGranted();
+      setConsoleMessage(`> IDENTITY INITIALIZED // WELCOME TO THE GRID, ${user.handle}`, 'success');
+      populateTerminalData();
+      setTimeout(() => hideAuthTerminal(), 600);
+    } catch (err) {
+      SFX.errorBuzz();
+      setConsoleMessage(`> REGISTRATION ERROR: ${err.message}`, 'error');
+    }
+  };
+
   if (btnRegister) {
-    btnRegister.onclick = (e) => { e.stopPropagation(); handlePasskeyAuth(true); };
+    btnRegister.onclick = (e) => { e.stopPropagation(); handleRegister(); };
   }
+
+  // Magic Link OTP
   const btnMagicLink = document.getElementById('btnMagicLink');
   if (btnMagicLink) {
     btnMagicLink.onclick = async (e) => {
@@ -309,24 +433,29 @@ export function initAuthTerminal() {
       const email = (emailInput?.value || '').trim();
       if (!email || !email.includes('@')) {
         SFX.errorBuzz();
-        setConsoleMessage('> ERROR: VALID COMM IDENT (EMAIL) REQUIRED FOR MAGIC LINK.', 'error');
+        setConsoleMessage('> ERROR: VALID EMAIL REQUIRED FOR MAGIC LINK.', 'error');
         return;
       }
       try {
         await authManager.signInWithCredentials(email, '');
         SFX.accessGranted();
-        setConsoleMessage(`> MAGIC LINK DISPATCHED TO ${email}. CHECK TERMINAL INBOX.`, 'success');
+        setConsoleMessage(`> MAGIC LINK DISPATCHED TO ${email}. CHECK INBOX.`, 'success');
       } catch (err) {
         SFX.errorBuzz();
         setConsoleMessage(`> MAGIC LINK ERROR: ${err.message}`, 'error');
       }
     };
   }
+
   if (passInput) {
     passInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
         e.preventDefault();
-        handlePasskeyAuth(false);
+        if (activeMode === 'signin') {
+          handleSignIn();
+        } else {
+          btnContinue?.click();
+        }
       }
     });
   }
@@ -340,8 +469,20 @@ export function initAuthTerminal() {
     try {
       const user = await authManager.signInWithFederated(providerName);
       SFX.accessGranted();
-      setConsoleMessage(`> FEDERATED SYNC SUCCESSFUL // ${providerName.toUpperCase()} PROTOCOL LINKED AS "${user?.handle || 'PROGRAM'}"`, 'success');
-      populateTerminalData();
+
+      if (activeMode === 'signin') {
+        // Returning user - bypass Step 2
+        setConsoleMessage(`> FEDERATED SYNC SUCCESSFUL // LINKED AS "${user?.handle || 'PROGRAM'}"`, 'success');
+        populateTerminalData();
+        setTimeout(() => hideAuthTerminal(), 600);
+      } else {
+        // Creating new account - transition to Step 2 so player can review/customize callsign
+        if (callsignInput) {
+          callsignInput.value = (user?.handle || `${providerName.toUpperCase()}_PILOT`).slice(0, 16);
+        }
+        setTerminalStep(2, 'create');
+        setConsoleMessage(`> ${providerName.toUpperCase()} LINKED. CONFIRM YOUR COMBAT CALLSIGN.`, 'info');
+      }
     } catch (err) {
       SFX.errorBuzz();
       setConsoleMessage(`> FEDERATED SYNC FAILED: ${err.message}`, 'error');
@@ -358,12 +499,19 @@ export function initAuthTerminal() {
     btnGithub.onclick = (e) => { e.stopPropagation(); handleFederatedSync('github'); };
   }
 
-  // Dismiss / Close Button
-  const btnClose = document.getElementById('btnCloseTerminal');
-  if (btnClose) {
-    btnClose.onclick = (e) => {
+  // Legacy tab bridging (for tests or backward-compatibility)
+  const tabDirect = document.getElementById('tabDirectPasskey');
+  const tabQuick = document.getElementById('tabQuickSync');
+  if (tabDirect) {
+    tabDirect.onclick = (e) => {
       e.stopPropagation();
-      hideAuthTerminal();
+      setTerminalStep(1, 'signin');
+    };
+  }
+  if (tabQuick) {
+    tabQuick.onclick = (e) => {
+      e.stopPropagation();
+      setTerminalStep(1, 'signin');
     };
   }
 }
@@ -372,4 +520,5 @@ if (typeof window !== 'undefined') {
   window.__tronShowAuthTerminal = showAuthTerminal;
   window.__tronHideAuthTerminal = hideAuthTerminal;
   window.__tronUpdateIdentityHeader = updateIdentityHeader;
+  window.__tronSetTerminalStep = setTerminalStep;
 }

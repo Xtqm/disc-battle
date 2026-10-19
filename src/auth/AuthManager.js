@@ -132,8 +132,11 @@ export class AuthManager {
   async signInWithCredentials(email, password, handle = '') {
     if (!this._provider) throw new Error('AuthManager: No active auth provider.');
     const user = await this._provider.signInWithCredentials(email, password, handle);
-    this._applyUser(user);
-    return user;
+    if (handle && user && user.handle !== handle) {
+      await this.updateCallsign(handle);
+    }
+    this._applyUser(this._currentUser || user);
+    return this._currentUser || user;
   }
 
   /**
@@ -345,6 +348,10 @@ export class AuthManager {
 
     if (user && user.uid) {
       this._saveState = getOrCreateSaveState(user.uid, user.handle);
+      if (user.handle && this._saveState && this._saveState.handle !== user.handle) {
+        this._saveState.handle = user.handle;
+        saveSaveState(this._saveState);
+      }
       if (this._saveState && this._saveState.settings) {
         if (typeof this._saveState.settings.sens === 'number') {
           state.sens = this._saveState.settings.sens;

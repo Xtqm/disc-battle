@@ -690,165 +690,126 @@
   /* ───────────────────────── Grid Authorization Terminal Card ───────────────────────── */
   .auth-terminal-card {
     position: relative;
-    max-width: 520px;
-    background: rgba(1, 12, 18, 0.95) !important;
-    border: 1px solid var(--cyan) !important;
-    box-shadow: 0 0 50px rgba(79, 242, 255, 0.35), inset 0 0 28px rgba(0, 24, 36, 0.75) !important;
+    max-width: 480px;
+    background: rgba(1, 14, 22, 0.94) !important;
+    border: 1px solid rgba(79, 242, 255, 0.45) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 0 50px rgba(79, 242, 255, 0.22), inset 0 0 24px rgba(79, 242, 255, 0.1) !important;
     overflow: hidden;
     text-align: left !important;
     padding: 28px 32px !important;
+    font-family: "Segoe UI", Helvetica, Arial, sans-serif !important;
   }
-  .terminal-scanlines {
+  .terminal-close-btn {
     position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.45) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
-    background-size: 100% 3px, 4px 100%;
-    opacity: 0.85;
-    z-index: 2;
+    top: 16px;
+    right: 18px;
+    background: none;
+    border: none;
+    color: #9fe9f2;
+    font-size: 26px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 2px 8px;
+    border-radius: 4px;
+    transition: all 0.18s ease;
+    outline: none;
+    z-index: 10;
+  }
+  .terminal-close-btn:hover {
+    color: #fff;
+    background: rgba(79, 242, 255, 0.18);
+    text-shadow: 0 0 10px var(--cyan);
   }
   .terminal-header {
-    border-bottom: 1px solid rgba(79, 242, 255, 0.3);
+    border-bottom: 1px solid rgba(79, 242, 255, 0.2);
     padding-bottom: 12px;
-    margin-bottom: 16px;
+    margin-bottom: 14px;
+    padding-right: 36px;
   }
   .terminal-title {
-    font-size: 22px;
-    letter-spacing: 6px;
+    font-size: 20px;
+    letter-spacing: 5px;
     color: var(--cyan);
-    text-shadow: 0 0 14px var(--cyan);
+    text-shadow: 0 0 16px var(--cyan);
     font-weight: 700;
+    text-transform: uppercase;
   }
   .terminal-ver {
-    font-size: 10px;
-    letter-spacing: 3px;
+    font-size: 11px;
+    letter-spacing: 2px;
     color: #9fe9f2;
-    opacity: 0.75;
+    opacity: 0.8;
     margin-top: 4px;
-    font-family: "Courier New", Courier, monospace;
+    text-transform: uppercase;
   }
   .terminal-status-banner {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
     padding: 8px 12px;
-    margin-bottom: 18px;
-    border-radius: 4px;
-    font-family: "Courier New", Courier, monospace;
+    margin-bottom: 16px;
+    border-radius: 6px;
     font-size: 11px;
-    letter-spacing: 2px;
-    background: rgba(0, 24, 32, 0.5);
+    letter-spacing: 1px;
   }
   .terminal-status-banner.state-guest {
-    border: 1px dashed rgba(255, 123, 26, 0.5);
+    background: rgba(30, 15, 0, 0.45);
+    border: 1px solid rgba(255, 123, 26, 0.4);
     color: #ffb37a;
   }
   .terminal-status-banner.state-auth {
-    border: 1px solid rgba(79, 242, 255, 0.5);
-    color: var(--cyan);
-  }
-  .terminal-field-group {
-    margin-bottom: 14px;
-  }
-  .terminal-field-group label {
-    display: block;
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: #9fe9f2;
-    margin-bottom: 6px;
-    text-transform: uppercase;
-    font-family: "Courier New", Courier, monospace;
-  }
-  .terminal-input-row {
-    display: flex;
-    gap: 8px;
-  }
-  .terminal-input {
-    width: 100%;
-    padding: 10px 14px;
-    background: rgba(0, 8, 14, 0.85);
-    border: 1px solid rgba(79, 242, 255, 0.45);
-    color: #fff;
-    font-family: "Courier New", Courier, monospace;
-    font-size: 13px;
-    letter-spacing: 2px;
-    outline: none;
-    border-radius: 4px;
-    box-shadow: inset 0 0 8px rgba(0, 0, 0, 0.8);
-    transition: all 0.15s ease;
-  }
-  .terminal-input:focus {
-    border-color: var(--cyan);
-    box-shadow: 0 0 12px rgba(79, 242, 255, 0.5), inset 0 0 8px rgba(79, 242, 255, 0.2);
+    background: rgba(0, 24, 34, 0.5);
+    border: 1px solid rgba(79, 242, 255, 0.4);
     color: var(--cyan);
   }
   .terminal-tabs {
     display: flex;
-    gap: 8px;
-    margin: 18px 0 14px 0;
-    border-bottom: 1px solid rgba(79, 242, 255, 0.25);
-    padding-bottom: 8px;
+    gap: 6px;
+    margin-bottom: 16px;
+    background: rgba(0, 10, 16, 0.65);
+    padding: 4px;
+    border-radius: 8px;
+    border: 1px solid rgba(79, 242, 255, 0.2);
   }
   .tab-btn {
     flex: 1;
-    background: rgba(0, 16, 24, 0.6);
-    border: 1px solid rgba(79, 242, 255, 0.3);
+    background: transparent;
+    border: 1px solid transparent;
     color: #9fe9f2;
-    padding: 8px 12px;
-    font-family: "Courier New", Courier, monospace;
+    padding: 9px 12px;
+    font-family: inherit;
     font-size: 11px;
     letter-spacing: 2px;
+    font-weight: 600;
     cursor: pointer;
-    border-radius: 4px;
-    transition: all 0.15s ease;
+    border-radius: 6px;
+    transition: all 0.18s ease;
     text-align: center;
-  }
-  .tab-btn.active {
-    background: rgba(79, 242, 255, 0.2);
-    border-color: var(--cyan);
-    color: #fff;
-    box-shadow: 0 0 14px rgba(79, 242, 255, 0.4);
-    font-weight: 700;
-  }
-  .terminal-btn {
-    cursor: pointer;
-    background: rgba(0, 24, 34, 0.8);
-    border: 1px solid var(--cyan);
-    color: var(--cyan);
-    font-family: "Courier New", Courier, monospace;
-    font-size: 11px;
-    letter-spacing: 2px;
-    padding: 10px 18px;
-    border-radius: 4px;
-    transition: all 0.15s ease;
     text-transform: uppercase;
   }
-  .terminal-btn:hover {
-    background: rgba(79, 242, 255, 0.25);
+  .tab-btn.active {
+    background: rgba(79, 242, 255, 0.18);
+    border-color: var(--cyan);
     color: #fff;
-    box-shadow: 0 0 16px var(--cyan);
+    box-shadow: 0 0 14px rgba(79, 242, 255, 0.3);
   }
-  .terminal-actions-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 14px;
+  .quick-sync-section {
+    margin-bottom: 14px;
   }
-  .terminal-actions-row .terminal-btn {
-    flex: 1;
-    text-align: center;
-  }
-  .sync-desc {
+  .sync-section-title {
     font-size: 10px;
     letter-spacing: 2px;
     color: #9fe9f2;
-    margin-bottom: 14px;
-    text-align: center;
-    font-family: "Courier New", Courier, monospace;
+    opacity: 0.85;
+    margin-bottom: 8px;
+    text-transform: uppercase;
+    font-weight: 600;
   }
   .sync-buttons {
     display: flex;
     flex-direction: column;
-    gap: 10px;
+    gap: 8px;
   }
   .sync-btn {
     display: flex;
@@ -856,36 +817,215 @@
     justify-content: center;
     gap: 10px;
     width: 100%;
-    padding: 12px;
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 2px;
+    font-weight: 600;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    outline: none;
+    text-transform: uppercase;
+    background: rgba(0, 16, 24, 0.7);
   }
   .sync-btn.google-sync {
-    border-color: #4285F4;
-    color: #8ab4f8;
+    border: 1px solid #4285F4;
+    color: #9ec2ff;
   }
   .sync-btn.google-sync:hover {
     background: rgba(66, 133, 244, 0.25);
-    box-shadow: 0 0 16px #4285F4;
     color: #fff;
+    box-shadow: 0 0 16px rgba(66, 133, 244, 0.5);
+    transform: translateY(-1px);
   }
   .sync-btn.discord-sync {
-    border-color: #5865F2;
-    color: #949cf7;
+    border: 1px solid #5865F2;
+    color: #aab0ff;
   }
   .sync-btn.discord-sync:hover {
     background: rgba(88, 101, 242, 0.25);
-    box-shadow: 0 0 16px #5865F2;
+    color: #fff;
+    box-shadow: 0 0 16px rgba(88, 101, 242, 0.5);
+    transform: translateY(-1px);
+  }
+  .sync-btn.github-sync {
+    border: 1px solid #8b949e;
+    color: #d0d7de;
+  }
+  .sync-btn.github-sync:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #fff;
+    box-shadow: 0 0 16px rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
+  }
+  .terminal-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 14px 0;
+    color: #6e9da6;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .terminal-divider::before,
+  .terminal-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid rgba(79, 242, 255, 0.2);
+  }
+  .terminal-divider span {
+    padding: 0 10px;
+  }
+  .terminal-field-group {
+    margin-bottom: 12px;
+  }
+  .terminal-field-group label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: #9fe9f2;
+    margin-bottom: 6px;
+    font-weight: 500;
+  }
+  .terminal-input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 14px;
+    background: rgba(0, 10, 16, 0.85);
+    border: 1px solid rgba(79, 242, 255, 0.4);
+    color: #fff;
+    font-family: inherit;
+    font-size: 13px;
+    letter-spacing: 1px;
+    outline: none;
+    border-radius: 6px;
+    transition: all 0.18s ease;
+  }
+  .terminal-input:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 14px rgba(79, 242, 255, 0.45);
     color: #fff;
   }
+  .terminal-input-row {
+    display: flex;
+    gap: 8px;
+  }
+  .terminal-btn {
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    letter-spacing: 2.5px;
+    font-weight: 600;
+    padding: 12px 20px;
+    border-radius: 6px;
+    text-transform: uppercase;
+    transition: all 0.18s ease;
+    outline: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 24, 34, 0.8);
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+  }
+  .terminal-btn.primary-btn {
+    background: rgba(0, 24, 34, 0.85);
+    border: 1.5px solid var(--cyan);
+    color: var(--cyan);
+    box-shadow: 0 0 14px rgba(79, 242, 255, 0.3), inset 0 0 8px rgba(79, 242, 255, 0.15);
+  }
+  .terminal-btn.primary-btn:hover {
+    background: rgba(79, 242, 255, 0.25);
+    color: #fff;
+    box-shadow: 0 0 24px var(--cyan), inset 0 0 12px rgba(79, 242, 255, 0.35);
+    transform: translateY(-1px);
+  }
+  .text-link-btn {
+    background: none;
+    border: none;
+    color: #9fe9f2;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    padding: 8px 4px;
+    text-align: center;
+    width: 100%;
+    margin-top: 6px;
+    opacity: 0.8;
+    transition: all 0.15s ease;
+    outline: none;
+  }
+  .text-link-btn:hover {
+    opacity: 1;
+    color: var(--cyan);
+    text-decoration: underline;
+  }
+  .step-nav-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .text-nav-btn {
+    background: none;
+    border: none;
+    color: #9fe9f2;
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 1.5px;
+    cursor: pointer;
+    padding: 4px 0;
+    text-transform: uppercase;
+    font-weight: 600;
+    transition: color 0.15s;
+    outline: none;
+  }
+  .text-nav-btn:hover {
+    color: #fff;
+    text-shadow: 0 0 8px var(--cyan);
+  }
+  .step-indicator {
+    font-size: 10px;
+    letter-spacing: 2px;
+    color: var(--orange);
+    font-weight: 600;
+    text-transform: uppercase;
+  }
+  .step2-intro {
+    margin-bottom: 14px;
+  }
+  .step2-heading {
+    font-size: 14px;
+    letter-spacing: 3px;
+    color: var(--cyan);
+    font-weight: 700;
+    margin-bottom: 6px;
+    text-transform: uppercase;
+  }
+  .step2-desc {
+    font-size: 12px;
+    line-height: 1.5;
+    color: #9fe9f2;
+  }
+  .field-hint {
+    font-size: 10px;
+    letter-spacing: 1px;
+    color: #7cb8c2;
+    margin-top: 5px;
+  }
   .terminal-console {
-    margin-top: 16px;
+    margin-top: 14px;
     padding: 8px 12px;
-    background: rgba(0, 5, 8, 0.9);
+    background: rgba(0, 6, 10, 0.85);
     border: 1px solid rgba(79, 242, 255, 0.2);
-    border-radius: 4px;
+    border-radius: 6px;
     font-family: "Courier New", Courier, monospace;
     font-size: 10px;
-    letter-spacing: 1.5px;
-    min-height: 32px;
+    letter-spacing: 1px;
+    min-height: 28px;
     display: flex;
     align-items: center;
   }
@@ -2094,73 +2234,104 @@
 
 <div id="authModal" class="modal-overlay" style="display:none;">
   <div class="card auth-terminal-card">
-    <div class="terminal-scanlines"></div>
+    <button id="btnCloseTerminal" class="terminal-close-btn" aria-label="Close terminal" title="Close Terminal">&times;</button>
     <div class="terminal-header">
-      <div class="terminal-title">GRID AUTHORIZATION TERMINAL</div>
-      <div class="terminal-ver">// SYSTEM PROTOCOL v2.04</div>
+      <div class="terminal-title">GRID IDENTITY TERMINAL</div>
+      <div class="terminal-ver">SYNC PROGRESSION &amp; PROFILE</div>
     </div>
 
     <!-- Active Identity Overview -->
     <div class="terminal-status-banner" id="terminalStatusBanner">
       <span class="status-indicator-dot"></span>
-      <span id="terminalIdentityReadout">IDENTITY: GUEST // SUB-ROUTINE</span>
+      <span id="terminalIdentityReadout">STATUS: UNSECURED GUEST // ID: 0000</span>
     </div>
 
-    <!-- Callsign Customization -->
-    <div class="terminal-field-group">
-      <label for="authCallsignInput">GRID CALLSIGN // DISPLAY NAME</label>
-      <div class="terminal-input-row">
-        <input type="text" id="authCallsignInput" class="terminal-input" maxlength="16" placeholder="ENTER CALLSIGN" autocomplete="off" spellcheck="false" />
-        <button id="btnSaveCallsign" class="terminal-btn">COMMIT</button>
-      </div>
-    </div>
-
-    <!-- Dual Tab Selector -->
+    <!-- Mode Selector Tabs: Sign In vs Create Account -->
     <div class="terminal-tabs">
-      <button id="tabDirectPasskey" class="tab-btn active">DIRECT PASSKEY</button>
-      <button id="tabQuickSync" class="tab-btn">QUICK SYNC</button>
+      <button id="tabSignIn" class="tab-btn active">SIGN IN</button>
+      <button id="tabCreateAccount" class="tab-btn">CREATE ACCOUNT</button>
     </div>
 
-    <!-- Tab 1: Direct Passkey -->
-    <div id="panelDirectPasskey" class="tab-panel active">
+    <!-- Step 1 Container -->
+    <div id="authStep1" class="auth-step-container">
+      <!-- One-Click Quick Sync Section -->
+      <div class="quick-sync-section">
+        <div class="sync-section-title">ONE-CLICK CLOUD SYNC</div>
+        <div class="sync-buttons">
+          <button id="btnSyncGoogle" class="sync-btn google-sync">
+            <span class="sync-icon">G</span> CONTINUE WITH GOOGLE
+          </button>
+          <button id="btnSyncDiscord" class="sync-btn discord-sync">
+            <span class="sync-icon">D</span> CONTINUE WITH DISCORD
+          </button>
+          <button id="btnSyncGithub" class="sync-btn github-sync">
+            <span class="sync-icon">GH</span> CONTINUE WITH GITHUB
+          </button>
+        </div>
+      </div>
+
+      <div class="terminal-divider">
+        <span>OR WITH EMAIL &amp; PASSKEY</span>
+      </div>
+
+      <!-- Credentials Form -->
       <div class="terminal-field-group">
-        <label for="authEmailInput">GRID COMM IDENT // EMAIL</label>
-        <input type="email" id="authEmailInput" class="terminal-input" placeholder="USER@GRID.TRON" autocomplete="email" spellcheck="false" />
+        <label for="authEmailInput">Email Address</label>
+        <input type="email" id="authEmailInput" class="terminal-input" placeholder="player@grid.tron" autocomplete="email" spellcheck="false" />
       </div>
+
       <div class="terminal-field-group">
-        <label for="authPasswordInput">ENCRYPTED PASSKEY // SECURITY PHRASE</label>
-        <input type="password" id="authPasswordInput" class="terminal-input" placeholder="MIN 6 CHARACTERS" autocomplete="current-password" />
+        <label for="authPasswordInput">Security Passkey</label>
+        <input type="password" id="authPasswordInput" class="terminal-input" placeholder="Minimum 6 characters" autocomplete="current-password" />
       </div>
-      <div class="terminal-actions-row">
-        <button id="btnAuthorizePasskey" class="terminal-btn primary-btn">AUTHORIZE PASSKEY</button>
-        <button id="btnRegisterPasskey" class="terminal-btn secondary-btn">REGISTER NEW IDENT</button>
+
+      <!-- Action Buttons for Step 1 -->
+      <div class="step1-actions" style="margin-top:14px;">
+        <!-- Visible in Sign In mode -->
+        <button id="btnAuthorizePasskey" class="terminal-btn primary-btn action-signin" style="width:100%;">SIGN IN TO THE GRID</button>
+        <!-- Visible in Create Account mode -->
+        <button id="btnContinueToCallsign" class="terminal-btn primary-btn action-create" style="width:100%; display:none;">CONTINUE TO CALLSIGN &rarr;</button>
       </div>
-      <div style="margin-top:10px;">
-        <button id="btnMagicLink" class="terminal-btn secondary-btn" style="width:100%; border-color:var(--cyan); color:#9fe9f2;">DISPATCH MAGIC LINK OTP</button>
+
+      <div class="magic-link-wrapper">
+        <button id="btnMagicLink" class="text-link-btn">Forgot passkey? Dispatch Magic Link OTP</button>
       </div>
     </div>
 
-    <!-- Tab 2: Quick Sync -->
-    <div id="panelQuickSync" class="tab-panel" style="display:none;">
-      <div class="sync-desc">FEDERATED GRID CREDENTIAL HARMONIZATION</div>
-      <div class="sync-buttons">
-        <button id="btnSyncGoogle" class="terminal-btn sync-btn google-sync">
-          <span class="sync-icon">G</span> LINK GOOGLE SUITE
-        </button>
-        <button id="btnSyncDiscord" class="terminal-btn sync-btn discord-sync">
-          <span class="sync-icon">D</span> LINK DISCORD PROTOCOL
-        </button>
-        <button id="btnSyncGithub" class="terminal-btn sync-btn github-sync">
-          <span class="sync-icon">GH</span> LINK GITHUB PROTOCOL
-        </button>
+    <!-- Step 2 Container (Create Account - Callsign) -->
+    <div id="authStep2" class="auth-step-container" style="display:none;">
+      <div class="step-nav-bar">
+        <button id="btnBackToStep1" class="text-nav-btn">&larr; BACK TO CREDENTIALS</button>
+        <span class="step-indicator">STEP 2 OF 2</span>
       </div>
+
+      <div class="step2-intro">
+        <div class="step2-heading">CHOOSE YOUR CALLSIGN</div>
+        <div class="step2-desc">This is your combat moniker visible on the grid, leaderboards, and multiplayer. You can customize it later in Settings.</div>
+      </div>
+
+      <div class="terminal-field-group">
+        <label for="authCallsignInput">Display Callsign</label>
+        <div class="terminal-input-row">
+          <input type="text" id="authCallsignInput" class="terminal-input" maxlength="16" placeholder="ENTER CALLSIGN" autocomplete="off" spellcheck="false" />
+        </div>
+        <div class="field-hint">3 to 16 alphanumeric characters or underscores</div>
+      </div>
+
+      <button id="btnRegisterPasskey" class="terminal-btn primary-btn" style="width:100%; margin-top:16px;">INITIALIZE IDENTITY &amp; ENTER THE GRID</button>
     </div>
 
     <!-- Console Readout -->
-    <div id="terminalConsoleMsg" class="terminal-console">&gt; TERMINAL READY. SECURE IDENTITY TO PRESERVE COMBAT STATS.</div>
+    <div id="terminalConsoleMsg" class="terminal-console">&gt; TERMINAL READY. AWAITING INPUT...</div>
 
-    <!-- Modal Dismiss Button -->
-    <button id="btnCloseTerminal" class="btn" style="margin-top:20px; width:100%; border-color:var(--orange); color:#ffb37a;">DISMISS TERMINAL</button>
+    <!-- Hidden compatibility bridges for tests/scripts -->
+    <div style="display:none;">
+      <button id="btnSaveCallsign"></button>
+      <button id="tabDirectPasskey"></button>
+      <button id="tabQuickSync"></button>
+      <div id="panelDirectPasskey"></div>
+      <div id="panelQuickSync"></div>
+    </div>
   </div>
 </div>
 

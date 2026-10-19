@@ -437,6 +437,9 @@ export class SupabaseAuthProvider extends IAuthProvider {
       const { data, error } = await this._client.auth.signInWithPassword({ email, password });
       if (!error && data?.user) {
         this._currentUser = this._mapSupabaseUser(data.user, data.session);
+        if (handle && this._currentUser.handle !== handle) {
+          await this.updateHandle(handle);
+        }
         this._notifyListeners(this._currentUser);
         return this._currentUser;
       }

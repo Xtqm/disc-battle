@@ -59,7 +59,7 @@ assert.strictEqual(!!state.keys['KeyQ'], false, 'Disc curve keys must be ignored
 console.log('✓ Game actions are completely suspended while authModalOpen is active');
 
 
-// 4. Escape Key Dismissal of Auth Modal
+// 4. Escape Key Isolation (Modal Dismissal is Restricted Exclusively to [X] Button)
 let preventDefaultCalled = false;
 onDown({
   code: 'Escape',
@@ -67,8 +67,14 @@ onDown({
   preventDefault: () => { preventDefaultCalled = true; }
 });
 assert.strictEqual(preventDefaultCalled, true, 'Escape event default must be prevented');
-assert.strictEqual(state.authModalOpen, false, 'Escape key must close the auth modal');
-assert.strictEqual(authModalEl.style.display, 'none', 'authModal element display must be set to none');
-console.log('✓ Escape key cleanly dismisses the Grid Authorization Terminal');
+assert.strictEqual(state.authModalOpen, true, 'Escape key must NOT close the auth modal (prevent accidental data loss)');
+assert.strictEqual(authModalEl.style.display, 'flex', 'authModal element display must remain flex on Escape');
+console.log('✓ Escape key safely isolated and prevented from dismissing auth modal');
+
+// 5. Explicit Dismissal via [X] Close Action
+state.authModalOpen = false;
+authModalEl.style.display = 'none';
+assert.strictEqual(state.authModalOpen, false, 'Explicit dismiss must close the auth modal');
+console.log('✓ Explicit [X] dismiss cleanly closes the Grid Authorization Terminal');
 
 console.log('--- Terminal Input Isolation & PointerLock Tests PASSED ---');

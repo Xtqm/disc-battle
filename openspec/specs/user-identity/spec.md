@@ -60,23 +60,27 @@ The system SHALL render a persistent identity status indicator in the top-right 
 - **THEN** the main menu identity badge updates immediately without requiring a page reload or menu re-initialization.
 
 ### Requirement: Grid Authorization Terminal Modal
-The system SHALL provide a diegetic Grid Authorization Terminal modal interface featuring CRT scanline shaders, monospaced typography, and emissive grid styling.
+The system SHALL provide a diegetic Grid Authorization Terminal modal interface aligned with the Main Menu design language, featuring clean legible typography, rounded glassmorphism, elevated Quick Sync authentication, a 2-step account creation wizard with Callsign pre-fill, and dedicated exit control.
 
 #### Scenario: Opening authorization terminal
 - **WHEN** the player activates the identity header trigger or `[ SECURE IDENTITY ]` button
-- **THEN** the terminal modal opens over the current menu display, focuses the terminal input, and displays the current identity details.
+- **THEN** the terminal modal opens over the current menu display with clean, scanline-free typography matching the Main Menu, defaults to Step 1, and displays the current identity details.
 
 #### Scenario: Direct Passkey authentication tab
-- **WHEN** the player submits valid credentials in the "Direct Passkey" tab (Email and Password)
-- **THEN** the system validates the credentials, promotes or binds the session to the authenticated identity, and updates persistent save state.
+- **WHEN** the player submits valid credentials in the Direct Passkey section (Email and Password) under Sign In mode
+- **THEN** the system validates the credentials, promotes or binds the session to the authenticated identity, skips Step 2, and updates persistent save state.
 
 #### Scenario: Quick Sync authentication tab
-- **WHEN** the player activates an external authentication provider button (Google or Discord) in the "Quick Sync" tab
+- **WHEN** the player activates an external authentication provider button (Google, Discord, or GitHub) in the prominent Quick Sync section
 - **THEN** the system dispatches the provider authentication request and links the returned credentials to the active user session.
 
 #### Scenario: Callsign customization
-- **WHEN** the player modifies their callsign / display name in the terminal and commits changes
-- **THEN** the system sanitizes the handle, saves it to persistent storage, and dispatches a profile update event across all UI subsystems.
+- **WHEN** the player proceeds to Step 2 ("Choose Callsign") during account registration
+- **THEN** the system pre-fills the callsign with the external provider username or guest handle, sanitizes any committed handle, saves it to persistent storage, and dispatches a profile update event across all UI subsystems.
+
+#### Scenario: Strict modal exit control
+- **WHEN** the authorization terminal is open
+- **THEN** dismissal is permitted exclusively via activation of the explicit `[ X ]` exit control button, preventing accidental closures from backdrop clicks or key presses while entering credentials.
 
 ### Requirement: PointerLock and Canvas Modal Safety
 The system SHALL safely isolate mouse and touch input between active modal terminals and the Three.js canvas, guaranteeing PointerLock release upon terminal launch.
