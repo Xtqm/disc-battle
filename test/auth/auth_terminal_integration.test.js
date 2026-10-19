@@ -58,6 +58,17 @@ async function runTerminalIntegrationTests() {
     page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
     page.on('pageerror', err => console.error('BROWSER ERROR:', err));
 
+    await page.evaluateOnNewDocument(() => {
+      window.__authOscillatorCount = 0;
+      if (typeof window.AudioContext !== 'undefined') {
+        const origOsc = window.AudioContext.prototype.createOscillator;
+        window.AudioContext.prototype.createOscillator = function() {
+          window.__authOscillatorCount++;
+          return origOsc.apply(this, arguments);
+        };
+      }
+    });
+
     console.log('\n--- 1. Testing Main Menu Identity Header on Cold Boot ---');
     await page.goto(`http://localhost:${PORT}/index.html`);
     await page.waitForFunction(() => !!window.__TRON__ && window.__TRON__.currentUser());
@@ -102,7 +113,10 @@ async function runTerminalIntegrationTests() {
     assert.strictEqual(terminalOpenState.isOpen, true, 'Terminal modal must be open (display: flex)');
     assert.strictEqual(terminalOpenState.isLocked, false, 'PointerLock must remain null / uncaptured');
     assert.ok(terminalOpenState.callsignValue.length > 0, 'Callsign input must be pre-populated');
-    console.log('✓ Grid Authorization Terminal opened, PointerLock safely bypassed, and callsign loaded');
+
+    const openOscCount = await page.evaluate(() => window.__authOscillatorCount || 0);
+    assert.strictEqual(openOscCount, 0, 'Terminal launch must not trigger audio synthesis');
+    console.log('✓ Grid Authorization Terminal opened silently, PointerLock safely bypassed, and callsign loaded');
 
     console.log('\n--- 3. Testing Mode Tabs & Quick Sync Prominence ---');
     // Verify Quick Sync buttons are prominent in Step 1
@@ -204,7 +218,10 @@ async function runTerminalIntegrationTests() {
     assert.ok(authHeaderState.headerText.includes('[USER RECOGNIZED]'), 'Header must display [USER RECOGNIZED]');
     assert.strictEqual(authHeaderState.hasCircuit, true, 'Green status circuit must be rendered');
     assert.strictEqual(authHeaderState.hasTerminalBtn, true, 'Terminal button must be rendered');
-    console.log('✓ Registration completed in Step 2: Identity Header updated to Tron Cyan with customized handle');
+
+    const regOscCount = await page.evaluate(() => window.__authOscillatorCount || 0);
+    assert.strictEqual(regOscCount, 0, 'No audio oscillator nodes should be created during registration');
+    console.log('✓ Registration completed in Step 2: Identity Header updated to Tron Cyan with customized handle (0 SFX calls)');
 
     console.log('\n--- 5. Testing Single-Step Sign In Bypass for Returning Users ---');
     // Open terminal from recognized state

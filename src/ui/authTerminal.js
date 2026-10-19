@@ -1,7 +1,6 @@
 import { state } from '../core/state.js';
 import { authManager } from '../auth/AuthManager.js';
 import { AuthEvents } from '../auth/events.js';
-import { SFX } from '../audio/sfx.js';
 import { setCursor } from '../input/InputManager.js';
 
 let activeStep = 1;
@@ -142,9 +141,6 @@ export function showAuthTerminal() {
   state.authModalOpen = true;
   setCursor();
 
-  // Play terminal boot sound
-  SFX.terminalOpen();
-
   // Populate identity state and reset to Step 1 Sign In
   populateTerminalData();
   setTerminalStep(1, 'signin');
@@ -263,13 +259,11 @@ export function initAuthTerminal() {
     tabSignIn.onclick = (e) => {
       e.stopPropagation();
       setTerminalStep(1, 'signin');
-      SFX.terminalKey();
       setConsoleMessage('> SIGN IN MODE ACTIVE.', 'info');
     };
     tabCreate.onclick = (e) => {
       e.stopPropagation();
       setTerminalStep(1, 'create');
-      SFX.terminalKey();
       setConsoleMessage('> CREATE ACCOUNT MODE ACTIVE. CONNECT CREDENTIALS.', 'info');
     };
   }
@@ -288,12 +282,10 @@ export function initAuthTerminal() {
       const password = passInput?.value || '';
 
       if (!email || !email.includes('@')) {
-        SFX.errorBuzz();
         setConsoleMessage('> ERROR: VALID EMAIL ADDRESS REQUIRED.', 'error');
         return;
       }
       if (password.length < 6) {
-        SFX.errorBuzz();
         setConsoleMessage('> ERROR: PASSKEY REQUIRES MINIMUM 6 CHARACTERS.', 'error');
         return;
       }
@@ -305,7 +297,6 @@ export function initAuthTerminal() {
       }
 
       setTerminalStep(2, 'create');
-      SFX.terminalKey();
       setConsoleMessage('> STEP 2: CHOOSE YOUR COMBAT CALLSIGN.', 'info');
     };
   }
@@ -314,20 +305,9 @@ export function initAuthTerminal() {
     btnBack.onclick = (e) => {
       e.stopPropagation();
       setTerminalStep(1, 'create');
-      SFX.terminalKey();
       setConsoleMessage('> STEP 1: CREDENTIALS.', 'info');
     };
   }
-
-  // Keyboard sound effects on inputs
-  const inputs = modal.querySelectorAll('.terminal-input');
-  inputs.forEach(input => {
-    input.addEventListener('keydown', (e) => {
-      if (e.key !== 'Escape') {
-        SFX.terminalKey();
-      }
-    });
-  });
 
   // Callsign Commitment / Save handler
   const btnSaveCallsign = document.getElementById('btnSaveCallsign');
@@ -336,10 +316,8 @@ export function initAuthTerminal() {
     const raw = callsignInput.value.trim();
     try {
       await authManager.updateCallsign(raw);
-      SFX.accessGranted();
       setConsoleMessage(`> CALLSIGN UPDATED: "${authManager.currentUser.handle}" HARMONIZED TO LOCAL STORAGE.`, 'success');
     } catch (err) {
-      SFX.errorBuzz();
       setConsoleMessage(`> ERROR: ${err.message}`, 'error');
     }
   };
@@ -370,24 +348,20 @@ export function initAuthTerminal() {
     const password = passInput?.value || '';
 
     if (!email || !email.includes('@')) {
-      SFX.errorBuzz();
       setConsoleMessage('> ERROR: VALID EMAIL REQUIRED.', 'error');
       return;
     }
     if (password.length < 6) {
-      SFX.errorBuzz();
       setConsoleMessage('> ERROR: PASSKEY REQUIRES MINIMUM 6 CHARACTERS.', 'error');
       return;
     }
 
     try {
       const user = await authManager.signInWithCredentials(email, password);
-      SFX.accessGranted();
       setConsoleMessage(`> ACCESS GRANTED // USER AUTHORIZED AS "${user.handle}" [PROV: PASSKEY]`, 'success');
       populateTerminalData();
       setTimeout(() => hideAuthTerminal(), 600);
     } catch (err) {
-      SFX.errorBuzz();
       setConsoleMessage(`> AUTH ERROR: ${err.message}`, 'error');
     }
   };
@@ -404,19 +378,16 @@ export function initAuthTerminal() {
     const desiredHandle = (callsignInput?.value || '').trim();
 
     if (!desiredHandle || desiredHandle.length < 3) {
-      SFX.errorBuzz();
       setConsoleMessage('> ERROR: CALLSIGN REQUIRES AT LEAST 3 CHARACTERS.', 'error');
       return;
     }
 
     try {
       const user = await authManager.signInWithCredentials(email, password, desiredHandle);
-      SFX.accessGranted();
       setConsoleMessage(`> IDENTITY INITIALIZED // WELCOME TO THE GRID, ${user.handle}`, 'success');
       populateTerminalData();
       setTimeout(() => hideAuthTerminal(), 600);
     } catch (err) {
-      SFX.errorBuzz();
       setConsoleMessage(`> REGISTRATION ERROR: ${err.message}`, 'error');
     }
   };
@@ -432,16 +403,13 @@ export function initAuthTerminal() {
       e.stopPropagation();
       const email = (emailInput?.value || '').trim();
       if (!email || !email.includes('@')) {
-        SFX.errorBuzz();
         setConsoleMessage('> ERROR: VALID EMAIL REQUIRED FOR MAGIC LINK.', 'error');
         return;
       }
       try {
         await authManager.signInWithCredentials(email, '');
-        SFX.accessGranted();
         setConsoleMessage(`> MAGIC LINK DISPATCHED TO ${email}. CHECK INBOX.`, 'success');
       } catch (err) {
-        SFX.errorBuzz();
         setConsoleMessage(`> MAGIC LINK ERROR: ${err.message}`, 'error');
       }
     };
@@ -468,7 +436,6 @@ export function initAuthTerminal() {
   const handleFederatedSync = async (providerName) => {
     try {
       const user = await authManager.signInWithFederated(providerName);
-      SFX.accessGranted();
 
       if (activeMode === 'signin') {
         // Returning user - bypass Step 2
@@ -484,7 +451,6 @@ export function initAuthTerminal() {
         setConsoleMessage(`> ${providerName.toUpperCase()} LINKED. CONFIRM YOUR COMBAT CALLSIGN.`, 'info');
       }
     } catch (err) {
-      SFX.errorBuzz();
       setConsoleMessage(`> FEDERATED SYNC FAILED: ${err.message}`, 'error');
     }
   };

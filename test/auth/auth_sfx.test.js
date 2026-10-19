@@ -130,4 +130,17 @@ assert.strictEqual(typeof SFX.accessGranted, 'function');
 assert.strictEqual(typeof SFX.errorBuzz, 'function');
 console.log('✓ SFX namespace exports all terminal audio functions');
 
+// 4. Verify Auth Terminal operates completely silent (no SFX references)
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const authTerminalSource = fs.readFileSync(path.resolve(__dirname, '../../src/ui/authTerminal.js'), 'utf-8');
+
+assert.strictEqual(authTerminalSource.includes('SFX.'), false, 'authTerminal.js must not invoke any SFX routines');
+assert.strictEqual(authTerminalSource.includes("from '../audio/sfx.js'"), false, 'authTerminal.js must not import SFX');
+console.log('✓ authTerminal.js contains 0 SFX triggers and operates completely silently');
+
 console.log('--- Terminal SFX Procedural Synthesis Tests PASSED ---');
