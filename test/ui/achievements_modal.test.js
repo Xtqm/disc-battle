@@ -4,6 +4,7 @@
  */
 
 import assert from 'assert';
+import fs from 'fs';
 import { AchievementsModal } from '../../src/ui/modals/AchievementsModal.js';
 import { state } from '../../src/core/state.js';
 
@@ -247,6 +248,16 @@ returnBtn.onclick({ stopPropagation: () => {} });
 assert.strictEqual(modal.isOpen(), false);
 
 console.log('✓ Group 4: Close and return button events verified.');
+
+// =========================================================================
+// Test Group 5: Main Menu Static DOM & CSS Integration
+// =========================================================================
+console.log('\n[Group 5] Testing Main Menu Static DOM & CSS Integration...');
+const indexHtml = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+assert(indexHtml.includes('id="achievementsBtn"'), 'index.html must declare #achievementsBtn in mainMenuButtons');
+assert(indexHtml.includes('.achievements-btn {'), 'index.html must define .achievements-btn stylesheet rule');
+assert(indexHtml.includes('.achievements-btn:hover'), 'index.html must define .achievements-btn:hover stylesheet rule');
+console.log('✓ Main menu static HTML and CSS rules for Achievements verified.');
 
 console.log('\n======================================================');
 console.log('ALL ACHIEVEMENTS MODAL TESTS PASSED CLEANLY (100%)');

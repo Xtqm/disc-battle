@@ -165,6 +165,10 @@ The system SHALL provide an isolated Three.js preview scene and camera rig capab
 ### Requirement: Diegetic Main Menu Armory Navigation and Live Balance Counter
 The system SHALL provide an Armory entrypoint within the main menu interface that displays the Armory modal, featuring category navigation tabs (`IDENTITY DISCS`, `PROGRAM CHASSIS`, `EXOTIC ARENAS`), modal dismiss controls, and a reactive live Bit balance counter.
 
+#### Scenario: Initial page load rendering of Armory navigation button
+- **WHEN** the main menu renders upon initial application load
+- **THEN** `#armoryBtn` is present in `#mainMenuButtons` with amber cyber-neon styling and active click binding.
+
 #### Scenario: Opening Armory modal from main menu
 - **WHEN** the player clicks the Armory button from the main menu
 - **THEN** the system pauses background menu interactions, unlocks the cursor, displays the Armory modal overlay, defaults to the `IDENTITY DISCS` category, and stages the first catalog item in the 3D preview bay.

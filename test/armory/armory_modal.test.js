@@ -5,6 +5,7 @@
  */
 
 import assert from 'assert';
+import fs from 'fs';
 import {
   ARMORY_CATEGORIES,
   UNLOCK_TYPES,
@@ -285,6 +286,16 @@ modal.previewScene = new MockPreviewScene();
 modal.dispose();
 assert.strictEqual(modal.previewScene, null, 'dispose() must cleanly execute teardown');
 console.log('✓ Lifecycle teardown and WebGL resource disposal verified without memory leaks.');
+
+// =========================================================================
+// [Group 9] Main Menu Static DOM & CSS Integration
+// =========================================================================
+console.log('\n[Group 9] Testing Main Menu Static DOM & CSS Integration...');
+const indexHtml = fs.readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
+assert(indexHtml.includes('id="armoryBtn"'), 'index.html must declare #armoryBtn in mainMenuButtons');
+assert(indexHtml.includes('.armory-btn {'), 'index.html must define .armory-btn stylesheet rule');
+assert(indexHtml.includes('.armory-btn:hover'), 'index.html must define .armory-btn:hover stylesheet rule');
+console.log('✓ Main menu static HTML and CSS rules for Armory verified.');
 
 console.log('\n=================================================================');
 console.log('ALL ARMORY MODAL & FABRICATION FANFARE TESTS PASSED (100% SUCCESS)');

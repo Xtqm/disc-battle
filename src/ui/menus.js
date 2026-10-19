@@ -131,8 +131,8 @@ export function getMainMenuHtml() {
   </div>
   <div class="mode-select" id="mainMenuButtons">
     <button id="campaignBtn" class="mode-btn campaign-btn">CAMPAIGN SECTORS</button>
-    <button id="armoryBtn" class="mode-btn armory-btn" style="border-color:#ffaa00;color:#ffaa00;box-shadow:0 0 12px rgba(255,170,0,0.3);">ARMORY</button>
-    <button id="achievementsBtn" class="mode-btn achievements-btn" style="border-color:#00f3ff;color:#00f3ff;box-shadow:0 0 12px rgba(0,243,255,0.3);">ACHIEVEMENTS</button>
+    <button id="armoryBtn" class="mode-btn armory-btn">ARMORY</button>
+    <button id="achievementsBtn" class="mode-btn achievements-btn">ACHIEVEMENTS</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
