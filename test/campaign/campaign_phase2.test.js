@@ -382,6 +382,9 @@ assert(indexHtml.includes('id="missionBriefModal"'), 'index.html contains missio
 assert(indexHtml.includes('id="trialDebriefModal"'), 'index.html contains trialDebriefModal');
 assert(indexHtml.includes('id="campaignObjectiveHeader"'), 'index.html contains campaignObjectiveHeader');
 assert(indexHtml.includes('id="floatingIndicators"'), 'index.html contains floatingIndicators');
+assert(indexHtml.includes('.campaign-btn {'), 'index.html contains .campaign-btn stylesheet rule');
+assert(indexHtml.includes('border:1px solid var(--star-gold'), 'index.html .campaign-btn defines star-gold border');
+assert(indexHtml.includes('.campaign-btn:hover'), 'index.html contains .campaign-btn:hover stylesheet rule');
 
 console.log('✓ Main menu, UIManager, and index.html campaign integrations verified');
 

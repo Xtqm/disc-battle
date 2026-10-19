@@ -6,7 +6,7 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Ccircle cx=%2716%27 cy=%2716%27 r=%2712%27 fill=%27none%27 stroke=%27%234ff2ff%27 stroke-width=%273%27/%3E%3C/svg%3E" />
 <title>TRON :: DISC ARENA</title>
 <style>
-  :root { --cyan:#4ff2ff; --orange:#ff7b1a; }
+  :root { --cyan:#4ff2ff; --orange:#ff7b1a; --star-gold:#ffd700; }
   * { box-sizing:border-box; }
   html,body { margin:0; height:100%; background:#000; overflow:hidden;
     font-family: "Segoe UI", Helvetica, Arial, sans-serif; color:var(--cyan); }
@@ -202,6 +202,15 @@
     transition:all .2s ease; outline:none;
     min-width:140px; min-height:48px;
     display:inline-flex; align-items:center; justify-content:center;
+  }
+  .campaign-btn {
+    border:1px solid var(--star-gold, #ffd700); color:#ffe875;
+    box-shadow:0 0 14px rgba(255,215,0,.35), inset 0 0 10px rgba(255,215,0,.18);
+  }
+  .campaign-btn:hover {
+    background:rgba(255,215,0,.24); color:#fff;
+    box-shadow:0 0 24px rgba(255,215,0,.75), inset 0 0 16px rgba(255,215,0,.4);
+    transform:translateY(-2px);
   }
   .duel-btn {
     border:1px solid var(--orange); color:#ffb37a;

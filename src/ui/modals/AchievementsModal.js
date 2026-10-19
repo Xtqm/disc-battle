@@ -75,6 +75,7 @@ export class AchievementsModal {
    * Dismisses the modal and notifies listeners.
    */
   hide() {
+    const wasOpen = state.achievementsModalOpen;
     state.achievementsModalOpen = false;
     const el = this.container;
     if (el) {
@@ -86,7 +87,7 @@ export class AchievementsModal {
       this._keyHandler = null;
     }
 
-    if (typeof this._onBackToMenu === 'function') {
+    if (wasOpen && typeof this._onBackToMenu === 'function') {
       this._onBackToMenu();
     }
   }
