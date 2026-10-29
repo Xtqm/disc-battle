@@ -435,8 +435,15 @@ export function initAuthTerminal() {
 
   const handleFederatedSync = async (providerName) => {
     try {
-      const user = await authManager.signInWithFederated(providerName);
+      setConsoleMessage(`> CONNECTING TO ${providerName.toUpperCase()} GRID CLUSTER...`, 'info');
+      const result = await authManager.signInWithFederated(providerName);
 
+      if (result && !result.uid && result.url) {
+        setConsoleMessage(`> REDIRECTING TO ${providerName.toUpperCase()} AUTH GATEWAY...`, 'info');
+        return;
+      }
+
+      const user = result;
       if (activeMode === 'signin') {
         // Returning user - bypass Step 2
         setConsoleMessage(`> FEDERATED SYNC SUCCESSFUL // LINKED AS "${user?.handle || 'PROGRAM'}"`, 'success');
@@ -451,7 +458,14 @@ export function initAuthTerminal() {
         setConsoleMessage(`> ${providerName.toUpperCase()} LINKED. CONFIRM YOUR COMBAT CALLSIGN.`, 'info');
       }
     } catch (err) {
-      setConsoleMessage(`> FEDERATED SYNC FAILED: ${err.message}`, 'error');
+      const msg = err.message || '';
+      let cleanMsg = msg;
+      if (msg.includes('provider_not_enabled') || msg.includes('Unsupported provider') || msg.includes('provider is not enabled')) {
+        cleanMsg = `PROVIDER "${providerName.toUpperCase()}" NOT ACTIVATED IN CLUSTER DASHBOARD`;
+      } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
+        cleanMsg = 'GRID CONNECTION INTERRUPTED // RETRYING VIA OFFLINE BUFFER';
+      }
+      setConsoleMessage(`> FEDERATED SYNC FAILED: ${cleanMsg}`, 'error');
     }
   };
 

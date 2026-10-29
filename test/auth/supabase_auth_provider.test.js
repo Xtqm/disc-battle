@@ -1,5 +1,5 @@
 import assert from 'assert';
-import { SupabaseAuthProvider, generateGuestHandle, resolveSupabaseConfig } from '../../src/auth/SupabaseAuthProvider.js';
+import { SupabaseAuthProvider, generateGuestHandle, resolveSupabaseConfig, cleanAuthUrlHash } from '../../src/auth/SupabaseAuthProvider.js';
 
 console.log('--- Running SupabaseAuthProvider Test Suite ---');
 
@@ -74,6 +74,48 @@ await provider.signOut();
 assert.strictEqual(provider.getCurrentUser(), null);
 assert.strictEqual(lastReportedUser, null);
 console.log('✓ Sign out successfully terminated session and alerted listeners');
+
+// Test 9: cleanAuthUrlHash test
+global.window = {
+  location: { hash: '#access_token=xyz123&refresh_token=abc456&type=recovery', pathname: '/index.html', search: '' },
+  history: {
+    replaceState: (state, title, url) => {
+      global.window.location.hash = '';
+      global.window.location.url = url;
+    }
+  }
+};
+cleanAuthUrlHash();
+assert.strictEqual(global.window.location.hash, '');
+console.log('✓ cleanAuthUrlHash safely removes OAuth token fragments from URL');
+
+// Test 10: Anonymous account upgrade with desired handle via signInWithCredentials
+const upgradeProvider = new SupabaseAuthProvider();
+await upgradeProvider.init();
+const initialAnon = upgradeProvider.getCurrentUser();
+assert.strictEqual(initialAnon.isAnonymous, true);
+const anonUid = initialAnon.uid;
+
+const promotedUser = await upgradeProvider.signInWithCredentials('quorra@isomorphic.grid', 'SecureAlgorithm123', 'QUORRA_ISO');
+assert.strictEqual(promotedUser.uid, anonUid, 'promoted user must retain anonymous UID');
+assert.strictEqual(promotedUser.handle, 'QUORRA_ISO');
+assert.strictEqual(promotedUser.isAnonymous, false);
+console.log('✓ signInWithCredentials upgrades anonymous guest in-place preserving UID');
+
+// Test 11: Resilient fallback when live client fails
+const failingClient = {
+  auth: {
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    getSession: async () => ({ data: { session: null } }),
+    signInAnonymously: async () => { throw new Error('Live cluster connection timeout'); }
+  }
+};
+const fallbackProvider = new SupabaseAuthProvider({ client: failingClient });
+await fallbackProvider.init();
+const recoveredUser = fallbackProvider.getCurrentUser();
+assert.ok(recoveredUser, 'Fallback provider must recover and provision user');
+assert.strictEqual(recoveredUser.isAnonymous, true);
+console.log('✓ Resilient fallback provisions guest when remote cluster errors');
 
 unsub();
 console.log('--- SupabaseAuthProvider Test Suite PASSED ---\n');

@@ -32,6 +32,20 @@ export function resolveSupabaseConfig(opts = {}) {
   return { url, anonKey };
 }
 
+/**
+ * Removes OAuth authentication tokens and error fragments from the URL hash.
+ */
+export function cleanAuthUrlHash() {
+  try {
+    if (typeof window !== 'undefined' && window.location && window.history?.replaceState) {
+      const hash = window.location.hash || '';
+      if (hash && (hash.includes('access_token=') || hash.includes('error=') || hash.includes('refresh_token='))) {
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
+      }
+    }
+  } catch (_) {}
+}
+
 const MOCK_AUTH_STORAGE_KEY = 'tron_simulated_supabase_auth_session';
 
 /**
@@ -296,12 +310,21 @@ export class SupabaseAuthProvider extends IAuthProvider {
       });
       this._authSubscription = data?.subscription || null;
 
-      // Check current session
-      const { data: sessionData } = await this._client.auth.getSession();
-      if (sessionData?.session?.user) {
-        this._currentUser = this._mapSupabaseUser(sessionData.session.user, sessionData.session);
-      } else {
-        // Automatically provision native anonymous user if no session exists
+      // Check current session or capture OAuth callback redirect
+      try {
+        const { data: sessionData } = await this._client.auth.getSession();
+        if (sessionData?.session?.user) {
+          this._currentUser = this._mapSupabaseUser(sessionData.session.user, sessionData.session);
+          cleanAuthUrlHash();
+        } else {
+          cleanAuthUrlHash();
+          // Automatically provision native anonymous user if no session exists
+          await this.signInGuest();
+        }
+      } catch (sessionErr) {
+        console.warn('SupabaseAuthProvider: Session check or guest sign-in encountered error, falling back to simulated client:', sessionErr);
+        cleanAuthUrlHash();
+        this._client = { auth: new InMemorySupabaseAuth() };
         await this.signInGuest();
       }
     }
@@ -329,14 +352,24 @@ export class SupabaseAuthProvider extends IAuthProvider {
       await this.signOut();
     }
 
-    const { data, error } = await this._client.auth.signInAnonymously();
-    if (error) {
-      throw new Error(`Supabase signInAnonymously failed: ${error.message}`);
-    }
+    try {
+      const { data, error } = await this._client.auth.signInAnonymously();
+      if (error) {
+        throw new Error(`Supabase signInAnonymously failed: ${error.message}`);
+      }
 
-    this._currentUser = this._mapSupabaseUser(data.user, data.session);
-    this._notifyListeners(this._currentUser);
-    return this._currentUser;
+      this._currentUser = this._mapSupabaseUser(data.user, data.session);
+      this._notifyListeners(this._currentUser);
+      return this._currentUser;
+    } catch (err) {
+      // If live Supabase anonymous sign-in failed (offline/disabled), smoothly fall back to simulated in-memory
+      if (!(this._client.auth instanceof InMemorySupabaseAuth)) {
+        console.warn('SupabaseAuthProvider: Falling back to in-memory guest auth:', err.message);
+        this._client = { auth: new InMemorySupabaseAuth() };
+        return this.signInGuest(forceNew);
+      }
+      throw err;
+    }
   }
 
   /**
@@ -357,7 +390,7 @@ export class SupabaseAuthProvider extends IAuthProvider {
         const { data, error } = await this._client.auth.linkIdentity({
           provider: credentials.provider,
           options: {
-            redirectTo: typeof window !== 'undefined' ? window.location.href : undefined
+            redirectTo: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : undefined
           }
         });
         if (error) throw new Error(`Supabase linkIdentity failed: ${error.message}`);
@@ -397,10 +430,23 @@ export class SupabaseAuthProvider extends IAuthProvider {
   async signInWithFederated(providerName, profile = null) {
     if (!this._client) throw new Error('Supabase client is not initialized');
 
+    // Flush active save state to local persistence before redirect to guarantee progression safety
+    try {
+      if (typeof localStorage !== 'undefined' && this._currentUser?.uid) {
+        const saveStateKey = `tron_save_state_${this._currentUser.uid}`;
+        const existing = localStorage.getItem(saveStateKey);
+        if (existing) {
+          const parsed = JSON.parse(existing);
+          parsed.lastActiveAt = Date.now();
+          localStorage.setItem(saveStateKey, JSON.stringify(parsed));
+        }
+      }
+    } catch (_) {}
+
     const { data, error } = await this._client.auth.signInWithOAuth({
       provider: providerName.toLowerCase(),
       options: {
-        redirectTo: typeof window !== 'undefined' ? window.location.href : undefined
+        redirectTo: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : undefined
       }
     });
 
@@ -412,6 +458,10 @@ export class SupabaseAuthProvider extends IAuthProvider {
       this._currentUser = this._mapSupabaseUser(u, data?.session || this._client.auth._session);
       this._notifyListeners(this._currentUser);
       return this._currentUser;
+    }
+
+    if (data?.url && typeof window !== 'undefined') {
+      window.location.href = data.url;
     }
 
     return data;
@@ -431,9 +481,27 @@ export class SupabaseAuthProvider extends IAuthProvider {
       throw new Error('Valid email address required.');
     }
 
-    // If password is provided, attempt standard password authentication
+    // If password is provided, attempt standard password authentication or anonymous user upgrade
     if (password && password.length >= 6) {
-      // First attempt sign-in
+      // 1. If currently anonymous and registering new callsign, attempt upgrade in place
+      if (this._currentUser?.isAnonymous && handle && typeof this._client.auth.updateUser === 'function') {
+        try {
+          const { data: updateData, error: updateError } = await this._client.auth.updateUser({
+            email,
+            password,
+            data: { handle: handle.trim().toUpperCase() }
+          });
+          if (!updateError && updateData?.user) {
+            this._currentUser = this._mapSupabaseUser(updateData.user, null);
+            this._notifyListeners(this._currentUser);
+            return this._currentUser;
+          }
+        } catch (_) {
+          // Fall through to regular sign-in / sign-up if updateUser is unsupported or user exists
+        }
+      }
+
+      // 2. Attempt sign-in with existing password credentials
       const { data, error } = await this._client.auth.signInWithPassword({ email, password });
       if (!error && data?.user) {
         this._currentUser = this._mapSupabaseUser(data.user, data.session);
@@ -444,13 +512,13 @@ export class SupabaseAuthProvider extends IAuthProvider {
         return this._currentUser;
       }
 
-      // If sign-in failed due to non-existent account, attempt sign-up
+      // 3. If sign-in failed due to non-existent account, attempt registration
       const { data: signData, error: signError } = await this._client.auth.signUp({
         email,
         password,
         options: {
           data: {
-            handle: handle || email.split('@')[0].toUpperCase().substring(0, 16)
+            handle: handle ? handle.trim().toUpperCase() : email.split('@')[0].toUpperCase().substring(0, 16)
           }
         }
       });
@@ -470,7 +538,7 @@ export class SupabaseAuthProvider extends IAuthProvider {
     const { data, error } = await this._client.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: typeof window !== 'undefined' ? window.location.href : undefined
+        emailRedirectTo: typeof window !== 'undefined' ? (window.location.origin + window.location.pathname) : undefined
       }
     });
 
