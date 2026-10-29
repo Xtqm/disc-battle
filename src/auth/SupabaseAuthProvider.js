@@ -17,6 +17,10 @@ export function generateGuestHandle(uid) {
  * @returns {{ url: string, anonKey: string }}
  */
 export function resolveSupabaseConfig(opts = {}) {
+  if (typeof window !== 'undefined' && window.__FORCE_SIMULATED_AUTH__) {
+    return { url: '', anonKey: '' };
+  }
+
   const url = opts.supabaseUrl ||
     (typeof process !== 'undefined' && process.env && (process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL)) ||
     (typeof window !== 'undefined' && window.__ENV__ && window.__ENV__.SUPABASE_URL) ||
@@ -375,7 +379,7 @@ export class SupabaseAuthProvider extends IAuthProvider {
   /**
    * Upgrades an anonymous guest account by linking an external identity or credentials.
    * @param {object} credentials
-   * @param {string} [credentials.provider] OAuth provider ('google', 'discord', 'github')
+   * @param {string} [credentials.provider] OAuth provider ('google', 'github')
    * @param {string} [credentials.email]
    * @param {string} [credentials.password]
    * @param {string} [credentials.handle]
@@ -422,7 +426,7 @@ export class SupabaseAuthProvider extends IAuthProvider {
   }
 
   /**
-   * Signs in via OAuth provider (Google, Discord, GitHub).
+   * Signs in via OAuth provider (Google, GitHub).
    * @param {string} providerName
    * @param {object} [profile]
    * @returns {Promise<object>}

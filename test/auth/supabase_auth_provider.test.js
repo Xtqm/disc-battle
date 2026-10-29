@@ -47,8 +47,8 @@ assert.strictEqual(upgradedUser.handle, 'CLU_OVERRIDE');
 assert.strictEqual(upgradedUser.email, 'flynn@encom.grid');
 console.log('✓ Anonymous session upgraded via linkIdentity without losing UID:', upgradedUser.handle);
 
-// Test 5: OAuth Provider dispatch (Google, Discord, GitHub)
-for (const oAuthProvider of ['google', 'discord', 'github']) {
+// Test 5: OAuth Provider dispatch (Google, GitHub)
+for (const oAuthProvider of ['google', 'github']) {
   const oAuthUser = await provider.signInWithFederated(oAuthProvider);
   assert.ok(oAuthUser, `OAuth flow for ${oAuthProvider} must return user`);
   console.log(`✓ OAuth provider dispatch succeeded for [${oAuthProvider}]`);

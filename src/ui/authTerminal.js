@@ -428,9 +428,8 @@ export function initAuthTerminal() {
     });
   }
 
-  // Quick Sync (Google / Discord / GitHub)
+  // Quick Sync (Google / GitHub)
   const btnGoogle = document.getElementById('btnSyncGoogle');
-  const btnDiscord = document.getElementById('btnSyncDiscord');
   const btnGithub = document.getElementById('btnSyncGithub');
 
   const handleFederatedSync = async (providerName) => {
@@ -471,9 +470,6 @@ export function initAuthTerminal() {
 
   if (btnGoogle) {
     btnGoogle.onclick = (e) => { e.stopPropagation(); handleFederatedSync('google'); };
-  }
-  if (btnDiscord) {
-    btnDiscord.onclick = (e) => { e.stopPropagation(); handleFederatedSync('discord'); };
   }
   if (btnGithub) {
     btnGithub.onclick = (e) => { e.stopPropagation(); handleFederatedSync('github'); };

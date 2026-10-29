@@ -59,6 +59,7 @@ async function runTerminalIntegrationTests() {
     page.on('pageerror', err => console.error('BROWSER ERROR:', err));
 
     await page.evaluateOnNewDocument(() => {
+      window.__FORCE_SIMULATED_AUTH__ = true;
       window.__authOscillatorCount = 0;
       if (typeof window.AudioContext !== 'undefined') {
         const origOsc = window.AudioContext.prototype.createOscillator;
@@ -93,7 +94,8 @@ async function runTerminalIntegrationTests() {
 
     console.log('\n--- 2. Testing Terminal Modal Launch & PointerLock Isolation ---');
     // Click secure identity button
-    await page.click('#secureIdentityBtn');
+    await page.waitForSelector('#secureIdentityBtn');
+    await page.evaluate(() => document.getElementById('secureIdentityBtn')?.click());
     await page.waitForFunction(() => {
       const modal = document.getElementById('authModal');
       return modal && modal.style.display === 'flex';
@@ -122,14 +124,15 @@ async function runTerminalIntegrationTests() {
     // Verify Quick Sync buttons are prominent in Step 1
     const quickSyncButtonsExist = await page.evaluate(() => {
       const g = document.getElementById('btnSyncGoogle');
-      const d = document.getElementById('btnSyncDiscord');
       const gh = document.getElementById('btnSyncGithub');
+      const d = document.getElementById('btnSyncDiscord');
       const tabSignIn = document.getElementById('tabSignIn');
       const tabCreate = document.getElementById('tabCreateAccount');
       const btnAuth = document.getElementById('btnAuthorizePasskey');
       const btnCont = document.getElementById('btnContinueToCallsign');
       return {
-        hasProviders: !!(g && d && gh),
+        hasProviders: !!(g && gh),
+        noDiscord: d === null,
         signInActive: tabSignIn?.classList.contains('active'),
         createInactive: !tabCreate?.classList.contains('active'),
         authVisible: btnAuth?.style.display !== 'none',
@@ -137,7 +140,8 @@ async function runTerminalIntegrationTests() {
       };
     });
 
-    assert.strictEqual(quickSyncButtonsExist.hasProviders, true, 'Quick Sync providers (Google, Discord, GitHub) must exist');
+    assert.strictEqual(quickSyncButtonsExist.hasProviders, true, 'Quick Sync providers (Google, GitHub) must exist');
+    assert.strictEqual(quickSyncButtonsExist.noDiscord, true, 'Discord button must not exist in Quick Sync');
     assert.strictEqual(quickSyncButtonsExist.signInActive, true, 'Sign In tab must be active by default');
     assert.strictEqual(quickSyncButtonsExist.authVisible, true, 'Authorize Passkey button must be visible in Sign In mode');
     assert.strictEqual(quickSyncButtonsExist.continueHidden, true, 'Continue to Callsign button must be hidden in Sign In mode');

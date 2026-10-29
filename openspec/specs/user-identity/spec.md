@@ -71,7 +71,7 @@ The system SHALL provide a diegetic Grid Authorization Terminal modal interface 
 - **THEN** the system validates the credentials, promotes or binds the session to the authenticated identity, skips Step 2, and updates persistent save state.
 
 #### Scenario: Quick Sync authentication tab
-- **WHEN** the player activates an external authentication provider button (Google, Discord, or GitHub) in the prominent Quick Sync section
+- **WHEN** the player activates an external authentication provider button (Google or GitHub) in the prominent Quick Sync section
 - **THEN** the system dispatches the provider authentication request and links the returned credentials to the active user session.
 
 #### Scenario: Callsign customization
@@ -94,7 +94,7 @@ The system SHALL safely isolate mouse and touch input between active modal termi
 - **THEN** the modal cleanly unmounts or hides, returning the player to the underlying menu state without triggering accidental PointerLock re-acquisition.
 
 ### Requirement: Supabase Cloud Authentication Provider
-The system SHALL provide a Supabase-backed authentication provider supporting live client instantiation in the browser, native anonymous sign-in, account upgrade linking, OAuth providers (Google, Discord, GitHub) with URL redirect session capture, direct credentials/magic link verification, and resilient in-memory fallback.
+The system SHALL provide a Supabase-backed authentication provider supporting live client instantiation in the browser, native anonymous sign-in, account upgrade linking, OAuth providers (Google, GitHub) with URL redirect session capture, direct credentials/magic link verification, and resilient in-memory fallback.
 
 #### Scenario: Supabase client initialization
 - **WHEN** the authentication provider initializes
@@ -109,7 +109,7 @@ The system SHALL provide a Supabase-backed authentication provider supporting li
 - **THEN** the provider links the identity to the existing user profile without wiping or changing the primary user identifier.
 
 #### Scenario: OAuth provider sign-in
-- **WHEN** a player selects Google, Discord, or GitHub in the authorization interface
+- **WHEN** a player selects Google or GitHub in the authorization interface
 - **THEN** the provider initiates OAuth authorization with the chosen provider, redirects or verifies credentials, and returns or updates the authenticated session.
 
 #### Scenario: Password and Magic Link credentials
