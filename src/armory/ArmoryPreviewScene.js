@@ -177,7 +177,7 @@ export class ArmoryPreviewScene {
   previewChassis(chassisSkinIdOrConfig, activeDiscSkinId = null) {
     this.clearStaged();
 
-    const rig = makeProgram(0x00f3ff);
+    const rig = makeProgram(0x00f3ff, { isPlayer: true, helmetType: 'flynn' });
     this.cosmetics.applyChassisSkin(rig, chassisSkinIdOrConfig);
 
     if (activeDiscSkinId && rig.userData?.backDisc) {

@@ -2,7 +2,7 @@ import * as THREE from '../../vendor/three.module.js';
 import { state } from '../core/state.js';
 import { config } from '../core/config.js';
 import { scene } from '../graphics/scene.js';
-import { makeProgram, tmp, _duelLead, _duelOrigin, _duelAimDir, _duelWant, _duelSafe } from '../graphics/materials.js';
+import { makeProgram, animateProgramKinematics, tmp, _duelLead, _duelOrigin, _duelAimDir, _duelWant, _duelSafe } from '../graphics/materials.js';
 import { burst } from '../graphics/particles.js';
 import { shake, message } from '../ui/UIManager.js';
 import { resolveCircle, lineOfSight } from '../physics/collision.js';
@@ -641,6 +641,14 @@ export function updateDuelFoe(f, dt) {
   f.obj.position.y = f.y + (f.grounded ? Math.sin(state.time * 11) * 0.05 * Math.min(f.vel.length() / 8, 1) : 0);
   f.obj.rotation.x = THREE.MathUtils.clamp(-f.vy * 0.018, -0.22, 0.22);
   f.obj.userData.backDisc.visible = f.hasDisc;
+  animateProgramKinematics(f.obj, dt, {
+    speed: f.vel.length(),
+    vy: f.vy || 0,
+    grounded: f.grounded,
+    blocking: false,
+    hurt: f.hurt || 0,
+    time: state.time
+  });
   if (f.hurt > 0) { f.hurt -= dt; f.obj.position.x += Math.sin(state.time * 60) * 0.05; }
 }
 
@@ -783,6 +791,14 @@ export function updateFoes(dt) {
       f.obj.rotation.y += THREE.MathUtils.clamp(((face - f.obj.rotation.y + Math.PI * 3) % (Math.PI * 2)) - Math.PI, -turnRate, turnRate);
     }
     f.obj.userData.backDisc.visible = f.hasDisc;
+    animateProgramKinematics(f.obj, dt, {
+      speed: f.vel.length(),
+      vy: f.vy || 0,
+      grounded: f.grounded,
+      blocking: false,
+      hurt: f.hurt || 0,
+      time: state.time
+    });
     if (f.hurt > 0) { f.hurt -= dt; f.obj.position.x += Math.sin(state.time * 60) * .05; }
 
     f.cd -= dt;

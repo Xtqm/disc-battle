@@ -319,7 +319,7 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
     
     const isTeammate = spawns[r].team === mySpawn.team;
     const color = isTeammate ? config.CYAN : config.PURPLE;
-    const oppObj = makeProgram(color);
+    const oppObj = makeProgram(color, { isPlayer: isTeammate, helmetType: isTeammate ? 'flynn' : 'rinzler' });
     scene.add(oppObj);
     
     const s = spawns[r];

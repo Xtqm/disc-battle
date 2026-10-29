@@ -124,7 +124,7 @@ export function initGraphics() {
     document.body.appendChild(renderer.domElement);
   }
   if (!state.player.obj) {
-    state.player.obj = makeProgram(config.CYAN);
+    state.player.obj = makeProgram(config.CYAN, { isPlayer: true, helmetType: 'flynn' });
     scene.add(state.player.obj);
     cosmeticMaterialEngine.init({ playerObj: state.player.obj });
   } else {

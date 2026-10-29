@@ -5,6 +5,7 @@ import { scene, camera } from '../graphics/scene.js';
 import { resolveCircle } from '../physics/collision.js';
 import { burst } from '../graphics/particles.js';
 import { playDeRezSound } from '../audio/sfx.js';
+import { animateProgramKinematics } from '../graphics/materials.js';
 import { message, shake, showGameOver } from '../ui/UIManager.js';
 import { getTileAt, rebuildArenaTiles, pillars } from './Arena.js';
 import { spawnDisc } from './Disc.js';
@@ -150,10 +151,20 @@ export function updatePlayer(dt) {
     state.player.obj.rotation.y = state.player.yaw;
     state.player.obj.position.y = state.player.y + (state.player.grounded ? Math.sin(state.time * 11) * .05 * Math.min(state.player.vel.length() / 8, 1) : 0);
     state.player.obj.rotation.x = THREE.MathUtils.clamp(-state.player.vy * 0.018, -.22, .22);
+
+    animateProgramKinematics(state.player.obj, dt, {
+      speed: state.player.vel.length(),
+      vy: state.player.vy,
+      grounded: state.player.grounded,
+      blocking: !!(state.player.blocking || state.touchBlocking),
+      hurt: state.player.invuln > 0 ? 0.2 : 0,
+      time: state.time
+    });
+
     if (state.player.obj.userData && state.player.obj.userData.backDisc) {
       state.player.obj.userData.backDisc.visible = state.player.hasDisc;
       state.player.obj.userData.backDisc.rotation.z += dt * (state.player.hasDisc ? 3 : 0);
-      if (state.player.blocking && state.player.hasDisc) {
+      if ((state.player.blocking || state.touchBlocking) && state.player.hasDisc) {
         state.player.obj.userData.backDisc.position.set(0, 1.75, .75);
         state.player.obj.userData.backDisc.rotation.x = 0;
       } else {
