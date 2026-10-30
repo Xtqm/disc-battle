@@ -2,10 +2,13 @@ import { state } from '../core/state.js';
 import { authManager } from '../auth/AuthManager.js';
 import { AuthEvents } from '../auth/events.js';
 import { setCursor } from '../input/InputManager.js';
+import { armoryModal } from './modals/ArmoryModal.js';
+import { achievementsModal } from './modals/AchievementsModal.js';
 
 let activeStep = 1;
 let activeMode = 'signin'; // 'signin' | 'create'
 let activeView = 'dossier'; // 'dossier' | 'auth'
+let activeHubTab = 'ident'; // 'ident' | 'loadout' | 'directives'
 
 /**
  * Calculates current level tier from player save state.
@@ -59,6 +62,121 @@ export function setTerminalView(view) {
     if (consoleMsg) consoleMsg.style.display = 'flex';
     if (returnToDossierRow) {
       returnToDossierRow.style.display = isAuth ? 'block' : 'none';
+    }
+  }
+}
+
+/**
+ * Sets the active hub tab ('ident' | 'loadout' | 'directives').
+ * @param {'ident'|'loadout'|'directives'} tabName
+ */
+export function setTerminalHubTab(tabName) {
+  activeHubTab = tabName;
+  if (typeof document === 'undefined') return;
+
+  const card = document.querySelector('.auth-terminal-card');
+  const tabIdent = document.getElementById('tabHubIdent');
+  const tabLoadout = document.getElementById('tabHubLoadout');
+  const tabDirectives = document.getElementById('tabHubDirectives');
+
+  const dossierView = document.getElementById('dossierView');
+  const authView = document.getElementById('authView');
+  const hubLoadoutView = document.getElementById('hubLoadoutView');
+  const hubDirectivesView = document.getElementById('hubDirectivesView');
+
+  const headerTitle = document.getElementById('terminalHeaderTitle');
+  const headerSub = document.getElementById('terminalHeaderSub');
+  const statusBanner = document.getElementById('terminalStatusBanner');
+  const consoleMsg = document.getElementById('terminalConsoleMsg');
+
+  // Update nav tab active classes
+  if (tabIdent && tabIdent.classList) {
+    if (tabName === 'ident') tabIdent.classList.add('active');
+    else tabIdent.classList.remove('active');
+  }
+  if (tabLoadout && tabLoadout.classList) {
+    if (tabName === 'loadout') tabLoadout.classList.add('active');
+    else tabLoadout.classList.remove('active');
+  }
+  if (tabDirectives && tabDirectives.classList) {
+    if (tabName === 'directives') tabDirectives.classList.add('active');
+    else tabDirectives.classList.remove('active');
+  }
+
+  // Clean up any active Armory WebGL preview when leaving 'loadout'
+  if (tabName !== 'loadout' && armoryModal && typeof armoryModal.isOpen === 'function' && armoryModal.isOpen()) {
+    armoryModal.hide({ skipMenuCallback: true });
+    armoryModal._customContainer = null;
+    armoryModal._inHub = false;
+  }
+
+  // Clean up Achievements modal when leaving 'directives'
+  if (tabName !== 'directives' && achievementsModal && typeof achievementsModal.isOpen === 'function' && achievementsModal.isOpen()) {
+    achievementsModal.hide({ skipMenuCallback: true });
+    achievementsModal._customContainer = null;
+    achievementsModal._inHub = false;
+  }
+
+  if (tabName === 'ident') {
+    if (card) {
+      card.classList.remove('hub-view-loadout', 'hub-view-directives');
+    }
+    if (hubLoadoutView) hubLoadoutView.style.display = 'none';
+    if (hubDirectivesView) hubDirectivesView.style.display = 'none';
+
+    const user = authManager.currentUser;
+    const isAuth = user && !user.isAnonymous;
+    if (isAuth) {
+      setTerminalView('dossier');
+      populateDossierData();
+    } else {
+      setTerminalView('auth');
+    }
+  } else if (tabName === 'loadout') {
+    if (card) {
+      card.classList.add('hub-view-loadout');
+      card.classList.remove('hub-view-directives');
+    }
+    if (dossierView) dossierView.style.display = 'none';
+    if (authView) authView.style.display = 'none';
+    if (hubDirectivesView) hubDirectivesView.style.display = 'none';
+    if (statusBanner) statusBanner.style.display = 'none';
+    if (consoleMsg) consoleMsg.style.display = 'none';
+
+    if (headerTitle) headerTitle.textContent = 'ARMORY & LOADOUT';
+    if (headerSub) headerSub.textContent = 'CUSTOMIZE IDENTITY DISC & CHASSIS';
+
+    if (hubLoadoutView) {
+      hubLoadoutView.style.display = 'block';
+      if (armoryModal) {
+        armoryModal._customContainer = hubLoadoutView;
+        armoryModal._inHub = true;
+        armoryModal._onHubClose = () => setTerminalHubTab('ident');
+        armoryModal.show();
+      }
+    }
+  } else if (tabName === 'directives') {
+    if (card) {
+      card.classList.add('hub-view-directives');
+      card.classList.remove('hub-view-loadout');
+    }
+    if (dossierView) dossierView.style.display = 'none';
+    if (authView) authView.style.display = 'none';
+    if (hubLoadoutView) hubLoadoutView.style.display = 'none';
+    if (statusBanner) statusBanner.style.display = 'none';
+    if (consoleMsg) consoleMsg.style.display = 'none';
+
+    if (headerTitle) headerTitle.textContent = 'GRID DIRECTIVES';
+    if (headerSub) headerSub.textContent = 'TROPHY PROGRESSION & REWARD MATRIX';
+
+    if (hubDirectivesView) {
+      hubDirectivesView.style.display = 'block';
+      if (achievementsModal) {
+        achievementsModal._customContainer = hubDirectivesView;
+        achievementsModal._inHub = true;
+        achievementsModal._onHubClose = () => setTerminalHubTab('ident');
+        achievementsModal.show();
+      }
     }
   }
 }
@@ -173,8 +291,9 @@ export function setTerminalStep(step, mode = activeMode) {
 
 /**
  * Shows the Grid Authorization Terminal modal.
+ * @param {'ident'|'loadout'|'directives'} [initialTab='ident']
  */
-export function showAuthTerminal() {
+export function showAuthTerminal(initialTab = 'ident') {
   if (typeof document === 'undefined') return;
   const modal = document.getElementById('authModal');
   if (!modal) return;
@@ -189,19 +308,21 @@ export function showAuthTerminal() {
   populateTerminalData();
   populateDossierData();
 
-  const user = authManager.currentUser;
-  const isAuth = user && !user.isAnonymous;
-
-  if (isAuth) {
-    setTerminalView('dossier');
-    setConsoleMessage(`> DOSSIER LOADED FOR PROGRAM "${user.handle}". AWAITING INPUT...`, 'info');
+  if (initialTab && initialTab !== 'ident') {
+    setTerminalHubTab(initialTab);
   } else {
-    setTerminalView('auth');
-    setTerminalStep(1, 'signin');
-    setConsoleMessage('> TERMINAL READY. AWAITING INPUT...', 'info');
-    const emailInput = document.getElementById('authEmailInput');
-    if (emailInput) {
-      setTimeout(() => emailInput.focus(), 60);
+    setTerminalHubTab('ident');
+    const user = authManager.currentUser;
+    const isAuth = user && !user.isAnonymous;
+    if (isAuth) {
+      setConsoleMessage(`> DOSSIER LOADED FOR PROGRAM "${user.handle}". AWAITING INPUT...`, 'info');
+    } else {
+      setTerminalStep(1, 'signin');
+      setConsoleMessage('> TERMINAL READY. AWAITING INPUT...', 'info');
+      const emailInput = document.getElementById('authEmailInput');
+      if (emailInput) {
+        setTimeout(() => emailInput.focus(), 60);
+      }
     }
   }
 
@@ -217,6 +338,38 @@ export function hideAuthTerminal() {
   if (typeof document === 'undefined') return;
   const modal = document.getElementById('authModal');
   if (modal) modal.style.display = 'none';
+
+  // Clean up any active Armory WebGL preview
+  if (armoryModal && typeof armoryModal.isOpen === 'function' && armoryModal.isOpen()) {
+    armoryModal.hide({ skipMenuCallback: true });
+    armoryModal._customContainer = null;
+    armoryModal._inHub = false;
+  }
+
+  // Clean up Achievements modal
+  if (achievementsModal && typeof achievementsModal.isOpen === 'function' && achievementsModal.isOpen()) {
+    achievementsModal.hide({ skipMenuCallback: true });
+    achievementsModal._customContainer = null;
+    achievementsModal._inHub = false;
+  }
+
+  const card = document.querySelector('.auth-terminal-card');
+  if (card) {
+    card.classList.remove('hub-view-loadout', 'hub-view-directives');
+  }
+
+  const hubLoadoutView = document.getElementById('hubLoadoutView');
+  const hubDirectivesView = document.getElementById('hubDirectivesView');
+  if (hubLoadoutView) hubLoadoutView.style.display = 'none';
+  if (hubDirectivesView) hubDirectivesView.style.display = 'none';
+
+  activeHubTab = 'ident';
+  const tabIdent = document.getElementById('tabHubIdent');
+  const tabLoadout = document.getElementById('tabHubLoadout');
+  const tabDirectives = document.getElementById('tabHubDirectives');
+  if (tabIdent) tabIdent.classList.add('active');
+  if (tabLoadout) tabLoadout.classList.remove('active');
+  if (tabDirectives) tabDirectives.classList.remove('active');
 
   state.authModalOpen = false;
   setCursor();
@@ -689,25 +842,19 @@ export function initAuthTerminal() {
   if (tabHubIdent) {
     tabHubIdent.onclick = (e) => {
       e.stopPropagation();
-      const user = authManager.currentUser;
-      if (user && !user.isAnonymous) {
-        setTerminalView('dossier');
-        populateDossierData();
-      } else {
-        setTerminalView('auth');
-      }
+      setTerminalHubTab('ident');
     };
   }
   if (tabHubLoadout) {
     tabHubLoadout.onclick = (e) => {
       e.stopPropagation();
-      setConsoleMessage('> LOADOUT / ARMORY INTEGRATION SCHEDULED FOR PHASE 2.', 'info');
+      setTerminalHubTab('loadout');
     };
   }
   if (tabHubDirectives) {
     tabHubDirectives.onclick = (e) => {
       e.stopPropagation();
-      setConsoleMessage('> DIRECTIVES / ACHIEVEMENTS INTEGRATION SCHEDULED FOR PHASE 2.', 'info');
+      setTerminalHubTab('directives');
     };
   }
 
@@ -734,5 +881,6 @@ if (typeof window !== 'undefined') {
   window.__tronUpdateIdentityHeader = updateIdentityHeader;
   window.__tronSetTerminalStep = setTerminalStep;
   window.__tronSetTerminalView = setTerminalView;
+  window.__tronSetTerminalHubTab = setTerminalHubTab;
   window.__tronPopulateDossierData = populateDossierData;
 }

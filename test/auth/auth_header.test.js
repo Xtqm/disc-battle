@@ -57,7 +57,7 @@ unsub();
 console.log('✓ AuthManager.updateCallsign emits reactive profile update event');
 
 // 5. Program Dossier view switching and population tests (Mock DOM)
-const { setTerminalView, populateDossierData, showAuthTerminal } = await import('../../src/ui/authTerminal.js');
+const { setTerminalView, populateDossierData, showAuthTerminal, setTerminalHubTab } = await import('../../src/ui/authTerminal.js');
 
 class MockDomElement {
   constructor(id = '') {
@@ -67,16 +67,28 @@ class MockDomElement {
     this.value = '';
     this.className = '';
     this.innerHTML = '';
+    const classes = new Set();
     this.classList = {
-      add: () => {},
-      remove: () => {},
-      contains: () => false
+      add: (c) => classes.add(c),
+      remove: (c) => classes.delete(c),
+      contains: (c) => classes.has(c),
+      toggle: (c, force) => {
+        if (force === undefined) {
+          if (classes.has(c)) { classes.delete(c); return false; }
+          classes.add(c); return true;
+        }
+        if (force) { classes.add(c); return true; }
+        classes.delete(c); return false;
+      }
     };
     this.focus = () => {};
     this.select = () => {};
   }
   querySelector() {
     return null;
+  }
+  querySelectorAll() {
+    return [];
   }
 }
 
@@ -108,6 +120,11 @@ const mockElements = {
   tabCreateAccount: new MockDomElement('tabCreateAccount'),
   btnAuthorizePasskey: new MockDomElement('btnAuthorizePasskey'),
   btnContinueToCallsign: new MockDomElement('btnContinueToCallsign'),
+  tabHubIdent: new MockDomElement('tabHubIdent'),
+  tabHubLoadout: new MockDomElement('tabHubLoadout'),
+  tabHubDirectives: new MockDomElement('tabHubDirectives'),
+  hubLoadoutView: new MockDomElement('hubLoadoutView'),
+  hubDirectivesView: new MockDomElement('hubDirectivesView'),
 };
 
 globalThis.document = {
@@ -163,5 +180,33 @@ showAuthTerminal();
 assert.strictEqual(mockElements.dossierView.style.display, 'none', 'Dossier view must be hidden for guest user');
 assert.strictEqual(mockElements.authView.style.display, 'block', 'showAuthTerminal() must route guest user to auth wizard');
 console.log('✓ showAuthTerminal() automatically routes guest users to Auth Wizard Step 1');
+
+// Test setTerminalHubTab('loadout')
+setTerminalHubTab('loadout');
+assert.ok(mockElements.tabHubLoadout.classList.contains('active'), 'tabHubLoadout must have active class');
+assert.strictEqual(mockElements.tabHubIdent.classList.contains('active'), false, 'tabHubIdent must not be active');
+assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'ARMORY & LOADOUT', 'Header title must update to ARMORY & LOADOUT');
+assert.notStrictEqual(mockElements.hubLoadoutView.style.display, 'none', 'hubLoadoutView must be displayed');
+assert.strictEqual(mockElements.dossierView.style.display, 'none', 'dossierView must be hidden');
+console.log('✓ setTerminalHubTab("loadout") activates Loadout view and updates header titles');
+
+// Test setTerminalHubTab('directives')
+setTerminalHubTab('directives');
+assert.ok(mockElements.tabHubDirectives.classList.contains('active'), 'tabHubDirectives must have active class');
+assert.strictEqual(mockElements.tabHubLoadout.classList.contains('active'), false, 'tabHubLoadout must not be active');
+assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'GRID DIRECTIVES', 'Header title must update to GRID DIRECTIVES');
+assert.notStrictEqual(mockElements.hubDirectivesView.style.display, 'none', 'hubDirectivesView must be displayed');
+assert.strictEqual(mockElements.hubLoadoutView.style.display, 'none', 'hubLoadoutView must be hidden');
+console.log('✓ setTerminalHubTab("directives") activates Directives view and updates header titles');
+
+// Test setTerminalHubTab('ident')
+authManager._currentUser = { uid: 'u-123', handle: 'GRID_RUNNER', isAnonymous: false };
+setTerminalHubTab('ident');
+assert.ok(mockElements.tabHubIdent.classList.contains('active'), 'tabHubIdent must have active class');
+assert.strictEqual(mockElements.tabHubDirectives.classList.contains('active'), false, 'tabHubDirectives must not be active');
+assert.strictEqual(mockElements.hubLoadoutView.style.display, 'none', 'hubLoadoutView must be hidden');
+assert.strictEqual(mockElements.hubDirectivesView.style.display, 'none', 'hubDirectivesView must be hidden');
+assert.strictEqual(mockElements.dossierView.style.display, 'block', 'dossierView must be displayed for authenticated user');
+console.log('✓ setTerminalHubTab("ident") restores Program Dossier view');
 
 console.log('--- Main Menu Identity Header Unit Tests PASSED ---');

@@ -131,11 +131,12 @@ export function getMainMenuHtml() {
   </div>
   <div class="mode-select" id="mainMenuButtons">
     <button id="campaignBtn" class="mode-btn campaign-btn">CAMPAIGN SECTORS</button>
-    <button id="armoryBtn" class="mode-btn armory-btn">ARMORY</button>
-    <button id="achievementsBtn" class="mode-btn achievements-btn">ACHIEVEMENTS</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
+    <!-- Legacy compatibility elements for tests & programmatic navigation -->
+    <button id="armoryBtn" class="mode-btn armory-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ARMORY</button>
+    <button id="achievementsBtn" class="mode-btn achievements-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ACHIEVEMENTS</button>
     <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="btnSwarmSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="btnDuelSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
@@ -241,17 +242,13 @@ export function bindMainMenuEvents() {
   const openArmory = (e) => {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
-    const overlay = document.getElementById('overlay');
-    if (overlay) overlay.style.display = 'none';
-    armoryModal.show();
+    showAuthTerminal('loadout');
   };
 
   const openAchievements = (e) => {
     e.stopPropagation();
     if (e.cancelable) e.preventDefault();
-    const overlay = document.getElementById('overlay');
-    if (overlay) overlay.style.display = 'none';
-    achievementsModal.show();
+    showAuthTerminal('directives');
   };
 
   bind('campaignBtn', openCampaign);

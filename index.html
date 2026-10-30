@@ -691,6 +691,7 @@
   .auth-terminal-card {
     position: relative;
     max-width: 480px;
+    width: 92vw;
     background: rgba(1, 14, 22, 0.94) !important;
     border: 1px solid rgba(79, 242, 255, 0.45) !important;
     border-radius: 12px !important;
@@ -699,6 +700,26 @@
     text-align: left !important;
     padding: 28px 32px !important;
     font-family: "Segoe UI", Helvetica, Arial, sans-serif !important;
+    transition: max-width 0.22s ease;
+  }
+  .auth-terminal-card.hub-view-loadout {
+    max-width: 1040px !important;
+    width: 95vw !important;
+    padding: 24px 28px !important;
+  }
+  .auth-terminal-card.hub-view-directives {
+    max-width: 960px !important;
+    width: 95vw !important;
+    padding: 24px 28px !important;
+  }
+  .auth-terminal-card.hub-view-loadout .armory-card,
+  .auth-terminal-card.hub-view-directives .trophy-matrix-card {
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-height: 80vh !important;
+    background: transparent !important;
+    padding: 0 !important;
   }
   .terminal-close-btn {
     position: absolute;
@@ -2473,12 +2494,8 @@
     <!-- Terminal Hub Navigation Tabs -->
     <div class="terminal-hub-nav" id="terminalHubNav">
       <button class="hub-nav-tab active" id="tabHubIdent" type="button">IDENT MATRIX</button>
-      <button class="hub-nav-tab hub-tab-disabled" id="tabHubLoadout" type="button" title="Loadout (Armory) planned for Phase 2">
-        LOADOUT <span class="coming-soon-pill">SOON</span>
-      </button>
-      <button class="hub-nav-tab hub-tab-disabled" id="tabHubDirectives" type="button" title="Directives (Achievements) planned for Phase 2">
-        DIRECTIVES <span class="coming-soon-pill">SOON</span>
-      </button>
+      <button class="hub-nav-tab" id="tabHubLoadout" type="button">LOADOUT</button>
+      <button class="hub-nav-tab" id="tabHubDirectives" type="button">DIRECTIVES</button>
     </div>
 
     <!-- Active Identity Overview -->
@@ -2620,6 +2637,12 @@
       </div>
     </div>
 
+    <!-- 3. HUB LOADOUT VIEW (Armory 3D Preview Bay & Catalog) -->
+    <div id="hubLoadoutView" class="terminal-view-container" style="display:none;"></div>
+
+    <!-- 4. HUB DIRECTIVES VIEW (Achievements / Trophy Matrix) -->
+    <div id="hubDirectivesView" class="terminal-view-container" style="display:none;"></div>
+
     <!-- Console Readout -->
     <div id="terminalConsoleMsg" class="terminal-console">&gt; TERMINAL READY. AWAITING INPUT...</div>
 
@@ -2663,12 +2686,12 @@
   </div>
   <div class="mode-select" id="mainMenuButtons">
     <button id="campaignBtn" class="mode-btn campaign-btn">CAMPAIGN SECTORS</button>
-    <button id="armoryBtn" class="mode-btn armory-btn">ARMORY</button>
-    <button id="achievementsBtn" class="mode-btn achievements-btn">ACHIEVEMENTS</button>
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
-    <!-- Legacy compatibility elements for tests -->
+    <!-- Legacy compatibility elements for tests & programmatic navigation -->
+    <button id="armoryBtn" class="mode-btn armory-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ARMORY</button>
+    <button id="achievementsBtn" class="mode-btn achievements-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ACHIEVEMENTS</button>
     <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="btnSwarmSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="btnDuelSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>

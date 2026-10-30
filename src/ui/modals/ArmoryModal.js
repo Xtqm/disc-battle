@@ -52,7 +52,7 @@ export class ArmoryModal {
   }
 
   get container() {
-    return typeof document !== 'undefined' ? document.getElementById(this._containerId) : null;
+    return typeof document !== 'undefined' ? (this._customContainer || document.getElementById(this._containerId)) : null;
   }
 
   isOpen() {
@@ -108,7 +108,7 @@ export class ArmoryModal {
   /**
    * Hides the Armory modal and cleanly disposes WebGL preview resources.
    */
-  hide() {
+  hide(options = {}) {
     const wasOpen = state.armoryModalOpen;
     state.armoryModalOpen = false;
 
@@ -131,7 +131,7 @@ export class ArmoryModal {
         el.innerHTML = '';
       }
 
-      if (wasOpen && typeof this._onBackToMenu === 'function') {
+      if (wasOpen && !options.skipMenuCallback && typeof this._onBackToMenu === 'function') {
         this._onBackToMenu();
       }
     } finally {
@@ -203,7 +203,9 @@ export class ArmoryModal {
    * @returns {string}
    */
   render() {
-    const balance = this.economy.getBalance();
+    const balance = typeof this.economy.getBalance === 'function'
+      ? this.economy.getBalance()
+      : (typeof this.economy.getBits === 'function' ? this.economy.getBits() : 0);
     const formattedBits = `$B ${balance.toLocaleString()}`;
 
     return `
@@ -419,12 +421,16 @@ export class ArmoryModal {
     if (closeBtn) {
       closeBtn.onclick = (e) => {
         e.stopPropagation();
-        this.hide();
+        if (this._inHub && typeof this._onHubClose === 'function') {
+          this._onHubClose();
+        } else {
+          this.hide();
+        }
       };
     }
 
     // Category Tabs
-    const tabBtns = root.querySelectorAll('.armory-tab-btn');
+    const tabBtns = root.querySelectorAll ? root.querySelectorAll('.armory-tab-btn') : [];
     tabBtns.forEach((btn) => {
       btn.onclick = (e) => {
         e.stopPropagation();
@@ -443,7 +449,7 @@ export class ArmoryModal {
   }
 
   _bindCardClicks(root) {
-    const cards = root.querySelectorAll('.armory-item-card');
+    const cards = root.querySelectorAll ? root.querySelectorAll('.armory-item-card') : [];
     cards.forEach((card) => {
       card.onclick = (e) => {
         e.stopPropagation();
@@ -627,7 +633,9 @@ export class ArmoryModal {
   _refreshBitsCounter(flash = false) {
     const counterEl = this.container?.querySelector('#armoryBitsCounter');
     const valEl = this.container?.querySelector('#armoryBitsValue');
-    const balance = this.economy.getBalance();
+    const balance = typeof this.economy.getBalance === 'function'
+      ? this.economy.getBalance()
+      : (typeof this.economy.getBits === 'function' ? this.economy.getBits() : 0);
     const formattedBits = `$B ${balance.toLocaleString()}`;
 
     if (valEl) {

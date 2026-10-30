@@ -167,11 +167,11 @@ The system SHALL provide an Armory entrypoint within the main menu interface tha
 
 #### Scenario: Initial page load rendering of Armory navigation button
 - **WHEN** the main menu renders upon initial application load
-- **THEN** `#armoryBtn` is present in `#mainMenuButtons` with amber cyber-neon styling and active click binding.
+- **THEN** `#armoryBtn` is present in `#mainMenuButtons` with compatibility bindings, while the primary player access point is elevated to the Program Hub `[ LOADOUT ]` tab.
 
 #### Scenario: Opening Armory modal from main menu
-- **WHEN** the player clicks the Armory button from the main menu
-- **THEN** the system pauses background menu interactions, unlocks the cursor, displays the Armory modal overlay, defaults to the `IDENTITY DISCS` category, and stages the first catalog item in the 3D preview bay.
+- **WHEN** the player clicks the Armory button or activates `[ LOADOUT ]` in the Program Hub
+- **THEN** the system pauses background menu interactions, unlocks the cursor, displays the Armory interface, defaults to the `IDENTITY DISCS` category, and stages the equipped or first catalog item in the 3D preview bay.
 
 #### Scenario: Displaying and updating live Bit balance counter
 - **WHEN** the Armory modal is opened or when currency changes occur via purchase or earning

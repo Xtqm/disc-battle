@@ -296,13 +296,42 @@ async function runTerminalIntegrationTests() {
     });
     console.log('✓ Switch Identity transitioned to Auth Wizard and single-step sign in bypassed Step 2');
 
-    console.log('\n--- 6. Testing Escape Key Isolation and Strict [X] Button Dismissal ---');
+    console.log('\n--- 6. Testing Terminal Hub Tabs & View Transitions ---');
     // Open terminal again
     await page.click('#manageIdentityBtn');
     await page.waitForFunction(() => {
       const modal = document.getElementById('authModal');
       return modal && modal.style.display === 'flex';
     });
+
+    // Click [ LOADOUT ] tab
+    await page.click('#tabHubLoadout');
+    await page.waitForFunction(() => {
+      const loadoutView = document.getElementById('hubLoadoutView');
+      const tabLoadout = document.getElementById('tabHubLoadout');
+      return loadoutView && loadoutView.style.display !== 'none' && tabLoadout.classList.contains('active');
+    });
+    console.log('✓ Tab [ LOADOUT ] seamlessly mounts 3D Armory preview bay in Hub');
+
+    // Click [ DIRECTIVES ] tab
+    await page.click('#tabHubDirectives');
+    await page.waitForFunction(() => {
+      const dirView = document.getElementById('hubDirectivesView');
+      const tabDir = document.getElementById('tabHubDirectives');
+      return dirView && dirView.style.display !== 'none' && tabDir.classList.contains('active');
+    });
+    console.log('✓ Tab [ DIRECTIVES ] seamlessly mounts Trophy Matrix in Hub');
+
+    // Click [ IDENT MATRIX ] tab
+    await page.click('#tabHubIdent');
+    await page.waitForFunction(() => {
+      const dosView = document.getElementById('dossierView');
+      const tabIdent = document.getElementById('tabHubIdent');
+      return dosView && dosView.style.display !== 'none' && tabIdent.classList.contains('active');
+    });
+    console.log('✓ Tab [ IDENT MATRIX ] restores Program Dossier view');
+
+    console.log('\n--- 7. Testing Escape Key Isolation and Strict [X] Button Dismissal ---');
 
     // Press Escape - modal must NOT close
     await page.keyboard.press('Escape');

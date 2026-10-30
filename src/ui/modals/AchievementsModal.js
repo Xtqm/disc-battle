@@ -30,20 +30,23 @@ export class AchievementsModal {
 
   get container() {
     if (typeof document === 'undefined') return null;
+    if (this._customContainer) return this._customContainer;
     let el = document.getElementById(this._containerId);
-    if (!el) {
+    if (!el && typeof document.createElement === 'function') {
       el = document.createElement('div');
       el.id = this._containerId;
       el.className = 'achievements-modal modal-overlay';
       el.style.display = 'none';
-      document.body.appendChild(el);
+      if (document.body && typeof document.body.appendChild === 'function') {
+        document.body.appendChild(el);
+      }
     }
     return el;
   }
 
   isOpen() {
     const el = this.container;
-    return Boolean(el && el.style.display !== 'none');
+    return Boolean(el && el.style && el.style.display !== 'none');
   }
 
   setOnBackToMenu(callback) {
@@ -74,7 +77,7 @@ export class AchievementsModal {
   /**
    * Dismisses the modal and notifies listeners.
    */
-  hide() {
+  hide(options = {}) {
     const wasOpen = state.achievementsModalOpen;
     state.achievementsModalOpen = false;
     const el = this.container;
@@ -87,7 +90,7 @@ export class AchievementsModal {
       this._keyHandler = null;
     }
 
-    if (wasOpen && typeof this._onBackToMenu === 'function') {
+    if (wasOpen && !options.skipMenuCallback && typeof this._onBackToMenu === 'function') {
       this._onBackToMenu();
     }
   }
@@ -328,7 +331,11 @@ export class AchievementsModal {
     if (closeBtn) {
       closeBtn.onclick = (e) => {
         e.stopPropagation();
-        this.hide();
+        if (this._inHub && typeof this._onHubClose === 'function') {
+          this._onHubClose();
+        } else {
+          this.hide();
+        }
       };
     }
 
@@ -336,7 +343,11 @@ export class AchievementsModal {
     if (returnBtn) {
       returnBtn.onclick = (e) => {
         e.stopPropagation();
-        this.hide();
+        if (this._inHub && typeof this._onHubClose === 'function') {
+          this._onHubClose();
+        } else {
+          this.hide();
+        }
       };
     }
 

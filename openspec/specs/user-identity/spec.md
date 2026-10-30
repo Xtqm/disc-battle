@@ -91,8 +91,8 @@ The system SHALL provide a diegetic Grid Authorization Terminal modal interface 
 - **THEN** the terminal switches the active view from the dossier to the authentication wizard (Step 1), permitting sign in with alternative credentials or new account creation.
 
 #### Scenario: Terminal tabbed navigation
-- **WHEN** the Program Dossier modal is opened
-- **THEN** the terminal displays a clean horizontal tab bar for `[ IDENT MATRIX ]`, `[ LOADOUT ]`, and `[ DIRECTIVES ]` that preserves dedicated spacing for the exit control without awkward text-wrapping or crowded borders.
+- **WHEN** the player activates the hub navigation tabs (`[ IDENT MATRIX ]`, `[ LOADOUT ]`, `[ DIRECTIVES ]`)
+- **THEN** the terminal switches sub-views in real time, rendering the 3D Armory catalog under `[ LOADOUT ]`, the Trophy Matrix under `[ DIRECTIVES ]`, and the identity dossier under `[ IDENT MATRIX ]` without exiting the modal.
 
 ### Requirement: PointerLock and Canvas Modal Safety
 The system SHALL safely isolate mouse and touch input between active modal terminals and the Three.js canvas, guaranteeing PointerLock release upon terminal launch.
