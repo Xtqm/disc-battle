@@ -5,6 +5,7 @@ import { setCursor } from '../input/InputManager.js';
 
 let activeStep = 1;
 let activeMode = 'signin'; // 'signin' | 'create'
+let activeView = 'dossier'; // 'dossier' | 'auth'
 
 /**
  * Calculates current level tier from player save state.
@@ -16,6 +17,44 @@ export function calculateLevel(saveState) {
   const score = saveState.stats.totalScore || 0;
   const wave = saveState.stats.highestWave || 1;
   return Math.max(1, Math.floor(score / 500) + wave);
+}
+
+/**
+ * Sets the active terminal view ('dossier' | 'auth').
+ * @param {'dossier'|'auth'} view
+ */
+export function setTerminalView(view) {
+  activeView = view;
+  if (typeof document === 'undefined') return;
+
+  const dossierView = document.getElementById('dossierView');
+  const authView = document.getElementById('authView');
+  const headerTitle = document.getElementById('terminalHeaderTitle');
+  const headerSub = document.getElementById('terminalHeaderSub');
+  const returnToDossierRow = document.getElementById('returnToDossierRow');
+  const user = authManager.currentUser;
+  const isAuth = user && !user.isAnonymous;
+
+  if (view === 'dossier') {
+    if (dossierView) dossierView.style.display = 'block';
+    if (authView) authView.style.display = 'none';
+    if (headerTitle) headerTitle.textContent = 'PROGRAM DOSSIER';
+    if (headerSub) headerSub.textContent = 'GRID TELEMETRY & IDENTITY MATRIX';
+
+    // Reset inline callsign edit row
+    const displayRow = document.getElementById('callsignDisplayRow');
+    const editRow = document.getElementById('callsignEditRow');
+    if (displayRow) displayRow.style.display = 'flex';
+    if (editRow) editRow.style.display = 'none';
+  } else {
+    if (dossierView) dossierView.style.display = 'none';
+    if (authView) authView.style.display = 'block';
+    if (headerTitle) headerTitle.textContent = 'GRID IDENTITY TERMINAL';
+    if (headerSub) headerSub.textContent = 'SYNC PROGRESSION & PROFILE';
+    if (returnToDossierRow) {
+      returnToDossierRow.style.display = isAuth ? 'block' : 'none';
+    }
+  }
 }
 
 /**
@@ -141,18 +180,28 @@ export function showAuthTerminal() {
   state.authModalOpen = true;
   setCursor();
 
-  // Populate identity state and reset to Step 1 Sign In
   populateTerminalData();
-  setTerminalStep(1, 'signin');
+  populateDossierData();
+
+  const user = authManager.currentUser;
+  const isAuth = user && !user.isAnonymous;
+
+  if (isAuth) {
+    setTerminalView('dossier');
+    setConsoleMessage(`> DOSSIER LOADED FOR PROGRAM "${user.handle}". AWAITING INPUT...`, 'info');
+  } else {
+    setTerminalView('auth');
+    setTerminalStep(1, 'signin');
+    setConsoleMessage('> TERMINAL READY. AWAITING INPUT...', 'info');
+    const emailInput = document.getElementById('authEmailInput');
+    if (emailInput) {
+      setTimeout(() => emailInput.focus(), 60);
+    }
+  }
 
   modal.style.display = 'flex';
   const card = modal.querySelector('.card');
   if (card) card.scrollTop = 0;
-
-  const emailInput = document.getElementById('authEmailInput');
-  if (emailInput) {
-    setTimeout(() => emailInput.focus(), 60);
-  }
 }
 
 /**
@@ -173,6 +222,51 @@ export function hideAuthTerminal() {
  */
 export function isAuthTerminalOpen() {
   return !!state.authModalOpen;
+}
+
+/**
+ * Populates live telemetry and callsign in the Program Dossier view.
+ */
+export function populateDossierData() {
+  if (typeof document === 'undefined') return;
+  const user = authManager.currentUser;
+  const saveState = authManager.saveState;
+  const level = calculateLevel(saveState);
+  const levelStr = String(level).padStart(2, '0');
+
+  const callsignDisplay = document.getElementById('dossierCallsignDisplay');
+  const callsignInput = document.getElementById('dossierCallsignInput');
+  const levelEl = document.getElementById('dossierLevel');
+  const bitsEl = document.getElementById('dossierBits');
+  const waveEl = document.getElementById('dossierHighestWave');
+  const scoreEl = document.getElementById('dossierTotalScore');
+  const matchesEl = document.getElementById('dossierMatches');
+  const authTypeEl = document.getElementById('dossierAuthType');
+
+  const handle = (user?.handle || 'PROGRAM').toUpperCase();
+  if (callsignDisplay) callsignDisplay.textContent = handle;
+  if (callsignInput) callsignInput.value = user?.handle || '';
+
+  if (levelEl) levelEl.textContent = `LVL ${levelStr}`;
+  if (bitsEl) bitsEl.textContent = `${(saveState?.bits || 0).toLocaleString()} BITS`;
+
+  const highestWave = saveState?.stats?.highestWave || 1;
+  if (waveEl) waveEl.textContent = `WAVE ${String(highestWave).padStart(2, '0')}`;
+
+  const totalScore = saveState?.stats?.totalScore || 0;
+  if (scoreEl) scoreEl.textContent = `${totalScore.toLocaleString()} PTS`;
+
+  const matches = saveState?.stats?.matchesPlayed || 0;
+  if (matchesEl) matchesEl.textContent = String(matches.toLocaleString());
+
+  if (authTypeEl) {
+    if (user && !user.isAnonymous) {
+      const provider = (user.provider || 'GRID CLOUD').toUpperCase();
+      authTypeEl.textContent = `AUTHORIZED // ${provider}`;
+    } else {
+      authTypeEl.textContent = 'TRANSIENT GUEST';
+    }
+  }
 }
 
 /**
@@ -229,11 +323,17 @@ export function initAuthTerminal() {
   updateIdentityHeader();
   authManager.on(AuthEvents.STATE_CHANGED, () => {
     updateIdentityHeader();
-    if (isAuthTerminalOpen()) populateTerminalData();
+    if (isAuthTerminalOpen()) {
+      populateTerminalData();
+      populateDossierData();
+    }
   });
   authManager.on(AuthEvents.PROFILE_UPDATED, () => {
     updateIdentityHeader();
-    if (isAuthTerminalOpen()) populateTerminalData();
+    if (isAuthTerminalOpen()) {
+      populateTerminalData();
+      populateDossierData();
+    }
   });
 
   const modal = document.getElementById('authModal');
@@ -475,6 +575,133 @@ export function initAuthTerminal() {
     btnGithub.onclick = (e) => { e.stopPropagation(); handleFederatedSync('github'); };
   }
 
+  // Inline Callsign Editing in Program Dossier
+  const btnEditCallsign = document.getElementById('btnEditCallsign');
+  const btnSaveDossierCallsign = document.getElementById('btnSaveDossierCallsign');
+  const btnCancelEditCallsign = document.getElementById('btnCancelEditCallsign');
+  const displayRow = document.getElementById('callsignDisplayRow');
+  const editRow = document.getElementById('callsignEditRow');
+  const dossierInput = document.getElementById('dossierCallsignInput');
+
+  if (btnEditCallsign) {
+    btnEditCallsign.onclick = (e) => {
+      e.stopPropagation();
+      if (displayRow) displayRow.style.display = 'none';
+      if (editRow) editRow.style.display = 'flex';
+      if (dossierInput) {
+        dossierInput.value = authManager.currentUser?.handle || '';
+        setTimeout(() => {
+          dossierInput.focus();
+          dossierInput.select();
+        }, 50);
+      }
+      setConsoleMessage('> ENTER NEW CALLSIGN (3-16 CHARACTERS, ALPHANUMERIC OR _).', 'info');
+    };
+  }
+
+  const cancelDossierEdit = () => {
+    if (displayRow) displayRow.style.display = 'flex';
+    if (editRow) editRow.style.display = 'none';
+    setConsoleMessage('> CALLSIGN EDIT CANCELLED.', 'info');
+  };
+
+  if (btnCancelEditCallsign) {
+    btnCancelEditCallsign.onclick = (e) => {
+      e.stopPropagation();
+      cancelDossierEdit();
+    };
+  }
+
+  const saveDossierCallsign = async () => {
+    if (!dossierInput) return;
+    const raw = (dossierInput.value || '').trim();
+    if (!raw || raw.length < 3 || raw.length > 16 || !/^[a-zA-Z0-9_]+$/.test(raw)) {
+      setConsoleMessage('> ERROR: CALLSIGN MUST BE 3-16 ALPHANUMERIC CHARS OR UNDERSCORES.', 'error');
+      return;
+    }
+    try {
+      await authManager.updateCallsign(raw);
+      if (displayRow) displayRow.style.display = 'flex';
+      if (editRow) editRow.style.display = 'none';
+      populateDossierData();
+      populateTerminalData();
+      updateIdentityHeader();
+      setConsoleMessage(`> CALLSIGN UPDATED: "${authManager.currentUser.handle}" HARMONIZED TO GRID.`, 'success');
+    } catch (err) {
+      setConsoleMessage(`> ERROR: ${err.message}`, 'error');
+    }
+  };
+
+  if (btnSaveDossierCallsign) {
+    btnSaveDossierCallsign.onclick = (e) => {
+      e.stopPropagation();
+      saveDossierCallsign();
+    };
+  }
+
+  if (dossierInput) {
+    dossierInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveDossierCallsign();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        cancelDossierEdit();
+      }
+    });
+  }
+
+  // View Switchers: [ SWITCH IDENTITY / SIGN OUT ] and Return to Dossier
+  const btnSwitchIdentity = document.getElementById('btnSwitchIdentity');
+  if (btnSwitchIdentity) {
+    btnSwitchIdentity.onclick = (e) => {
+      e.stopPropagation();
+      setTerminalView('auth');
+      setTerminalStep(1, 'signin');
+      setConsoleMessage('> AUTH WIZARD ACTIVE. CONNECT DIFFERENT CREDENTIALS.', 'info');
+    };
+  }
+
+  const btnReturnToDossier = document.getElementById('btnReturnToDossier');
+  if (btnReturnToDossier) {
+    btnReturnToDossier.onclick = (e) => {
+      e.stopPropagation();
+      setTerminalView('dossier');
+      populateDossierData();
+      setConsoleMessage('> RETURNED TO PROGRAM DOSSIER.', 'info');
+    };
+  }
+
+  // Terminal Hub Navigation Tabs
+  const tabHubIdent = document.getElementById('tabHubIdent');
+  const tabHubLoadout = document.getElementById('tabHubLoadout');
+  const tabHubDirectives = document.getElementById('tabHubDirectives');
+
+  if (tabHubIdent) {
+    tabHubIdent.onclick = (e) => {
+      e.stopPropagation();
+      const user = authManager.currentUser;
+      if (user && !user.isAnonymous) {
+        setTerminalView('dossier');
+        populateDossierData();
+      } else {
+        setTerminalView('auth');
+      }
+    };
+  }
+  if (tabHubLoadout) {
+    tabHubLoadout.onclick = (e) => {
+      e.stopPropagation();
+      setConsoleMessage('> LOADOUT / ARMORY INTEGRATION SCHEDULED FOR PHASE 2.', 'info');
+    };
+  }
+  if (tabHubDirectives) {
+    tabHubDirectives.onclick = (e) => {
+      e.stopPropagation();
+      setConsoleMessage('> DIRECTIVES / ACHIEVEMENTS INTEGRATION SCHEDULED FOR PHASE 2.', 'info');
+    };
+  }
+
   // Legacy tab bridging (for tests or backward-compatibility)
   const tabDirect = document.getElementById('tabDirectPasskey');
   const tabQuick = document.getElementById('tabQuickSync');
@@ -497,4 +724,6 @@ if (typeof window !== 'undefined') {
   window.__tronHideAuthTerminal = hideAuthTerminal;
   window.__tronUpdateIdentityHeader = updateIdentityHeader;
   window.__tronSetTerminalStep = setTerminalStep;
+  window.__tronSetTerminalView = setTerminalView;
+  window.__tronPopulateDossierData = populateDossierData;
 }

@@ -56,4 +56,112 @@ assert.strictEqual(receivedEvent.user.handle, 'GRID_RUNNER');
 unsub();
 console.log('✓ AuthManager.updateCallsign emits reactive profile update event');
 
+// 5. Program Dossier view switching and population tests (Mock DOM)
+const { setTerminalView, populateDossierData, showAuthTerminal } = await import('../../src/ui/authTerminal.js');
+
+class MockDomElement {
+  constructor(id = '') {
+    this.id = id;
+    this.style = {};
+    this.textContent = '';
+    this.value = '';
+    this.className = '';
+    this.innerHTML = '';
+    this.classList = {
+      add: () => {},
+      remove: () => {},
+      contains: () => false
+    };
+    this.focus = () => {};
+    this.select = () => {};
+  }
+  querySelector() {
+    return null;
+  }
+}
+
+const mockElements = {
+  dossierView: new MockDomElement('dossierView'),
+  authView: new MockDomElement('authView'),
+  terminalHeaderTitle: new MockDomElement('terminalHeaderTitle'),
+  terminalHeaderSub: new MockDomElement('terminalHeaderSub'),
+  returnToDossierRow: new MockDomElement('returnToDossierRow'),
+  callsignDisplayRow: new MockDomElement('callsignDisplayRow'),
+  callsignEditRow: new MockDomElement('callsignEditRow'),
+  dossierCallsignDisplay: new MockDomElement('dossierCallsignDisplay'),
+  dossierCallsignInput: new MockDomElement('dossierCallsignInput'),
+  dossierLevel: new MockDomElement('dossierLevel'),
+  dossierBits: new MockDomElement('dossierBits'),
+  dossierHighestWave: new MockDomElement('dossierHighestWave'),
+  dossierTotalScore: new MockDomElement('dossierTotalScore'),
+  dossierMatches: new MockDomElement('dossierMatches'),
+  dossierAuthType: new MockDomElement('dossierAuthType'),
+  authModal: new MockDomElement('authModal'),
+  terminalStatusBanner: new MockDomElement('terminalStatusBanner'),
+  terminalIdentityReadout: new MockDomElement('terminalIdentityReadout'),
+  terminalConsoleMsg: new MockDomElement('terminalConsoleMsg'),
+  authCallsignInput: new MockDomElement('authCallsignInput'),
+  authEmailInput: new MockDomElement('authEmailInput'),
+  authStep1: new MockDomElement('authStep1'),
+  authStep2: new MockDomElement('authStep2'),
+  tabSignIn: new MockDomElement('tabSignIn'),
+  tabCreateAccount: new MockDomElement('tabCreateAccount'),
+  btnAuthorizePasskey: new MockDomElement('btnAuthorizePasskey'),
+  btnContinueToCallsign: new MockDomElement('btnContinueToCallsign'),
+};
+
+globalThis.document = {
+  getElementById: (id) => mockElements[id] || null,
+  querySelector: () => null,
+  activeElement: new MockDomElement('BODY'),
+  pointerLockElement: null,
+  exitPointerLock: () => {}
+};
+
+// Test setTerminalView('dossier')
+setTerminalView('dossier');
+assert.strictEqual(mockElements.dossierView.style.display, 'block', 'Dossier view must be displayed in dossier mode');
+assert.strictEqual(mockElements.authView.style.display, 'none', 'Auth view must be hidden in dossier mode');
+assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'PROGRAM DOSSIER', 'Header title must update to PROGRAM DOSSIER');
+assert.strictEqual(mockElements.callsignDisplayRow.style.display, 'flex', 'Callsign display row must be visible');
+assert.strictEqual(mockElements.callsignEditRow.style.display, 'none', 'Callsign edit row must be hidden');
+console.log('✓ setTerminalView("dossier") accurately configures dossier UI elements');
+
+// Test setTerminalView('auth')
+setTerminalView('auth');
+assert.strictEqual(mockElements.dossierView.style.display, 'none', 'Dossier view must be hidden in auth mode');
+assert.strictEqual(mockElements.authView.style.display, 'block', 'Auth view must be displayed in auth mode');
+assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'GRID IDENTITY TERMINAL', 'Header title must update to GRID IDENTITY TERMINAL');
+console.log('✓ setTerminalView("auth") accurately configures auth wizard elements');
+
+// Test populateDossierData() with authenticated user saveState
+authManager._currentUser = { uid: 'u-123', handle: 'GRID_RUNNER', isAnonymous: false, provider: 'google' };
+authManager._saveState = {
+  bits: 2450,
+  stats: { totalScore: 3500, highestWave: 5, matchesPlayed: 14 }
+};
+populateDossierData();
+assert.strictEqual(mockElements.dossierCallsignDisplay.textContent, 'GRID_RUNNER', 'Callsign display must show uppercase handle');
+assert.strictEqual(mockElements.dossierCallsignInput.value, 'GRID_RUNNER', 'Callsign input must prefill with current handle');
+assert.strictEqual(mockElements.dossierLevel.textContent, 'LVL 12', 'Level should be computed: 3500/500 + 5 = 12');
+assert.strictEqual(mockElements.dossierBits.textContent, '2,450 BITS', 'Bits must be formatted with commas and BITS suffix');
+assert.strictEqual(mockElements.dossierHighestWave.textContent, 'WAVE 05', 'Highest wave must be padded to 2 digits');
+assert.strictEqual(mockElements.dossierTotalScore.textContent, '3,500 PTS', 'Total score must be formatted with PTS suffix');
+assert.strictEqual(mockElements.dossierMatches.textContent, '14', 'Matches played must be populated');
+assert.ok(mockElements.dossierAuthType.textContent.includes('GOOGLE'), 'Auth clearance status must include provider name');
+console.log('✓ populateDossierData() properly renders telemetry matrix and clearance indicators');
+
+// Test showAuthTerminal() view routing for authenticated user
+showAuthTerminal();
+assert.strictEqual(mockElements.dossierView.style.display, 'block', 'showAuthTerminal() must route authenticated user to dossier view');
+assert.strictEqual(mockElements.authView.style.display, 'none', 'Auth wizard must remain hidden for authenticated user');
+console.log('✓ showAuthTerminal() automatically routes authenticated users to Program Dossier');
+
+// Test showAuthTerminal() view routing for guest user
+authManager._currentUser = { uid: 'guest-99', handle: 'GUEST_99', isAnonymous: true };
+showAuthTerminal();
+assert.strictEqual(mockElements.dossierView.style.display, 'none', 'Dossier view must be hidden for guest user');
+assert.strictEqual(mockElements.authView.style.display, 'block', 'showAuthTerminal() must route guest user to auth wizard');
+console.log('✓ showAuthTerminal() automatically routes guest users to Auth Wizard Step 1');
+
 console.log('--- Main Menu Identity Header Unit Tests PASSED ---');

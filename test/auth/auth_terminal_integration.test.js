@@ -227,21 +227,74 @@ async function runTerminalIntegrationTests() {
     assert.strictEqual(regOscCount, 0, 'No audio oscillator nodes should be created during registration');
     console.log('✓ Registration completed in Step 2: Identity Header updated to Tron Cyan with customized handle (0 SFX calls)');
 
-    console.log('\n--- 5. Testing Single-Step Sign In Bypass for Returning Users ---');
+    console.log('\n--- 5. Testing Program Dossier Launch & Inline Callsign Edit ---');
     // Open terminal from recognized state
     await page.click('#manageIdentityBtn');
     await page.waitForFunction(() => {
       const modal = document.getElementById('authModal');
-      return modal && modal.style.display === 'flex';
+      const dossier = document.getElementById('dossierView');
+      return modal && modal.style.display === 'flex' && dossier && dossier.style.display !== 'none';
     });
 
-    // Sign In should bypass Step 2 and authenticate directly
+    const dossierState = await page.evaluate(() => {
+      const dossierView = document.getElementById('dossierView');
+      const authView = document.getElementById('authView');
+      const callsign = document.getElementById('dossierCallsignDisplay')?.textContent || '';
+      const level = document.getElementById('dossierLevel')?.textContent || '';
+      const headerTitle = document.getElementById('terminalHeaderTitle')?.textContent || '';
+      return {
+        dossierVisible: dossierView?.style.display !== 'none',
+        authHidden: authView?.style.display === 'none',
+        callsign,
+        level,
+        headerTitle
+      };
+    });
+
+    assert.strictEqual(dossierState.dossierVisible, true, 'Program Dossier view must be visible for recognized user');
+    assert.strictEqual(dossierState.authHidden, true, 'Auth wizard view must be hidden initially');
+    assert.strictEqual(dossierState.callsign, 'TRON_WARRIOR', 'Dossier callsign must match user handle');
+    assert.ok(dossierState.level.includes('LVL'), 'Dossier must display combat level tier');
+    assert.strictEqual(dossierState.headerTitle, 'PROGRAM DOSSIER', 'Terminal title must read PROGRAM DOSSIER');
+    console.log('✓ Recognized user opening terminal automatically lands on Program Dossier with live telemetry');
+
+    // Inline Callsign Edit within Dossier
+    await page.click('#btnEditCallsign');
+    await page.waitForFunction(() => {
+      const editRow = document.getElementById('callsignEditRow');
+      return editRow && editRow.style.display !== 'none';
+    });
+
+    await page.click('#dossierCallsignInput', { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.type('#dossierCallsignInput', 'CYBER_COMMANDER');
+    await page.click('#btnSaveDossierCallsign');
+
+    await page.waitForFunction(() => {
+      const disp = document.getElementById('dossierCallsignDisplay');
+      return disp && disp.textContent === 'CYBER_COMMANDER';
+    });
+
+    const updatedHeader = await page.evaluate(() => {
+      const idCallsign = document.getElementById('idCallsign');
+      return idCallsign?.textContent || '';
+    });
+    assert.strictEqual(updatedHeader, 'CYBER_COMMANDER', 'Identity header badge must update in real time on save');
+    console.log('✓ Inline Callsign edited and saved directly from Program Dossier with real-time reactive sync');
+
+    // Test Switch Identity -> Auth Wizard -> Single-Step Passkey Sign In
+    await page.click('#btnSwitchIdentity');
+    await page.waitForFunction(() => {
+      const authView = document.getElementById('authView');
+      return authView && authView.style.display !== 'none';
+    });
+
     await page.click('#btnAuthorizePasskey');
     await page.waitForFunction(() => {
       const modal = document.getElementById('authModal');
       return modal && modal.style.display === 'none';
     });
-    console.log('✓ Single-step Sign In bypass successfully authenticates and closes without Step 2 prompt');
+    console.log('✓ Switch Identity transitioned to Auth Wizard and single-step sign in bypassed Step 2');
 
     console.log('\n--- 6. Testing Escape Key Isolation and Strict [X] Button Dismissal ---');
     // Open terminal again
