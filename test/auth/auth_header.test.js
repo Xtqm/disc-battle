@@ -2,6 +2,8 @@ import assert from 'assert';
 import { getIdentityHeaderHtml, calculateLevel } from '../../src/ui/authTerminal.js';
 import { authManager } from '../../src/auth/AuthManager.js';
 import { AuthEvents, authEventBus } from '../../src/auth/events.js';
+import { economyManager } from '../../src/core/economy/EconomyManager.js';
+import { state } from '../../src/core/state.js';
 
 console.log('--- Running Main Menu Identity Header Unit Tests ---');
 
@@ -57,7 +59,7 @@ unsub();
 console.log('✓ AuthManager.updateCallsign emits reactive profile update event');
 
 // 5. Program Dossier view switching and population tests (Mock DOM)
-const { setTerminalView, populateDossierData, showAuthTerminal, setTerminalHubTab } = await import('../../src/ui/authTerminal.js');
+const { setTerminalView, populateDossierData, showAuthTerminal, setTerminalHubTab, initAuthTerminal } = await import('../../src/ui/authTerminal.js');
 
 class MockDomElement {
   constructor(id = '') {
@@ -83,6 +85,8 @@ class MockDomElement {
     };
     this.focus = () => {};
     this.select = () => {};
+    this.addEventListener = () => {};
+    this.removeEventListener = () => {};
   }
   querySelector() {
     return null;
@@ -125,6 +129,7 @@ const mockElements = {
   tabHubDirectives: new MockDomElement('tabHubDirectives'),
   hubLoadoutView: new MockDomElement('hubLoadoutView'),
   hubDirectivesView: new MockDomElement('hubDirectivesView'),
+  identityHeader: new MockDomElement('identityHeader'),
 };
 
 globalThis.document = {
@@ -134,6 +139,8 @@ globalThis.document = {
   pointerLockElement: null,
   exitPointerLock: () => {}
 };
+
+initAuthTerminal();
 
 // Test setTerminalView('dossier')
 setTerminalView('dossier');
@@ -208,5 +215,29 @@ assert.strictEqual(mockElements.hubLoadoutView.style.display, 'none', 'hubLoadou
 assert.strictEqual(mockElements.hubDirectivesView.style.display, 'none', 'hubDirectivesView must be hidden');
 assert.strictEqual(mockElements.dossierView.style.display, 'block', 'dossierView must be displayed for authenticated user');
 console.log('✓ setTerminalHubTab("ident") restores Program Dossier view');
+
+// 6. Live Bits & Economy Harmonization Tests
+state.authModalOpen = true;
+economyManager.storage.set('player.currency.bits', 500);
+authManager._saveState = {
+  bits: 0,
+  stats: { totalScore: 1000, highestWave: 2, matchesPlayed: 5 }
+};
+populateDossierData();
+assert.strictEqual(mockElements.dossierBits.textContent, '500 BITS', 'dossierBits must reflect live economy balance');
+assert.strictEqual(authManager._saveState.bits, 500, 'authManager.saveState.bits must be harmonized with economyManager');
+console.log('✓ populateDossierData() harmonizes live Bits from EconomyManager into saveState and DOM');
+
+// Test reactive Bits award synchronization
+economyManager.awardBits(250, 'test_reward');
+assert.strictEqual(authManager._saveState.bits, 750, 'awardBits must synchronously update saveState.bits');
+assert.strictEqual(mockElements.dossierBits.textContent, '750 BITS', 'awardBits must synchronously update dossierBits readout');
+console.log('✓ economyManager.awardBits reactively updates Program Dossier Bits readout');
+
+// Test reactive Bits spend synchronization
+economyManager.spendBits(150, 'test_cat', 'test_item');
+assert.strictEqual(authManager._saveState.bits, 600, 'spendBits must synchronously update saveState.bits');
+assert.strictEqual(mockElements.dossierBits.textContent, '600 BITS', 'spendBits must synchronously update dossierBits readout');
+console.log('✓ economyManager.spendBits reactively updates Program Dossier Bits readout');
 
 console.log('--- Main Menu Identity Header Unit Tests PASSED ---');

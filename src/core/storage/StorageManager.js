@@ -610,3 +610,4 @@ export class StorageManager {
 // Export singleton instance as default runtime orchestrator
 export const storageManager = new StorageManager();
 export const defaultStorageManager = storageManager;
+export { StorageEvents } from './schema.js';

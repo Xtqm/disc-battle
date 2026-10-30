@@ -4,6 +4,10 @@ import { AuthEvents } from '../auth/events.js';
 import { setCursor } from '../input/InputManager.js';
 import { armoryModal } from './modals/ArmoryModal.js';
 import { achievementsModal } from './modals/AchievementsModal.js';
+import { economyManager, EconomyEvents } from '../core/economy/EconomyManager.js';
+import { storageManager } from '../core/storage/StorageManager.js';
+import { StorageEvents } from '../core/storage/schema.js';
+import { saveSaveState } from '../auth/saveState.js';
 
 let activeStep = 1;
 let activeMode = 'signin'; // 'signin' | 'create'
@@ -390,7 +394,47 @@ export function populateDossierData() {
   if (typeof document === 'undefined') return;
   const user = authManager.currentUser;
   const saveState = authManager.saveState;
-  const level = calculateLevel(saveState);
+
+  // Authoritative live Bits synchronization
+  const economyBits = typeof economyManager?.getBits === 'function' ? economyManager.getBits() : 0;
+  const saveBits = typeof saveState?.bits === 'number' ? saveState.bits : 0;
+  const liveBits = Math.max(economyBits, saveBits);
+
+  if (saveState && saveState.bits !== liveBits) {
+    saveState.bits = liveBits;
+    try { saveSaveState(saveState); } catch (_) {}
+  }
+  if (typeof economyManager?.storage?.set === 'function' && economyBits < liveBits) {
+    economyManager.storage.set('player.currency.bits', liveBits, { immediate: false });
+  }
+
+  // Authoritative telemetry stats synchronization
+  const storageWave = typeof storageManager?.get === 'function'
+    ? (storageManager.get('stats.highestWave', 1) || storageManager.get('stats.swarmHighestWave', 1) || 1)
+    : 1;
+  const saveWave = saveState?.stats?.highestWave || saveState?.stats?.swarmHighestWave || 1;
+  const highestWave = Math.max(storageWave, saveWave);
+
+  const storageScore = typeof storageManager?.get === 'function'
+    ? (storageManager.get('stats.highestScore', 0) || storageManager.get('stats.totalScore', 0) || 0)
+    : 0;
+  const saveScore = saveState?.stats?.totalScore || 0;
+  const totalScore = Math.max(storageScore, saveScore);
+
+  const storageMatches = typeof storageManager?.get === 'function'
+    ? (storageManager.get('stats.matchesPlayed', 0) || 0)
+    : 0;
+  const saveMatches = saveState?.stats?.matchesPlayed || 0;
+  const matches = Math.max(storageMatches, saveMatches);
+
+  if (saveState && saveState.stats) {
+    saveState.stats.highestWave = highestWave;
+    saveState.stats.swarmHighestWave = highestWave;
+    saveState.stats.totalScore = totalScore;
+    saveState.stats.matchesPlayed = matches;
+  }
+
+  const level = calculateLevel(saveState || { stats: { totalScore, highestWave } });
   const levelStr = String(level).padStart(2, '0');
 
   const callsignDisplay = document.getElementById('dossierCallsignDisplay');
@@ -407,15 +451,10 @@ export function populateDossierData() {
   if (callsignInput) callsignInput.value = user?.handle || '';
 
   if (levelEl) levelEl.textContent = `LVL ${levelStr}`;
-  if (bitsEl) bitsEl.textContent = `${(saveState?.bits || 0).toLocaleString()} BITS`;
+  if (bitsEl) bitsEl.textContent = `${liveBits.toLocaleString()} BITS`;
 
-  const highestWave = saveState?.stats?.highestWave || 1;
   if (waveEl) waveEl.textContent = `WAVE ${String(highestWave).padStart(2, '0')}`;
-
-  const totalScore = saveState?.stats?.totalScore || 0;
   if (scoreEl) scoreEl.textContent = `${totalScore.toLocaleString()} PTS`;
-
-  const matches = saveState?.stats?.matchesPlayed || 0;
   if (matchesEl) matchesEl.textContent = String(matches.toLocaleString());
 
   if (authTypeEl) {
@@ -498,12 +537,52 @@ export function initAuthTerminal() {
     }
   });
 
+  // Subscribe to live economy and storage events for real-time synchronization
+  if (economyManager && typeof economyManager.on === 'function') {
+    economyManager.on(EconomyEvents.BITS_EARNED, (data) => {
+      const newBits = data?.balance ?? economyManager.getBits();
+      if (authManager.saveState) {
+        authManager.saveState.bits = newBits;
+        try { saveSaveState(authManager.saveState); } catch (_) {}
+      }
+      if (isAuthTerminalOpen()) {
+        populateDossierData();
+      }
+    });
+
+    economyManager.on(EconomyEvents.BITS_SPENT, () => {
+      const newBits = economyManager.getBits();
+      if (authManager.saveState) {
+        authManager.saveState.bits = newBits;
+        try { saveSaveState(authManager.saveState); } catch (_) {}
+      }
+      if (isAuthTerminalOpen()) {
+        populateDossierData();
+      }
+    });
+  }
+
+  if (storageManager && typeof storageManager.on === 'function') {
+    storageManager.on(StorageEvents.MUTATED, (data) => {
+      if (!data || data.path === 'player.currency.bits' || data.path === '*' || (typeof data.path === 'string' && data.path.startsWith('stats.'))) {
+        if (authManager.saveState && typeof economyManager?.getBits === 'function') {
+          authManager.saveState.bits = economyManager.getBits();
+        }
+        if (isAuthTerminalOpen()) {
+          populateDossierData();
+        }
+      }
+    });
+  }
+
   const modal = document.getElementById('authModal');
   if (!modal) return;
 
   // Prevent click-through to Three.js canvas; strict modal dismissal via [X] only
-  modal.addEventListener('mousedown', (e) => e.stopPropagation());
-  modal.addEventListener('click', (e) => e.stopPropagation());
+  if (modal.addEventListener) {
+    modal.addEventListener('mousedown', (e) => e.stopPropagation());
+    modal.addEventListener('click', (e) => e.stopPropagation());
+  }
 
   // Close Button [X]
   const btnClose = document.getElementById('btnCloseTerminal');
