@@ -163,14 +163,6 @@ export function updatePlayer(dt) {
 
     if (state.player.obj.userData && state.player.obj.userData.backDisc) {
       state.player.obj.userData.backDisc.visible = state.player.hasDisc;
-      state.player.obj.userData.backDisc.rotation.z += dt * (state.player.hasDisc ? 3 : 0);
-      if ((state.player.blocking || state.touchBlocking) && state.player.hasDisc) {
-        state.player.obj.userData.backDisc.position.set(0, 1.75, .75);
-        state.player.obj.userData.backDisc.rotation.x = 0;
-      } else {
-        state.player.obj.userData.backDisc.position.set(0, 1.8, -.45);
-        state.player.obj.userData.backDisc.rotation.x = Math.PI / 2;
-      }
     }
   }
 }

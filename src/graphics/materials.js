@@ -170,6 +170,7 @@ export function makeProgram(color, options = {}) {
 
   // 6. Shoulders & Arms (left and right)
   let leftShoulder, rightShoulder, leftElbow, rightElbow;
+  let leftHand, rightHand;
   for (const s of [-1, 1]) {
     const isLeft = s === -1;
     const shoulder = new THREE.Group();
@@ -233,11 +234,19 @@ export function makeProgram(color, options = {}) {
     gauntletTrim.userData.part = 'chassis_trim';
     elbow.add(gauntletTrim);
 
-    // Hand
-    const hand = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.10, 0.05), suit);
+    // Hand joint pivot
+    const hand = new THREE.Group();
     hand.position.set(0, -0.31, 0);
-    hand.userData.part = 'chassis_suit';
+    hand.userData.name = isLeft ? 'leftHand' : 'rightHand';
     elbow.add(hand);
+
+    const handMesh = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.10, 0.05), suit);
+    handMesh.castShadow = true;
+    handMesh.userData.part = 'chassis_suit';
+    hand.add(handMesh);
+
+    if (isLeft) leftHand = hand;
+    else rightHand = hand;
   }
 
   // 7. Hips & Legs (left and right)
@@ -307,12 +316,12 @@ export function makeProgram(color, options = {}) {
     knee.add(soleRim);
   }
 
-  // 8. Back-mounted disc (child of root for direct world/rig coordinate parity)
+  // 8. Right-hand mounted Identity Disc
   const disc = new THREE.Mesh(discGeo(), new THREE.MeshBasicMaterial({ color }));
-  disc.position.set(0, 1.8, -0.45);
-  disc.rotation.x = Math.PI / 2;
+  disc.position.set(0.04, -0.28, 0.02);
+  disc.rotation.set(0, Math.PI / 2, 0);
   disc.userData.part = 'chassis_back_disc';
-  g.add(disc);
+  rightHand.add(disc);
   g.userData.backDisc = disc;
 
   // 9. Halo PointLight
@@ -333,6 +342,8 @@ export function makeProgram(color, options = {}) {
     rightShoulder,
     leftElbow,
     rightElbow,
+    leftHand,
+    rightHand,
     leftHip,
     rightHip,
     leftKnee,
@@ -345,6 +356,8 @@ export function makeProgram(color, options = {}) {
   g.userData.rightShoulder = rightShoulder;
   g.userData.leftElbow = leftElbow;
   g.userData.rightElbow = rightElbow;
+  g.userData.leftHand = leftHand;
+  g.userData.rightHand = rightHand;
   g.userData.leftHip = leftHip;
   g.userData.rightHip = rightHip;
   g.userData.leftKnee = leftKnee;
@@ -365,6 +378,7 @@ export function animateProgramKinematics(rig, dt, params = {}) {
   } = params;
 
   const {
+    pelvis,
     torso,
     head,
     leftShoulder,
@@ -377,64 +391,126 @@ export function animateProgramKinematics(rig, dt, params = {}) {
     rightKnee
   } = rig.userData.joints;
 
-  // 1. Locomotion running strides vs idle
+  const disc = rig.userData.backDisc;
+  rig.userData._discSpin = ((rig.userData._discSpin || 0) + dt * 3.5) % (Math.PI * 2);
+  const spin = rig.userData._discSpin;
+
+  // 1. Locomotion strides (walking vs running)
   if (grounded && speed > 0.4) {
-    const runRate = Math.min(speed * 1.1, 14);
-    rig.userData._runCycle = (rig.userData._runCycle || 0) + dt * runRate;
+    const isRunning = speed > 6.0;
+    const isWalking = !isRunning;
+
+    // Cadence adjusts dynamically to movement speed
+    const strideRate = isWalking
+      ? Math.max(4.2, speed * 1.35)
+      : Math.min(speed * 1.15 + 2.5, 13.5);
+    rig.userData._runCycle = (rig.userData._runCycle || 0) + dt * strideRate;
     const cycle = rig.userData._runCycle;
-    const strideAmp = Math.min(speed / 9, 1) * 0.65;
+
+    // Stride amplitude scaling
+    const strideAmp = isWalking
+      ? (0.28 + 0.12 * Math.min(speed / 6.0, 1.0))
+      : Math.min(speed / 9.0, 1.0) * 0.65;
+
+    const phiL = cycle;
+    const phiR = cycle + Math.PI;
 
     // Hips swing in antiphase
-    leftHip.rotation.x = Math.sin(cycle) * strideAmp;
-    rightHip.rotation.x = -Math.sin(cycle) * strideAmp;
+    leftHip.rotation.x = Math.cos(phiL) * strideAmp;
+    rightHip.rotation.x = Math.cos(phiR) * strideAmp;
 
-    // Knees flex backwards
-    leftKnee.rotation.x = Math.max(0, -Math.sin(cycle)) * (strideAmp * 1.15);
-    rightKnee.rotation.x = Math.max(0, Math.sin(cycle)) * (strideAmp * 1.15);
+    leftHip.rotation.y = -Math.sin(phiL) * (isWalking ? 0.03 : 0.05);
+    rightHip.rotation.y = -Math.sin(phiR) * (isWalking ? 0.03 : 0.05);
+    leftHip.rotation.z = -0.03;
+    rightHip.rotation.z = 0.03;
 
-    // Torso subtle counter-rotation
-    torso.rotation.y = THREE.MathUtils.lerp(torso.rotation.y, Math.sin(cycle) * 0.08, dt * 10);
+    // Knee flex: smoothly lifts during forward swing phase to clear floor
+    const swingFlexL = Math.max(0, -Math.sin(phiL - 0.25));
+    const swingFlexR = Math.max(0, -Math.sin(phiR - 0.25));
+    leftKnee.rotation.x = swingFlexL * (isWalking ? 0.85 : 1.35) * strideAmp + 0.05;
+    rightKnee.rotation.x = swingFlexR * (isWalking ? 0.85 : 1.35) * strideAmp + 0.05;
+
+    // Pelvis step bounce and hip sway
+    pelvis.position.y = 1.05 - Math.abs(Math.sin(cycle)) * (isWalking ? 0.025 : 0.055);
+    pelvis.rotation.z = Math.sin(cycle) * (isWalking ? 0.03 : 0.055);
+    pelvis.rotation.y = -Math.cos(cycle) * (isWalking ? 0.04 : 0.07);
+
+    // Torso counter-twist & forward lean
+    torso.rotation.y = Math.cos(cycle) * (isWalking ? 0.06 : 0.11);
+    torso.rotation.x = isWalking ? 0.03 : (0.04 + 0.09 * Math.min(speed / 10, 1));
+    torso.rotation.z = -Math.sin(cycle) * (isWalking ? 0.02 : 0.035);
+
+    // Head stabilization
+    head.rotation.x = isWalking ? 0 : -0.04;
+    head.rotation.y = -torso.rotation.y * 0.6;
 
     // Arms counter-swing opposite to legs (if not blocking)
     if (!blocking) {
-      leftShoulder.rotation.x = -Math.sin(cycle) * (strideAmp * 0.85);
-      rightShoulder.rotation.x = Math.sin(cycle) * (strideAmp * 0.85);
+      leftShoulder.rotation.x = -Math.cos(cycle) * (isWalking ? 0.42 : 0.82) * strideAmp;
+      rightShoulder.rotation.x = Math.cos(cycle) * (isWalking ? 0.36 : 0.72) * strideAmp;
+
       leftShoulder.rotation.y = THREE.MathUtils.lerp(leftShoulder.rotation.y, 0, dt * 10);
       rightShoulder.rotation.y = THREE.MathUtils.lerp(rightShoulder.rotation.y, 0, dt * 10);
-      leftShoulder.rotation.z = THREE.MathUtils.lerp(leftShoulder.rotation.z, 0, dt * 10);
-      rightShoulder.rotation.z = THREE.MathUtils.lerp(rightShoulder.rotation.z, 0, dt * 10);
+      leftShoulder.rotation.z = -0.10 - Math.sin(cycle) * 0.03;
+      rightShoulder.rotation.z = 0.10 + Math.sin(cycle) * 0.03;
 
-      leftElbow.rotation.x = -0.15 - Math.max(0, Math.sin(cycle)) * 0.35;
-      rightElbow.rotation.x = -0.15 - Math.max(0, -Math.sin(cycle)) * 0.35;
+      leftElbow.rotation.x = -0.25 - Math.max(0, -Math.cos(cycle)) * (isWalking ? 0.35 : 0.65) * strideAmp;
+      rightElbow.rotation.x = -0.28 - Math.max(0, Math.cos(cycle)) * (isWalking ? 0.25 : 0.50) * strideAmp;
     }
   } else if (grounded) {
-    // Idle rest stance
-    leftHip.rotation.x = THREE.MathUtils.lerp(leftHip.rotation.x, 0, dt * 10);
-    rightHip.rotation.x = THREE.MathUtils.lerp(rightHip.rotation.x, 0, dt * 10);
-    leftKnee.rotation.x = THREE.MathUtils.lerp(leftKnee.rotation.x, 0, dt * 10);
-    rightKnee.rotation.x = THREE.MathUtils.lerp(rightKnee.rotation.x, 0, dt * 10);
-    torso.rotation.y = THREE.MathUtils.lerp(torso.rotation.y, 0, dt * 10);
+    // 2. Idle breathing & natural relaxed stance
+    const idleCycle = time * 2.3;
+    const idleBreath = Math.sin(idleCycle);
+    const idleSlow = Math.sin(idleCycle * 0.5);
+
+    // Stance weight distribution
+    leftHip.rotation.x = THREE.MathUtils.lerp(leftHip.rotation.x, 0.06 + idleBreath * 0.005, dt * 6);
+    rightHip.rotation.x = THREE.MathUtils.lerp(rightHip.rotation.x, -0.05 - idleBreath * 0.005, dt * 6);
+    leftHip.rotation.y = THREE.MathUtils.lerp(leftHip.rotation.y, -0.04, dt * 6);
+    rightHip.rotation.y = THREE.MathUtils.lerp(rightHip.rotation.y, 0.04, dt * 6);
+    leftHip.rotation.z = THREE.MathUtils.lerp(leftHip.rotation.z, -0.03, dt * 6);
+    rightHip.rotation.z = THREE.MathUtils.lerp(rightHip.rotation.z, 0.03, dt * 6);
+
+    leftKnee.rotation.x = THREE.MathUtils.lerp(leftKnee.rotation.x, 0.08 - idleBreath * 0.005, dt * 6);
+    rightKnee.rotation.x = THREE.MathUtils.lerp(rightKnee.rotation.x, 0.06 + idleBreath * 0.005, dt * 6);
+
+    // Pelvis breathing float & gentle weight shift
+    pelvis.position.y = THREE.MathUtils.lerp(pelvis.position.y, 1.05 + idleBreath * 0.012, dt * 8);
+    pelvis.rotation.z = THREE.MathUtils.lerp(pelvis.rotation.z, idleSlow * 0.015, dt * 4);
+    pelvis.rotation.y = THREE.MathUtils.lerp(pelvis.rotation.y, 0.04, dt * 4);
+
+    // Torso breathing expansion & subtle counter-drift
+    torso.rotation.x = THREE.MathUtils.lerp(torso.rotation.x, idleBreath * 0.02, dt * 6);
+    torso.rotation.y = THREE.MathUtils.lerp(torso.rotation.y, -0.04 + idleSlow * 0.015, dt * 4);
+    torso.rotation.z = THREE.MathUtils.lerp(torso.rotation.z, -idleSlow * 0.015, dt * 4);
+
+    // Head alert gaze stabilization
+    head.rotation.x = THREE.MathUtils.lerp(head.rotation.x, -idleBreath * 0.015, dt * 6);
+    head.rotation.y = THREE.MathUtils.lerp(head.rotation.y, Math.sin(time * 0.4) * 0.03, dt * 4);
 
     if (!blocking) {
-      leftShoulder.rotation.x = THREE.MathUtils.lerp(leftShoulder.rotation.x, 0.04, dt * 10);
-      rightShoulder.rotation.x = THREE.MathUtils.lerp(rightShoulder.rotation.x, 0.04, dt * 10);
-      leftShoulder.rotation.y = THREE.MathUtils.lerp(leftShoulder.rotation.y, 0, dt * 10);
-      rightShoulder.rotation.y = THREE.MathUtils.lerp(rightShoulder.rotation.y, 0, dt * 10);
-      leftShoulder.rotation.z = THREE.MathUtils.lerp(leftShoulder.rotation.z, 0, dt * 10);
-      rightShoulder.rotation.z = THREE.MathUtils.lerp(rightShoulder.rotation.z, 0, dt * 10);
+      leftShoulder.rotation.x = THREE.MathUtils.lerp(leftShoulder.rotation.x, 0.04 + idleBreath * 0.02, dt * 6);
+      rightShoulder.rotation.x = THREE.MathUtils.lerp(rightShoulder.rotation.x, -0.02 + idleBreath * 0.02, dt * 6);
+      leftShoulder.rotation.y = THREE.MathUtils.lerp(leftShoulder.rotation.y, 0, dt * 6);
+      rightShoulder.rotation.y = THREE.MathUtils.lerp(rightShoulder.rotation.y, 0, dt * 6);
+      leftShoulder.rotation.z = THREE.MathUtils.lerp(leftShoulder.rotation.z, -0.10, dt * 6);
+      rightShoulder.rotation.z = THREE.MathUtils.lerp(rightShoulder.rotation.z, 0.09, dt * 6);
 
-      leftElbow.rotation.x = THREE.MathUtils.lerp(leftElbow.rotation.x, -0.15, dt * 10);
-      rightElbow.rotation.x = THREE.MathUtils.lerp(rightElbow.rotation.x, -0.15, dt * 10);
+      leftElbow.rotation.x = THREE.MathUtils.lerp(leftElbow.rotation.x, -0.35 + idleBreath * 0.015, dt * 6);
+      rightElbow.rotation.x = THREE.MathUtils.lerp(rightElbow.rotation.x, -0.28 + idleBreath * 0.015, dt * 6);
     }
   } else {
-    // Airborne / Jump: legs trail aerodynamically backwards
+    // 3. Airborne / Jump: legs trail aerodynamically backwards
     leftHip.rotation.x = THREE.MathUtils.lerp(leftHip.rotation.x, 0.28, dt * 8);
     rightHip.rotation.x = THREE.MathUtils.lerp(rightHip.rotation.x, 0.22, dt * 8);
     leftKnee.rotation.x = THREE.MathUtils.lerp(leftKnee.rotation.x, 0.35, dt * 8);
     rightKnee.rotation.x = THREE.MathUtils.lerp(rightKnee.rotation.x, 0.45, dt * 8);
 
+    pelvis.position.y = THREE.MathUtils.lerp(pelvis.position.y, 1.05, dt * 8);
+    pelvis.rotation.set(0, 0, 0);
+    torso.rotation.set(0, 0, 0);
+
     if (!blocking) {
-      // Arms sweep outwards and slightly forward
       leftShoulder.rotation.x = THREE.MathUtils.lerp(leftShoulder.rotation.x, -0.32, dt * 8);
       rightShoulder.rotation.x = THREE.MathUtils.lerp(rightShoulder.rotation.x, -0.32, dt * 8);
       leftShoulder.rotation.z = THREE.MathUtils.lerp(leftShoulder.rotation.z, -0.30, dt * 8);
@@ -444,9 +520,8 @@ export function animateProgramKinematics(rig, dt, params = {}) {
     }
   }
 
-  // 2. Shield Deflection Defense Stance
+  // 4. Shield Deflection Defense Stance
   if (blocking) {
-    // Shoulders rotate forward and inward, elbows bend to brace disc in front of chest
     leftShoulder.rotation.x = THREE.MathUtils.lerp(leftShoulder.rotation.x, -0.75, dt * 18);
     rightShoulder.rotation.x = THREE.MathUtils.lerp(rightShoulder.rotation.x, -0.75, dt * 18);
     leftShoulder.rotation.y = THREE.MathUtils.lerp(leftShoulder.rotation.y, 0.32, dt * 18);
@@ -458,7 +533,20 @@ export function animateProgramKinematics(rig, dt, params = {}) {
     rightElbow.rotation.x = THREE.MathUtils.lerp(rightElbow.rotation.x, -0.65, dt * 18);
   }
 
-  // 3. Hurt Reaction: high-frequency twitch/tremor
+  // 5. Disc position and orientation on right hand
+  if (disc) {
+    if (blocking) {
+      // Braced in front of chest as a forward holographic shield
+      disc.position.set(-0.06, -0.15, 0.22);
+      disc.rotation.set(0.65, 0.35, spin);
+    } else {
+      // Held naturally at the side of the right hand
+      disc.position.set(0.04, -0.28, 0.02);
+      disc.rotation.set(0, Math.PI / 2, spin);
+    }
+  }
+
+  // 6. Hurt Reaction: high-frequency twitch/tremor
   if (hurt > 0) {
     torso.rotation.z = Math.sin(time * 55) * 0.08;
     head.rotation.y = Math.sin(time * 45) * 0.06;

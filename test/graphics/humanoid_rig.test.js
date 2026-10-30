@@ -20,6 +20,7 @@ assert.strictEqual(playerRig.userData.part, 'chassis_root');
 assert.ok(playerRig.userData.suitMaterial instanceof THREE.MeshStandardMaterial);
 assert.ok(playerRig.userData.litMaterial instanceof THREE.MeshBasicMaterial);
 assert.strictEqual(playerRig.userData.backDisc.userData.part, 'chassis_back_disc');
+assert.strictEqual(playerRig.userData.backDisc.parent, playerRig.userData.joints.rightHand, 'Disc must be attached to right hand');
 assert.strictEqual(playerRig.userData.halo.userData.part, 'chassis_halo');
 
 // Verify joint references exist
@@ -138,6 +139,38 @@ animateProgramKinematics(playerRig, 0.1, {
 });
 
 assert.ok(playerRig.userData.leftHip.rotation.x > 0.1, 'Legs must trail backward when airborne');
+
+// 3.4 Idle Animation Breathing
+animateProgramKinematics(playerRig, 0.1, {
+  speed: 0,
+  grounded: true,
+  vy: 0,
+  blocking: false,
+  hurt: 0,
+  time: 2.0
+});
+const idleTorsoX = playerRig.userData.torso.rotation.x;
+animateProgramKinematics(playerRig, 0.5, {
+  speed: 0,
+  grounded: true,
+  vy: 0,
+  blocking: false,
+  hurt: 0,
+  time: 2.5
+});
+assert.notStrictEqual(playerRig.userData.torso.rotation.x, idleTorsoX, 'Torso must breathe during idle animation');
+assert.strictEqual(playerRig.userData.backDisc.parent, playerRig.userData.joints.rightHand, 'Disc must remain in right hand during idle');
+
+// 3.5 Walking Locomotion Stride
+animateProgramKinematics(playerRig, 0.05, {
+  speed: 3.5,
+  grounded: true,
+  vy: 0,
+  blocking: false,
+  hurt: 0,
+  time: 3.0
+});
+assert.ok(playerRig.userData.leftKnee.rotation.x > 0, 'Knee must flex during walking stride');
 
 console.log('✓ Group 3: Procedural kinematics verified.');
 
