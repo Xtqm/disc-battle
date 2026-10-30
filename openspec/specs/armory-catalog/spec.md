@@ -181,6 +181,10 @@ The system SHALL provide an Armory entrypoint within the main menu interface tha
 - **WHEN** the player clicks a category tab (`IDENTITY DISCS`, `PROGRAM CHASSIS`, or `EXOTIC ARENAS`)
 - **THEN** the system sets the active category tab state, populates the catalog grid with items belonging to that category, and stages the first item of that category in the 3D preview bay.
 
+#### Scenario: Armory dismiss control in Program Hub
+- **WHEN** the Armory view is displayed within the Program Hub modal
+- **THEN** internal return/dismiss buttons (`[ESC // RETURN]`) are omitted, leaving modal exit exclusively to the Hub's top-right dismiss control.
+
 ### Requirement: Split-Pane Catalog Grid and Integrated 3D Turntable Preview Bay
 The system SHALL present a split-pane layout inside the Armory modal containing a scrollable item grid on the left and an interactive 3D turntable preview viewport with an item lore dossier on the right.
 

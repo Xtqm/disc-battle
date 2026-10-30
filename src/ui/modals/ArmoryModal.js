@@ -228,7 +228,7 @@ export class ArmoryModal {
               <span style="color:#ffaa00;font-size:14px;">◆</span>
               <span id="armoryBitsValue">${formattedBits}</span>
             </div>
-            <button class="armory-close-btn" id="armoryCloseBtn" title="Return to Grid (ESC)">[ESC // RETURN]</button>
+            ${!this._inHub ? `<button class="armory-close-btn" id="armoryCloseBtn" title="Return to Grid (ESC)">[ESC // RETURN]</button>` : ''}
           </div>
         </div>
 

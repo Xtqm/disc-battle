@@ -137,6 +137,7 @@ export class AchievementsModal {
               SYSTEM SUBSYSTEM MILESTONES &amp; PERFORMANCE RECOGNITION
             </div>
           </div>
+          ${!this._inHub ? `
           <button id="achievementsCloseBtn" style="
             background: rgba(255, 0, 85, 0.15);
             border: 1px solid #ff0055;
@@ -151,6 +152,7 @@ export class AchievementsModal {
           " onmouseover="this.style.background='rgba(255,0,85,0.3)'" onmouseout="this.style.background='rgba(255,0,85,0.15)'">
             [ ESC // CLOSE ]
           </button>
+          ` : ''}
         </div>
 
         <!-- Completion Summary Bar -->

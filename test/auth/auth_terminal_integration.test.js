@@ -311,7 +311,12 @@ async function runTerminalIntegrationTests() {
       const tabLoadout = document.getElementById('tabHubLoadout');
       return loadoutView && loadoutView.style.display !== 'none' && tabLoadout.classList.contains('active');
     });
-    console.log('✓ Tab [ LOADOUT ] seamlessly mounts 3D Armory preview bay in Hub');
+    const armoryCloseBtnHidden = await page.evaluate(() => {
+      const btn = document.getElementById('armoryCloseBtn');
+      return !btn || btn.offsetParent === null || window.getComputedStyle(btn).display === 'none';
+    });
+    assert.strictEqual(armoryCloseBtnHidden, true, 'Inner [ESC // RETURN] close button must not be visible in Hub Loadout');
+    console.log('✓ Tab [ LOADOUT ] seamlessly mounts 3D Armory preview bay in Hub (inner return button omitted)');
 
     // Click [ DIRECTIVES ] tab
     await page.click('#tabHubDirectives');
@@ -320,7 +325,12 @@ async function runTerminalIntegrationTests() {
       const tabDir = document.getElementById('tabHubDirectives');
       return dirView && dirView.style.display !== 'none' && tabDir.classList.contains('active');
     });
-    console.log('✓ Tab [ DIRECTIVES ] seamlessly mounts Trophy Matrix in Hub');
+    const achieveCloseBtnHidden = await page.evaluate(() => {
+      const btn = document.getElementById('achievementsCloseBtn');
+      return !btn || btn.offsetParent === null || window.getComputedStyle(btn).display === 'none';
+    });
+    assert.strictEqual(achieveCloseBtnHidden, true, 'Inner [ESC // CLOSE] button must not be visible in Hub Directives');
+    console.log('✓ Tab [ DIRECTIVES ] seamlessly mounts Trophy Matrix in Hub (inner close button omitted)');
 
     // Click [ IDENT MATRIX ] tab
     await page.click('#tabHubIdent');

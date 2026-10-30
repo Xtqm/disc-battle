@@ -721,6 +721,11 @@
     background: transparent !important;
     padding: 0 !important;
   }
+  /* Suppress redundant inner modal close/exit buttons when hosted within the Terminal Hub */
+  .auth-terminal-card #armoryCloseBtn,
+  .auth-terminal-card #achievementsCloseBtn {
+    display: none !important;
+  }
   .terminal-close-btn {
     position: absolute;
     top: 16px;
