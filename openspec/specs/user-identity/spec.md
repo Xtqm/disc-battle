@@ -64,7 +64,7 @@ The system SHALL provide a diegetic Grid Authorization Terminal modal interface 
 
 #### Scenario: Opening authorization terminal
 - **WHEN** the player activates the identity header trigger or `[ SECURE IDENTITY ]` button
-- **THEN** if authenticated, the terminal modal opens directly to the Program Dossier view displaying active callsign, live progression telemetry, system clearance, and an identity switching action; if unauthenticated or guest, the terminal modal opens to Step 1 of the authentication wizard.
+- **THEN** if authenticated, the terminal modal opens directly to a streamlined Program Dossier view displaying active callsign, unified progression telemetry, system clearance, and an identity switching action without redundant status banners; if unauthenticated or guest, the terminal modal opens to Step 1 of the authentication wizard.
 
 #### Scenario: Direct Passkey authentication tab
 - **WHEN** the player submits valid credentials in the Direct Passkey section (Email and Password) under Sign In mode
@@ -84,7 +84,7 @@ The system SHALL provide a diegetic Grid Authorization Terminal modal interface 
 
 #### Scenario: Viewing live telemetry in Program Dossier
 - **WHEN** the Program Dossier view is active
-- **THEN** the system renders the player's progression level, bits balance, highest wave reached, total score, and total matches played extracted from active save state.
+- **THEN** the system renders the player's progression level, bits balance, highest wave reached, and total score in a unified, non-redundant telemetry panel without excessive border nesting.
 
 #### Scenario: Switching identity or signing out from Program Dossier
 - **WHEN** the player activates the switch identity action in the Program Dossier
@@ -92,7 +92,7 @@ The system SHALL provide a diegetic Grid Authorization Terminal modal interface 
 
 #### Scenario: Terminal tabbed navigation
 - **WHEN** the Program Dossier modal is opened
-- **THEN** the terminal displays tab navigation headers for `[ IDENT MATRIX ]`, `[ LOADOUT ]`, and `[ DIRECTIVES ]`, where `[ IDENT MATRIX ]` is active and `[ LOADOUT ]` and `[ DIRECTIVES ]` display visual indicators of upcoming availability.
+- **THEN** the terminal displays a clean horizontal tab bar for `[ IDENT MATRIX ]`, `[ LOADOUT ]`, and `[ DIRECTIVES ]` that preserves dedicated spacing for the exit control without awkward text-wrapping or crowded borders.
 
 ### Requirement: PointerLock and Canvas Modal Safety
 The system SHALL safely isolate mouse and touch input between active modal terminals and the Three.js canvas, guaranteeing PointerLock release upon terminal launch.

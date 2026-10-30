@@ -1023,51 +1023,55 @@
   .terminal-console.msg-success { color: #00ff66; text-shadow: 0 0 8px #00ff66; border-color: rgba(0, 255, 102, 0.4); }
   .terminal-console.msg-error { color: var(--orange); text-shadow: 0 0 8px var(--orange); border-color: rgba(255, 123, 26, 0.4); }
 
-  /* ───────────────────────── Program Dossier & Hub Tabs ───────────────────────── */
+  /* ───────────────────────── Sleek Program Dossier & Hub Tabs ───────────────────────── */
   .terminal-hub-nav {
     display: flex;
-    gap: 8px;
-    margin-bottom: 14px;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
     border-bottom: 1px solid rgba(79, 242, 255, 0.15);
-    padding-bottom: 8px;
+    padding-bottom: 0px;
   }
   .hub-nav-tab {
     background: transparent;
-    border: 1px solid rgba(79, 242, 255, 0.25);
-    color: #9fe9f2;
-    padding: 6px 12px;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #7cb8c2;
+    padding: 6px 4px 8px;
     font-family: inherit;
-    font-size: 10px;
+    font-size: 11px;
     letter-spacing: 2px;
     font-weight: 600;
     cursor: pointer;
-    border-radius: 4px;
     transition: all 0.18s ease;
     text-transform: uppercase;
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    outline: none;
+    white-space: nowrap;
+  }
+  .hub-nav-tab:hover {
+    color: #fff;
   }
   .hub-nav-tab.active {
-    background: rgba(79, 242, 255, 0.15);
-    border-color: var(--cyan);
-    color: #fff;
-    box-shadow: 0 0 12px rgba(79, 242, 255, 0.25);
+    color: var(--cyan);
+    border-bottom-color: var(--cyan);
+    text-shadow: 0 0 10px rgba(79, 242, 255, 0.5);
   }
   .hub-nav-tab.hub-tab-disabled {
-    border-style: dashed;
-    border-color: rgba(255, 123, 26, 0.35);
-    color: #a88;
-    opacity: 0.65;
+    color: #617377;
+    opacity: 0.6;
     cursor: default;
+    border-bottom-color: transparent;
   }
   .coming-soon-pill {
     font-size: 8px;
     letter-spacing: 1px;
     padding: 1px 4px;
     border-radius: 3px;
-    background: rgba(255, 123, 26, 0.2);
-    border: 1px solid rgba(255, 123, 26, 0.5);
+    background: rgba(255, 123, 26, 0.15);
+    border: 1px solid rgba(255, 123, 26, 0.4);
     color: #ffb37a;
   }
 
@@ -1075,44 +1079,62 @@
     width: 100%;
   }
 
-  /* Callsign Card */
-  .dossier-card {
-    background: rgba(0, 14, 22, 0.7);
-    border: 1px solid rgba(79, 242, 255, 0.3);
-    border-radius: 8px;
-    padding: 14px 16px;
-    margin-bottom: 14px;
-    box-shadow: inset 0 0 12px rgba(79, 242, 255, 0.08);
+  /* Hero Identity Section */
+  .dossier-hero-identity {
+    padding: 4px 2px 16px;
+    border-bottom: 1px solid rgba(79, 242, 255, 0.12);
+    margin-bottom: 18px;
   }
-  .dossier-card-label {
-    font-size: 10px;
-    letter-spacing: 2px;
-    color: #7cb8c2;
-    font-weight: 600;
-    margin-bottom: 8px;
-    text-transform: uppercase;
+  .dossier-hero-top {
+    margin-bottom: 6px;
   }
   .callsign-display-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
     gap: 12px;
   }
-  .callsign-val {
+  .dossier-hero-callsign {
     font-family: "Courier New", Courier, monospace;
-    font-size: 18px;
+    font-size: 22px;
     font-weight: 700;
     color: #fff;
     letter-spacing: 3px;
-    text-shadow: 0 0 10px var(--cyan);
+    text-shadow: 0 0 12px var(--cyan);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .dossier-edit-trigger {
+    background: transparent;
+    border: 1px solid rgba(79, 242, 255, 0.35);
+    color: #7cb8c2;
+    font-family: inherit;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    transition: all 0.15s ease;
+    outline: none;
+  }
+  .dossier-edit-trigger:hover {
+    border-color: var(--cyan);
+    color: #fff;
+    background: rgba(79, 242, 255, 0.12);
   }
   .callsign-edit-row {
     display: flex;
     gap: 8px;
     align-items: center;
+  }
+  .dossier-callsign-input {
+    max-width: 220px;
+    font-family: "Courier New", Courier, monospace;
+    font-weight: 700;
+    font-size: 14px;
+    letter-spacing: 2px;
+    padding: 6px 10px;
   }
   .dossier-sm-btn {
     cursor: pointer;
@@ -1129,17 +1151,12 @@
     transition: all 0.15s ease;
     white-space: nowrap;
   }
-  .dossier-sm-btn:hover {
-    background: rgba(79, 242, 255, 0.25);
-    color: #fff;
-    box-shadow: 0 0 10px var(--cyan);
-  }
   .dossier-sm-btn.btn-save {
     border-color: #00ff66;
     color: #00ff66;
   }
   .dossier-sm-btn.btn-save:hover {
-    background: rgba(0, 255, 102, 0.25);
+    background: rgba(0, 255, 102, 0.2);
     box-shadow: 0 0 10px #00ff66;
   }
   .dossier-sm-btn.btn-cancel {
@@ -1147,8 +1164,29 @@
     color: #ffb37a;
   }
   .dossier-sm-btn.btn-cancel:hover {
-    background: rgba(255, 123, 26, 0.25);
+    background: rgba(255, 123, 26, 0.2);
     box-shadow: 0 0 10px var(--orange);
+  }
+  .dossier-hero-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10px;
+    letter-spacing: 1.5px;
+    color: #7cb8c2;
+    text-transform: uppercase;
+    font-weight: 500;
+  }
+  .hero-meta-status {
+    color: var(--cyan);
+    opacity: 0.9;
+  }
+  .hero-meta-divider {
+    opacity: 0.4;
+  }
+  .hero-meta-matches {
+    color: #9fe9f2;
+    opacity: 0.8;
   }
   .dossier-field-hint {
     font-size: 9px;
@@ -1157,71 +1195,71 @@
     margin-top: 6px;
   }
 
-  /* Telemetry Matrix Grid */
-  .dossier-telemetry-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 10px;
-    margin-bottom: 16px;
+  /* Sleek Telemetry Strip */
+  .dossier-stats-strip {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(0, 18, 28, 0.6);
+    border: 1px solid rgba(79, 242, 255, 0.25);
+    border-radius: 8px;
+    padding: 14px 18px;
+    margin-bottom: 22px;
+    box-shadow: inset 0 0 14px rgba(79, 242, 255, 0.06);
   }
-  @media (max-width: 480px) {
-    .dossier-telemetry-grid {
-      grid-template-columns: 1fr;
-    }
+  .stat-col {
+    flex: 1;
+    text-align: center;
   }
-  .telemetry-cell {
-    background: rgba(0, 16, 24, 0.65);
-    border: 1px solid rgba(79, 242, 255, 0.22);
-    border-radius: 6px;
-    padding: 10px 12px;
-    box-shadow: inset 0 0 8px rgba(79, 242, 255, 0.05);
-  }
-  .telemetry-label {
+  .stat-col-label {
     font-size: 9px;
     letter-spacing: 1.5px;
     color: #7cb8c2;
     text-transform: uppercase;
-    margin-bottom: 4px;
-    font-weight: 500;
+    margin-bottom: 5px;
+    font-weight: 600;
   }
-  .telemetry-value {
+  .stat-col-val {
     font-family: "Courier New", Courier, monospace;
     font-size: 13px;
     font-weight: 700;
     letter-spacing: 1.5px;
   }
-  .telemetry-value.cyan-val { color: var(--cyan); text-shadow: 0 0 8px rgba(79, 242, 255, 0.4); }
-  .telemetry-value.yellow-val { color: #ffe600; text-shadow: 0 0 8px rgba(255, 230, 0, 0.35); }
-  .telemetry-value.green-val { color: #00ff66; text-shadow: 0 0 8px rgba(0, 255, 102, 0.35); }
-  .telemetry-value.orange-val { color: var(--orange); text-shadow: 0 0 8px rgba(255, 123, 26, 0.35); }
-
-  /* Dossier Actions */
-  .dossier-actions-row {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 10px;
+  .stat-col-val.cyan-val { color: var(--cyan); text-shadow: 0 0 8px rgba(79, 242, 255, 0.4); }
+  .stat-col-val.yellow-val { color: #ffe600; text-shadow: 0 0 8px rgba(255, 230, 0, 0.35); }
+  .stat-col-val.green-val { color: #00ff66; text-shadow: 0 0 8px rgba(0, 255, 102, 0.35); }
+  .stat-col-val.orange-val { color: var(--orange); text-shadow: 0 0 8px rgba(255, 123, 26, 0.35); }
+  .stat-divider {
+    width: 1px;
+    height: 28px;
+    background: rgba(79, 242, 255, 0.15);
   }
-  .dossier-action-btn {
-    cursor: pointer;
-    background: rgba(0, 12, 18, 0.85);
-    border: 1px solid rgba(79, 242, 255, 0.4);
-    color: #9fe9f2;
+
+  /* Sleek Footer Actions */
+  .dossier-footer {
+    display: flex;
+    justify-content: center;
+    margin-top: 8px;
+  }
+  .dossier-ghost-btn {
+    background: none;
+    border: none;
+    color: #7cb8c2;
     font-family: inherit;
     font-size: 10px;
     letter-spacing: 2px;
     font-weight: 600;
-    padding: 9px 16px;
-    border-radius: 6px;
+    cursor: pointer;
+    padding: 8px 12px;
     text-transform: uppercase;
-    transition: all 0.18s ease;
-    width: 100%;
-    text-align: center;
+    transition: all 0.15s ease;
+    opacity: 0.8;
+    outline: none;
   }
-  .dossier-action-btn:hover {
-    border-color: var(--cyan);
-    color: #fff;
-    background: rgba(79, 242, 255, 0.15);
-    box-shadow: 0 0 12px rgba(79, 242, 255, 0.25);
+  .dossier-ghost-btn:hover {
+    color: var(--orange);
+    opacity: 1;
+    text-shadow: 0 0 8px rgba(255, 123, 26, 0.4);
   }
 
   /* Offline Sync Resilience Banner */
@@ -2427,20 +2465,20 @@
   <div class="card auth-terminal-card">
     <button id="btnCloseTerminal" class="terminal-close-btn" aria-label="Close terminal" title="Close Terminal">&times;</button>
 
-    <!-- Terminal Hub Navigation Tabs -->
-    <div class="terminal-hub-nav" id="terminalHubNav">
-      <button class="hub-nav-tab active" id="tabHubIdent" type="button">[ IDENT MATRIX ]</button>
-      <button class="hub-nav-tab hub-tab-disabled" id="tabHubLoadout" type="button" title="Loadout (Armory) integration planned for Phase 2">
-        [ LOADOUT ] <span class="coming-soon-pill">SOON</span>
-      </button>
-      <button class="hub-nav-tab hub-tab-disabled" id="tabHubDirectives" type="button" title="Directives (Achievements) integration planned for Phase 2">
-        [ DIRECTIVES ] <span class="coming-soon-pill">SOON</span>
-      </button>
-    </div>
-
     <div class="terminal-header">
       <div class="terminal-title" id="terminalHeaderTitle">GRID IDENTITY TERMINAL</div>
       <div class="terminal-ver" id="terminalHeaderSub">SYNC PROGRESSION &amp; PROFILE</div>
+    </div>
+
+    <!-- Terminal Hub Navigation Tabs -->
+    <div class="terminal-hub-nav" id="terminalHubNav">
+      <button class="hub-nav-tab active" id="tabHubIdent" type="button">IDENT MATRIX</button>
+      <button class="hub-nav-tab hub-tab-disabled" id="tabHubLoadout" type="button" title="Loadout (Armory) planned for Phase 2">
+        LOADOUT <span class="coming-soon-pill">SOON</span>
+      </button>
+      <button class="hub-nav-tab hub-tab-disabled" id="tabHubDirectives" type="button" title="Directives (Achievements) planned for Phase 2">
+        DIRECTIVES <span class="coming-soon-pill">SOON</span>
+      </button>
     </div>
 
     <!-- Active Identity Overview -->
@@ -2451,57 +2489,58 @@
 
     <!-- 1. PROGRAM DOSSIER VIEW (Default for Authenticated Users) -->
     <div id="dossierView" class="terminal-view-container" style="display:none;">
-      <!-- Callsign Management Card -->
-      <div class="dossier-card callsign-card">
-        <div class="dossier-card-label">ACTIVE COMBAT CALLSIGN</div>
-        <div class="callsign-display-row" id="callsignDisplayRow">
-          <div class="callsign-val" id="dossierCallsignDisplay">PROGRAM</div>
-          <button id="btnEditCallsign" class="dossier-sm-btn" type="button" title="Edit Callsign">[ EDIT ]</button>
+      <!-- Hero Identity Section -->
+      <div class="dossier-hero-identity">
+        <div class="dossier-hero-top">
+          <div class="callsign-display-row" id="callsignDisplayRow">
+            <span class="status-circuit green-circuit" title="Active Grid Connection"></span>
+            <span class="dossier-hero-callsign" id="dossierCallsignDisplay">PROGRAM</span>
+            <button id="btnEditCallsign" class="dossier-edit-trigger" type="button" title="Edit Callsign">[ EDIT ]</button>
+          </div>
+          <div class="callsign-edit-row" id="callsignEditRow" style="display:none;">
+            <input type="text" id="dossierCallsignInput" class="terminal-input dossier-callsign-input" maxlength="16" placeholder="ENTER CALLSIGN" spellcheck="false" autocomplete="off" />
+            <button id="btnSaveDossierCallsign" class="dossier-sm-btn btn-save" type="button">[ SAVE ]</button>
+            <button id="btnCancelEditCallsign" class="dossier-sm-btn btn-cancel" type="button">[ CANCEL ]</button>
+          </div>
         </div>
-        <div class="callsign-edit-row" id="callsignEditRow" style="display:none;">
-          <input type="text" id="dossierCallsignInput" class="terminal-input" maxlength="16" placeholder="ENTER CALLSIGN" spellcheck="false" autocomplete="off" />
-          <button id="btnSaveDossierCallsign" class="dossier-sm-btn btn-save" type="button">[ SAVE ]</button>
-          <button id="btnCancelEditCallsign" class="dossier-sm-btn btn-cancel" type="button">[ CANCEL ]</button>
+        <div class="dossier-hero-meta">
+          <span class="hero-meta-status" id="dossierAuthType">AUTHORIZED // GRID CLOUD</span>
+          <span class="hero-meta-divider">//</span>
+          <span class="hero-meta-matches"><span id="dossierMatches">0</span> MATCHES</span>
         </div>
-        <div class="dossier-field-hint" id="dossierCallsignHint">3 to 16 alphanumeric characters or underscores</div>
+        <div class="dossier-field-hint" id="dossierCallsignHint" style="display:none;">3 to 16 alphanumeric characters or underscores</div>
       </div>
 
-      <!-- Telemetry Matrix Grid -->
-      <div class="dossier-telemetry-grid">
-        <div class="telemetry-cell">
-          <div class="telemetry-label">COMBAT LEVEL</div>
-          <div class="telemetry-value cyan-val" id="dossierLevel">LVL 01</div>
+      <!-- Streamlined Telemetry Strip -->
+      <div class="dossier-stats-strip">
+        <div class="stat-col">
+          <div class="stat-col-label">LEVEL</div>
+          <div class="stat-col-val cyan-val" id="dossierLevel">LVL 01</div>
         </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label">BITS HARVESTED</div>
-          <div class="telemetry-value yellow-val" id="dossierBits">0 BITS</div>
+        <div class="stat-divider"></div>
+        <div class="stat-col">
+          <div class="stat-col-label">BITS</div>
+          <div class="stat-col-val yellow-val" id="dossierBits">0 BITS</div>
         </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label">HIGHEST WAVE</div>
-          <div class="telemetry-value green-val" id="dossierHighestWave">WAVE 01</div>
+        <div class="stat-divider"></div>
+        <div class="stat-col">
+          <div class="stat-col-label">BEST WAVE</div>
+          <div class="stat-col-val green-val" id="dossierHighestWave">WAVE 01</div>
         </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label">TOTAL SCORE</div>
-          <div class="telemetry-value cyan-val" id="dossierTotalScore">0 PTS</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label">GRID MATCHES</div>
-          <div class="telemetry-value orange-val" id="dossierMatches">0</div>
-        </div>
-        <div class="telemetry-cell">
-          <div class="telemetry-label">CLEARANCE STATUS</div>
-          <div class="telemetry-value green-val" id="dossierAuthType">AUTHORIZED</div>
+        <div class="stat-divider"></div>
+        <div class="stat-col">
+          <div class="stat-col-label">TOTAL SCORE</div>
+          <div class="stat-col-val cyan-val" id="dossierTotalScore">0 PTS</div>
         </div>
       </div>
 
       <!-- Dossier Actions Footer -->
-      <div class="dossier-actions-row">
-        <button id="btnSwitchIdentity" class="dossier-action-btn" type="button">
-          [ SWITCH IDENTITY / SIGN OUT ]
+      <div class="dossier-footer">
+        <button id="btnSwitchIdentity" class="dossier-ghost-btn" type="button">
+          SWITCH IDENTITY / SIGN OUT &rarr;
         </button>
       </div>
     </div>
-
     <!-- 2. AUTH WIZARD VIEW (Sign In / Create Account for Guests or Switching) -->
     <div id="authView" class="terminal-view-container">
       <!-- Mode Selector Tabs: Sign In vs Create Account -->

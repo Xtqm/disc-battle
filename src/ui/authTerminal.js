@@ -32,6 +32,8 @@ export function setTerminalView(view) {
   const headerTitle = document.getElementById('terminalHeaderTitle');
   const headerSub = document.getElementById('terminalHeaderSub');
   const returnToDossierRow = document.getElementById('returnToDossierRow');
+  const statusBanner = document.getElementById('terminalStatusBanner');
+  const consoleMsg = document.getElementById('terminalConsoleMsg');
   const user = authManager.currentUser;
   const isAuth = user && !user.isAnonymous;
 
@@ -40,6 +42,8 @@ export function setTerminalView(view) {
     if (authView) authView.style.display = 'none';
     if (headerTitle) headerTitle.textContent = 'PROGRAM DOSSIER';
     if (headerSub) headerSub.textContent = 'GRID TELEMETRY & IDENTITY MATRIX';
+    if (statusBanner) statusBanner.style.display = 'none';
+    if (consoleMsg) consoleMsg.style.display = 'none';
 
     // Reset inline callsign edit row
     const displayRow = document.getElementById('callsignDisplayRow');
@@ -51,6 +55,8 @@ export function setTerminalView(view) {
     if (authView) authView.style.display = 'block';
     if (headerTitle) headerTitle.textContent = 'GRID IDENTITY TERMINAL';
     if (headerSub) headerSub.textContent = 'SYNC PROGRESSION & PROFILE';
+    if (statusBanner) statusBanner.style.display = 'flex';
+    if (consoleMsg) consoleMsg.style.display = 'flex';
     if (returnToDossierRow) {
       returnToDossierRow.style.display = isAuth ? 'block' : 'none';
     }
@@ -311,6 +317,9 @@ function setConsoleMessage(msg, type = 'info') {
   if (!el) return;
   el.textContent = msg;
   el.className = `terminal-console msg-${type}`;
+  if (type === 'error' || type === 'success') {
+    el.style.display = 'flex';
+  }
 }
 
 /**
