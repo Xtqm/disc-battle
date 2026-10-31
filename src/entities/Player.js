@@ -265,7 +265,14 @@ export function aimTarget() {
 
   if (_rd.y < -0.001) {
     const t = -_ro.y / _rd.y;
-    if (t > 0.5 && t < best) { best = t; hitFoe = null; }
+    const hitX = _ro.x + _rd.x * t;
+    const hitZ = _ro.z + _rd.z * t;
+    const dx = hitX - state.player.pos.x;
+    const dz = hitZ - state.player.pos.z;
+    const fwdX = -Math.sin(state.player.yaw);
+    const fwdZ = -Math.cos(state.player.yaw);
+    const forwardDist = dx * fwdX + dz * fwdZ;
+    if (forwardDist >= 8.0 && t > 0.5 && t < best) { best = t; hitFoe = null; }
   }
   const lim = config.ARENA - 1.5;
   for (const [axis, sign] of [['x',1],['x',-1],['z',1],['z',-1]]) {

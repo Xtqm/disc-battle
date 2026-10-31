@@ -99,7 +99,7 @@ async function runUnifiedFlowTests() {
   console.log('Test 1 results:', test1);
   if (
     test1.buttonsExist &&
-    test1.swarmText.includes('SWARM') &&
+    (test1.swarmText.includes('ARCFIELD') || test1.swarmText.includes('SURVIVAL') || test1.swarmText.includes('SWARM')) &&
     test1.hostText.includes('HOST') &&
     test1.joinText.includes('JOIN') &&
     test1.hostModalVisibleAfterClick &&

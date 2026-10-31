@@ -572,6 +572,99 @@ async function runTests() {
     throw new Error(`Test 10 FAILED: ${JSON.stringify(test10)}`);
   }
 
+  // -------------------------------------------------------------
+  // TEST 11: Midair Disc Launch Trajectory & Parallax Protection
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 11: Midair Disc Launch Trajectory & Parallax Protection ---');
+  const test11 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { state } = dbg;
+
+    // Reset player position and discs
+    dbg.setPlayerPos(0, 0, 3.5); // Airborne at Air Jump height
+    state.player.vy = 0;
+    state.player.yaw = 0;
+    state.player.pitch = -0.20; // Natural downward look angle (-11.5 deg)
+    state.player.hasDisc = true;
+    state.discs.length = 0;
+
+    // Step a few frames to let camera stabilize behind player
+    for (let f = 0; f < 5; f++) {
+      dbg.step(0.016);
+      dbg.setPlayerPos(0, 0, 3.5);
+      state.player.vy = 0;
+    }
+
+    // 1. Check trajectory prediction:
+    // With forwardDist >= 8m guard and launchY hover dampening,
+    // the trajectory should NOT prematurely ricochet off the floor 3-5m ahead.
+    const traj = dbg.traj();
+    const noPrematureFloorBounceInTraj = traj.bounces <= 1;
+
+    // 2. Check live disc launch and flight:
+    dbg.throwDisc();
+    const disc = state.discs.find(d => d.owner === 'player');
+    const launchYRecorded = disc && disc.launchY !== undefined && Math.abs(disc.launchY - (1.7 + 3.5)) < 0.2;
+
+    // Step 20 frames (~0.32s, ~12m flight distance at 38m/s)
+    let minFlightY = disc ? disc.pos.y : 0;
+    let prematureFloorBounces = 0;
+    for (let f = 0; f < 20; f++) {
+      dbg.step(0.016);
+      dbg.setPlayerPos(0, 0, 3.5); // hold airborne height for test
+      state.player.vy = 0;
+      if (disc) {
+        minFlightY = Math.min(minFlightY, disc.pos.y);
+        if (disc.bounces > prematureFloorBounces) {
+          prematureFloorBounces = disc.bounces;
+        }
+      }
+    }
+
+    // Disc should cruise at airborne height without diving to floor level (DISC_R = 0.35)
+    const heldAirborneElevation = minFlightY >= 3.0;
+    const zeroPrematureFloorBounces = prematureFloorBounces === 0;
+
+    // 3. Near-parallax floor raycast guard check:
+    // When aiming down steeply (e.g. pitch = -0.35), verify camera ray hitting near toes (< 8m forward)
+    // is rejected from snapping aimTarget onto floor under feet.
+    state.player.pitch = -0.35;
+    for (let f = 0; f < 5; f++) {
+      dbg.step(0.016);
+      dbg.setPlayerPos(0, 0, 3.5);
+      state.player.vy = 0;
+    }
+    const aim = dbg.aim();
+    // In aimTarget(), when near floor ray is rejected, aim.dist targets far arena wall / limit (not near feet t ~ 10-12m)
+    const nearParallaxProtected = aim.dist > 15;
+
+    // Clean up
+    state.player.pitch = 0;
+    dbg.setPlayerPos(0, 0, 0);
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+
+    return {
+      trajBounces: traj.bounces,
+      noPrematureFloorBounceInTraj,
+      launchYRecorded,
+      launchY: disc ? +disc.launchY.toFixed(2) : null,
+      minFlightY: +minFlightY.toFixed(2),
+      heldAirborneElevation,
+      prematureFloorBounces,
+      zeroPrematureFloorBounces,
+      nearParallaxProtected,
+      aimDistAtSteepPitch: aim.dist
+    };
+  });
+
+  console.log('Test 11 results:', test11);
+  if (test11.noPrematureFloorBounceInTraj && test11.launchYRecorded && test11.heldAirborneElevation && test11.zeroPrematureFloorBounces && test11.nearParallaxProtected) {
+    console.log('>>> TEST 11 PASSED: Midair disc launch maintains cruise elevation, eliminates floor ricochets & protects against near-parallax toe snap!');
+  } else {
+    throw new Error(`Test 11 FAILED: ${JSON.stringify(test11)}`);
+  }
+
   console.log('\n=============================================');
   console.log('ALL ACCEPTANCE CRITERIA RIGOROUSLY VERIFIED!');
   console.log('=============================================\n');

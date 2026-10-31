@@ -39,7 +39,8 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
 
     p.addScaledVector(v, step);
     if (p.y > config.DISC_R) {
-      p.y += (1.7 - p.y) * Math.min(1, step * 2.2);
+      const cruiseY = origin.y !== undefined ? origin.y : 1.7;
+      p.y += (cruiseY - p.y) * Math.min(1, step * 2.2);
     }
 
     // Floor collision & void check

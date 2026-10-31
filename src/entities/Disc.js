@@ -43,6 +43,7 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
     obj,
     pos: pos.clone(),
     vel: vel.clone(),
+    launchY: pos.y,
     owner,
     originalOwner: owner,
     color,
@@ -150,7 +151,8 @@ export function updateDiscs(dt) {
 
     D.pos.addScaledVector(D.vel, dt);
     if (!D.returning && D.pos.y > config.DISC_R) {
-      D.pos.y += (1.7 - D.pos.y) * Math.min(1, dt * 2.2);
+      const cruiseY = D.launchY !== undefined ? D.launchY : 1.7;
+      D.pos.y += (cruiseY - D.pos.y) * Math.min(1, dt * 2.2);
     }
     if (D.cosmetics && !D.returning && Math.random() < 0.3) {
       const trailHex = Math.random() > 0.4 ? D.cosmetics.primaryHex : D.cosmetics.secondaryEmissiveHex;
