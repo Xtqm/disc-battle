@@ -115,6 +115,7 @@ export function updateDiscs(dt) {
       if (L < 1.4) {
         if (D.owner === 'player') {
           state.player.hasDisc = true;
+          SFX.catchDisc();
         } else if (D.owner) {
           D.owner.hasDisc = true;
           if (D.owner.obj && D.owner.obj.userData && D.owner.obj.userData.backDisc) {
@@ -148,7 +149,7 @@ export function updateDiscs(dt) {
     }
 
     D.pos.addScaledVector(D.vel, dt);
-    if (D.pos.y > config.DISC_R) {
+    if (!D.returning && D.pos.y > config.DISC_R) {
       D.pos.y += (1.7 - D.pos.y) * Math.min(1, dt * 2.2);
     }
     if (D.cosmetics && !D.returning && Math.random() < 0.3) {
@@ -384,7 +385,20 @@ export function updateDiscs(dt) {
           const isDead = applyDamageToTarget(f, dmg, D);
           f.hurt = .25;
           state.score += 25;
+
+          const toTarget = D.pos.clone().sub(fCenter).setY(0);
+          if (toTarget.lengthSq() > 1e-4) toTarget.normalize();
+          else toTarget.set(0, 0, 1);
+
+          D.vel.multiplyScalar(-0.45);
+          D.vel.x += (Math.random() - 0.5) * 4;
+          D.vel.z += (Math.random() - 0.5) * 4;
+          D.vel.y = Math.random() * 2 + 1;
+          D.bounces = 0;
+          D.curve = 0;
           D.returning = true;
+          D.pos.addScaledVector(toTarget, 0.4);
+
           if (isDead) {
             if (Math.abs(D.initialCurve || 0) > 0.05 || Math.abs(D.curve || 0) > 0.05) {
               duelEconomyBridge.rewardCurveElimination(Math.abs(D.initialCurve || D.curve || 0));
@@ -397,8 +411,10 @@ export function updateDiscs(dt) {
           if (D.pos.distanceTo(tmp.copy(holder.pos).setY(1.7 + (holder.y || 0))) < 1.4) {
             state.player.hasDisc = true;
             scene.remove(D.obj);
+            disposeHierarchy(D.obj);
             state.discs.splice(i, 1);
             discCaught = true;
+            SFX.catchDisc();
           }
           break;
         }

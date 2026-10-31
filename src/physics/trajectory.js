@@ -2,7 +2,7 @@ import * as THREE from '../../vendor/three.module.js';
 import { state } from '../core/state.js';
 import { config } from '../core/config.js';
 import { scene, camera } from '../graphics/scene.js';
-import { getTileAt, pillars } from '../entities/Arena.js';
+import { getTileAt, pillars, sectorHazardBuilder } from '../entities/Arena.js';
 import { tmp } from '../graphics/materials.js';
 import { getPlayerCurveIntent } from '../input/keyboard.js';
 
@@ -13,7 +13,7 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
   let k = curve;
   const lim = config.ARENA - 1.5;
 
-  while (t < tMax && bounces <= maxBounces) {
+  while (t < tMax && bounces < maxBounces) {
     t += step;
 
     if (k) {
@@ -58,6 +58,10 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
           if (sig) {
             bounces++;
             bounceAt.push(p.clone());
+            if (bounces >= maxBounces) {
+              pts.push(p.clone());
+              return { pts, bounceAt, hitFoe };
+            }
           }
         }
       } else {
@@ -81,10 +85,17 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
         hit = true;
       }
     }
+    if (sectorHazardBuilder && sectorHazardBuilder.checkDiscCollision({ pos: p, vel: v })) {
+      hit = true;
+    }
     if (hit) {
       bounces++;
       bounceAt.push(p.clone());
       k = -k * 0.5;
+      if (bounces >= maxBounces) {
+        pts.push(p.clone());
+        return { pts, bounceAt, hitFoe };
+      }
     }
 
     // Intercepts a foe program?

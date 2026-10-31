@@ -310,6 +310,9 @@ if (typeof document !== 'undefined') {
 
 // Debug hooks for headless puppeteer test harness
 window.__dbg = {
+  THREE,
+  spawnDisc: (p, v, owner, color, curve) => spawnDisc(p, v, owner, color, curve),
+  updateCrosshair: (aim = { dist: 10 }, traj = null) => updateCrosshair(aim, traj),
   state,
   player: state.player,
   hp: () => state.player.hp,

@@ -347,6 +347,231 @@ async function runTests() {
     throw new Error(`Test 6 FAILED: ${JSON.stringify(test6)}`);
   }
 
+  // -------------------------------------------------------------
+  // TEST 7: Trajectory Simulation Bounce Cap Parity
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 7: Trajectory Simulation Bounce Cap Parity ---');
+  const test7 = await page.evaluate(() => {
+    const dbg = window.__dbg;
+    const { THREE, simulatePath } = dbg;
+
+    const origin = new THREE.Vector3(0, 1.7, 0);
+    // Aim into a corner with high speed and long duration to guarantee multiple ricochets
+    const vel = new THREE.Vector3(30, 0, 30);
+
+    // Max 3 bounces
+    const sim3 = simulatePath(origin, vel, 3, 5.0, 1 / 90, 0);
+    // Max 1 bounce
+    const sim1 = simulatePath(origin, vel, 1, 5.0, 1 / 90, 0);
+    // Max 2 bounces
+    const sim2 = simulatePath(origin, vel, 2, 5.0, 1 / 90, 0);
+
+    return {
+      bounces3: sim3.bounceAt.length,
+      bounces1: sim1.bounceAt.length,
+      bounces2: sim2.bounceAt.length,
+      pts3Count: sim3.pts.length,
+      pts1Count: sim1.pts.length
+    };
+  });
+
+  console.log('Test 7 results:', test7);
+  if (test7.bounces3 <= 3 && test7.bounces1 <= 1 && test7.bounces2 <= 2 && test7.pts1Count < test7.pts3Count) {
+    console.log('>>> TEST 7 PASSED: simulatePath strictly respects maxBounces (never exceeds cap)!');
+  } else {
+    throw new Error(`Test 7 FAILED: ${JSON.stringify(test7)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 8: Player Disc Elastic Rebound on Enemy Hit
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 8: Player Disc Elastic Rebound on Enemy Hit ---');
+  const test8 = await page.evaluate(() => {
+    const dbg = window.__dbg;
+    const { THREE, spawnDisc, state } = dbg;
+    dbg.resetTiles();
+
+    // Ensure a live duel boss is present
+    dbg.finishCountdown();
+    let boss = state.foes.find(f => f.isBoss) || state.foes[0];
+    if (!boss) {
+      dbg.startMode('duel');
+      dbg.finishCountdown();
+      boss = state.foes.find(f => f.isBoss) || state.foes[0];
+    }
+    boss.alive = true;
+    boss.hp = 100;
+    boss.maxHp = 100;
+    boss.state = 'IDLE';
+    boss.cd = 999;
+    boss.pos.set(0, 0, -10);
+    boss.obj.position.copy(boss.pos);
+    dbg.setPlayerPos(0, 0, 0);
+
+    // Clear any existing discs
+    state.discs.length = 0;
+
+    // Spawn player disc at (0, 1.7, -6) with forward velocity (0, 0, -32) heading towards boss at z = -10
+    const p = new THREE.Vector3(0, 1.7, -6);
+    const v = new THREE.Vector3(0, 0, -32);
+    const d = spawnDisc(p, v, 'player', 0x00ffff, 0);
+
+    let collided = false;
+    let velZInverted = false;
+    let velYPopped = false;
+    let returningSet = false;
+    let distanceToBossAfterHit = 0;
+    let recordedVel = null;
+
+    for (let f = 0; f < 30; f++) {
+      dbg.step(0.016);
+      if (d.returning) {
+        collided = true;
+        returningSet = true;
+        // Inverted horizontal velocity means moving back toward positive Z (vel.z > 0)
+        velZInverted = d.vel.z > 0;
+        velYPopped = d.vel.y > 0;
+        distanceToBossAfterHit = d.pos.distanceTo(boss.pos);
+        recordedVel = { x: +d.vel.x.toFixed(2), y: +d.vel.y.toFixed(2), z: +d.vel.z.toFixed(2) };
+        break;
+      }
+    }
+
+    return {
+      collided,
+      returningSet,
+      velZInverted,
+      velYPopped,
+      distanceToBossAfterHit,
+      discVel: recordedVel || { x: +d.vel.x.toFixed(2), y: +d.vel.y.toFixed(2), z: +d.vel.z.toFixed(2) }
+    };
+  });
+
+  console.log('Test 8 results:', test8);
+  if (test8.collided && test8.returningSet && test8.velZInverted && test8.velYPopped) {
+    console.log('>>> TEST 8 PASSED: Player disc rebounded elastically with velocity inversion & pop!');
+  } else {
+    throw new Error(`Test 8 FAILED: ${JSON.stringify(test8)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 9: Airborne Return Kinematics & Player Re-Arm Watchdog
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 9: Airborne Return Kinematics & Player Re-Arm Watchdog ---');
+  const test9 = await page.evaluate(() => {
+    const dbg = window.__dbg;
+    const { THREE, spawnDisc, state } = dbg;
+    dbg.resetTiles();
+
+    // 1. Airborne Return Kinematics:
+    // Player is high in air at y = 4.0
+    dbg.setPlayerPos(0, 0, 4.0);
+    state.player.alive = true;
+    state.player.hp = 100;
+    state.player.hasDisc = false;
+    state.discs.length = 0;
+
+    // Spawn a returning disc at (0, 2.0, 8.0)
+    const p = new THREE.Vector3(0, 2.0, 8.0);
+    const v = new THREE.Vector3(0, 0, -20);
+    const retDisc = spawnDisc(p, v, 'player', 0x00ffff, 0);
+    retDisc.returning = true;
+
+    let reachedAirborneHeight = false;
+    let caughtAirborne = false;
+    let maxYReached = retDisc.pos.y;
+
+    for (let f = 0; f < 90; f++) {
+      // Keep player airborne during this test
+      dbg.setPlayerPos(0, 0, 4.0);
+      state.player.vy = 0;
+      dbg.step(0.016);
+      if (retDisc.pos.y > maxYReached) maxYReached = retDisc.pos.y;
+      if (retDisc.pos.y > 3.0) reachedAirborneHeight = true;
+      if (state.player.hasDisc) {
+        caughtAirborne = true;
+        break;
+      }
+    }
+
+    // 2. Player Re-Arm Watchdog:
+    // Place player on ground, remove disc, ensure no discs in flight
+    dbg.setPlayerPos(0, 0, 0);
+    state.player.alive = true;
+    state.player.hp = 100;
+    state.player.hasDisc = false;
+    state.discs.length = 0;
+    state.player.noDiscTimer = 0;
+
+    let watchdogRearmed = false;
+    let framesToWatchdog = 0;
+
+    // 3.0 second watchdog is ~188 frames at 0.016
+    for (let f = 0; f < 220; f++) {
+      dbg.step(0.016);
+      if (state.player.hasDisc) {
+        watchdogRearmed = true;
+        framesToWatchdog = f;
+        break;
+      }
+    }
+
+    return {
+      reachedAirborneHeight,
+      maxYReached: +maxYReached.toFixed(2),
+      caughtAirborne,
+      watchdogRearmed,
+      framesToWatchdog
+    };
+  });
+
+  console.log('Test 9 results:', test9);
+  if (test9.reachedAirborneHeight && test9.caughtAirborne && test9.watchdogRearmed) {
+    console.log('>>> TEST 9 PASSED: Returning disc climbed to airborne chest height & player re-arm watchdog triggered!');
+  } else {
+    throw new Error(`Test 9 FAILED: ${JSON.stringify(test9)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 10: Gamepad Curve Brackets & HUD Parity
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 10: Gamepad Curve Brackets & HUD Parity ---');
+  const test10 = await page.evaluate(() => {
+    const dbg = window.__dbg;
+    const { state } = dbg;
+    const ch = document.getElementById('crosshair');
+
+    // Test Left Curve via gamepadCurveL
+    state.gamepadCurveL = true;
+    state.gamepadCurveR = false;
+    dbg.updateCrosshair({ dist: 10 }, null);
+    const hasCurveL = ch.classList.contains('curve-l') && !ch.classList.contains('curve-r');
+
+    // Test Right Curve via gamepadCurveR
+    state.gamepadCurveL = false;
+    state.gamepadCurveR = true;
+    dbg.updateCrosshair({ dist: 10 }, null);
+    const hasCurveR = ch.classList.contains('curve-r') && !ch.classList.contains('curve-l');
+
+    // Clean up
+    state.gamepadCurveR = false;
+    dbg.updateCrosshair({ dist: 10 }, null);
+    const neutral = !ch.classList.contains('curve-l') && !ch.classList.contains('curve-r');
+
+    return {
+      hasCurveL,
+      hasCurveR,
+      neutral
+    };
+  });
+
+  console.log('Test 10 results:', test10);
+  if (test10.hasCurveL && test10.hasCurveR && test10.neutral) {
+    console.log('>>> TEST 10 PASSED: Gamepad curve state triggers .curve-l and .curve-r brackets correctly!');
+  } else {
+    throw new Error(`Test 10 FAILED: ${JSON.stringify(test10)}`);
+  }
+
   console.log('\n=============================================');
   console.log('ALL ACCEPTANCE CRITERIA RIGOROUSLY VERIFIED!');
   console.log('=============================================\n');

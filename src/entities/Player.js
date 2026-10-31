@@ -4,7 +4,7 @@ import { config } from '../core/config.js';
 import { scene, camera, snapCamera } from '../graphics/scene.js';
 import { resolveCircle } from '../physics/collision.js';
 import { burst } from '../graphics/particles.js';
-import { playDeRezSound } from '../audio/sfx.js';
+import { playDeRezSound, SFX } from '../audio/sfx.js';
 import { animateProgramKinematics } from '../graphics/materials.js';
 import { message, shake, showGameOver } from '../ui/UIManager.js';
 import { getTileAt, rebuildArenaTiles, pillars } from './Arena.js';
@@ -22,6 +22,18 @@ export function updatePlayer(dt) {
 
   if (state.player.invuln > 0) {
     state.player.invuln -= dt;
+  }
+
+  // Player re-arm failsafe watchdog
+  if (!state.player.hasDisc && !state.discs.some(d => d.owner === 'player')) {
+    state.player.noDiscTimer = (state.player.noDiscTimer || 0) + dt;
+    if (state.player.noDiscTimer > 3.0) {
+      state.player.hasDisc = true;
+      state.player.noDiscTimer = 0;
+      SFX.catchDisc();
+    }
+  } else {
+    state.player.noDiscTimer = 0;
   }
 
   updateTouchMomentum(dt);

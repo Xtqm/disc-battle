@@ -79,8 +79,8 @@ export function updateCrosshair(aim, traj) {
     ch.classList.toggle('hot', onFoe);
     ch.classList.toggle('bank', !!(traj && traj.willHit && traj.bounces > 0));
     ch.classList.toggle('empty', !state.player.hasDisc);
-    const qHeld = (!!state.keys.KeyQ || state.touchCurveL) && !(!!state.keys.KeyE || state.touchCurveR);
-    const eHeld = (!!state.keys.KeyE || state.touchCurveR) && !(!!state.keys.KeyQ || state.touchCurveL);
+    const qHeld = (!!state.keys.KeyQ || state.touchCurveL || state.gamepadCurveL) && !(!!state.keys.KeyE || state.touchCurveR || state.gamepadCurveR);
+    const eHeld = (!!state.keys.KeyE || state.touchCurveR || state.gamepadCurveR) && !(!!state.keys.KeyQ || state.touchCurveL || state.gamepadCurveL);
     ch.classList.toggle('curve-l', qHeld);
     ch.classList.toggle('curve-r', eHeld);
     const range = document.getElementById('range');

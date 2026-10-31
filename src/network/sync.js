@@ -62,11 +62,11 @@ export function updateRemotePlayers(dt) {
     if (opp.obj.userData && opp.obj.userData.backDisc) {
       opp.obj.userData.backDisc.visible = opp.hasDisc;
       if (opp.blocking && opp.hasDisc) {
-        opp.obj.userData.backDisc.position.set(0, 1.75, .75);
-        opp.obj.userData.backDisc.rotation.x = 0;
+        opp.obj.userData.backDisc.position.set(-0.06, -0.15, 0.22);
+        opp.obj.userData.backDisc.rotation.set(0.65, 0.35, 0);
       } else {
-        opp.obj.userData.backDisc.position.set(0, 1.8, -.45);
-        opp.obj.userData.backDisc.rotation.x = Math.PI / 2;
+        opp.obj.userData.backDisc.position.set(0.04, -0.28, 0.02);
+        opp.obj.userData.backDisc.rotation.set(0, Math.PI / 2, 0);
       }
     }
   }
