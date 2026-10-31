@@ -67,7 +67,7 @@ const TEST_DOMAINS = {
 async function main() {
   const filterArg = process.argv[2]?.toLowerCase().trim();
   let testQueue = [];
-  let scopeLabel = 'FULL TRON DISC ARENA TEST SUITE';
+  let scopeLabel = 'FULL ARC LEAGUE TEST SUITE';
 
   if (filterArg && filterArg !== 'all') {
     if (!TEST_DOMAINS[filterArg]) {

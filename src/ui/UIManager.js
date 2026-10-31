@@ -1,6 +1,6 @@
 import { state } from '../core/state.js';
-import { updateHUD, message, el, updateCrosshair, updateKeyMonitor, updateLockStateBanner, showFloatingNeonBits } from './hud.js';
-export { showFloatingNeonBits };
+import { updateHUD, message, el, updateCrosshair, updateKeyMonitor, updateLockStateBanner, showFloatingNeonBits, showFloatingNeonCredits } from './hud.js';
+export { showFloatingNeonBits, showFloatingNeonCredits };
 import { startMode, startGame, showModeSelect, showModeSelectMenu, bindMenuButtons, bindMainMenuEvents } from './menus.js';
 import { pauseGame, resumeGame, restartMatch, showGameOver, checkOrientation, requestFullScreen, exitFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
 import { updateIdentityHeader, showAuthTerminal, hideAuthTerminal, initAuthTerminal } from './authTerminal.js';

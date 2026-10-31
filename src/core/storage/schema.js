@@ -45,6 +45,7 @@ export const DEFAULT_SAVE_STATE = Object.freeze({
     xp: 0,
     currency: Object.freeze({
       bits: 0,
+      credits: 0,
       sparks: 0
     })
   }),
@@ -81,6 +82,7 @@ export const DEFAULT_SAVE_STATE = Object.freeze({
     highestScore: 0,
     totalPlaytimeSec: 0,
     totalDerezzes: 0,
+    totalDeallocations: 0,
     parriesExecuted: 0,
     curveEliminations: 0
   })
@@ -103,7 +105,8 @@ export function createDefaultSaveState(overrides = {}) {
       level: overrides?.player?.level ?? 1,
       xp: overrides?.player?.xp ?? 0,
       currency: {
-        bits: overrides?.player?.currency?.bits ?? 0,
+        bits: overrides?.player?.currency?.credits ?? overrides?.player?.currency?.bits ?? 0,
+        credits: overrides?.player?.currency?.credits ?? overrides?.player?.currency?.bits ?? 0,
         sparks: overrides?.player?.currency?.sparks ?? 0
       }
     },
@@ -139,7 +142,8 @@ export function createDefaultSaveState(overrides = {}) {
       swarmHighestWave: overrides?.stats?.swarmHighestWave ?? overrides?.stats?.highestWave ?? 1,
       highestScore: overrides?.stats?.highestScore ?? 0,
       totalPlaytimeSec: overrides?.stats?.totalPlaytimeSec ?? 0,
-      totalDerezzes: overrides?.stats?.totalDerezzes ?? 0,
+      totalDerezzes: overrides?.stats?.totalDeallocations ?? overrides?.stats?.totalDerezzes ?? 0,
+      totalDeallocations: overrides?.stats?.totalDeallocations ?? overrides?.stats?.totalDerezzes ?? 0,
       parriesExecuted: overrides?.stats?.parriesExecuted ?? 0,
       curveEliminations: overrides?.stats?.curveEliminations ?? 0
     }
@@ -206,6 +210,9 @@ export function validateSaveState(data) {
     }
     if (data.stats.totalDerezzes !== undefined && typeof data.stats.totalDerezzes !== 'number') {
       errors.push('"stats.totalDerezzes" must be a number');
+    }
+    if (data.stats.totalDeallocations !== undefined && typeof data.stats.totalDeallocations !== 'number') {
+      errors.push('"stats.totalDeallocations" must be a number');
     }
     if (data.stats.parriesExecuted !== undefined && typeof data.stats.parriesExecuted !== 'number') {
       errors.push('"stats.parriesExecuted" must be a number');

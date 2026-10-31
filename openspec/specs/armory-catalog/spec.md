@@ -29,7 +29,7 @@ The system SHALL define structured visual rendering parameters for all cosmetic 
 
 #### Scenario: Free baseline cosmetics configuration
 - **WHEN** default baseline items (`disc_default`, `chassis_default`, `arena_grid_01`) are queried
-- **THEN** the system provides default cyan and blue Tron grid visual aesthetics with unlockType set to free.
+- **THEN** the system provides default cyan and blue Arc League athletic grid aesthetics with unlockType set to free.
 
 ### Requirement: Unlock Condition and Ownership Verification
 The system SHALL verify item ownership and unlock criteria based on stored inventory, default entitlements, and achievement requirements.
@@ -163,22 +163,22 @@ The system SHALL provide an isolated Three.js preview scene and camera rig capab
 - **THEN** the system halts the animation loop, removes all objects from the preview sub-scene, disposes materials and geometries, and releases WebGL canvas resources.
 
 ### Requirement: Diegetic Main Menu Armory Navigation and Live Balance Counter
-The system SHALL provide an Armory entrypoint within the main menu interface that displays the Armory modal, featuring category navigation tabs (`IDENTITY DISCS`, `PROGRAM CHASSIS`, `EXOTIC ARENAS`), modal dismiss controls, and a reactive live Bit balance counter.
+The system SHALL provide an Armory entrypoint within the main menu interface that displays the Armory modal, featuring category navigation tabs (`KINETIC DISCS`, `ATHLETE RIGS`, `STADIUM ARENAS`), modal dismiss controls, and a reactive live Arc Credits balance counter.
 
 #### Scenario: Initial page load rendering of Armory navigation button
 - **WHEN** the main menu renders upon initial application load
-- **THEN** `#armoryBtn` is present in `#mainMenuButtons` with compatibility bindings, while the primary player access point is elevated to the Program Hub `[ LOADOUT ]` tab.
+- **THEN** `#armoryBtn` is present in `#mainMenuButtons` with compatibility bindings, while the primary player access point is elevated to the Program Hub `[ LOADOUT ]` or `[ OUTFITTING ]` tab.
 
 #### Scenario: Opening Armory modal from main menu
-- **WHEN** the player clicks the Armory button or activates `[ LOADOUT ]` in the Program Hub
-- **THEN** the system pauses background menu interactions, unlocks the cursor, displays the Armory interface, defaults to the `IDENTITY DISCS` category, and stages the equipped or first catalog item in the 3D preview bay.
+- **WHEN** the player clicks the Armory button or activates `[ OUTFITTING ]` in the Program Hub
+- **THEN** the system pauses background menu interactions, unlocks the cursor, displays the Armory interface, defaults to the `KINETIC DISCS` category, and stages the equipped or first catalog item in the 3D preview bay.
 
 #### Scenario: Displaying and updating live Bit balance counter
 - **WHEN** the Armory modal is opened or when currency changes occur via purchase or earning
-- **THEN** the balance display renders the current Bit total formatted as `$B {balance}` and immediately updates upon any economy balance change.
+- **THEN** the balance display renders the current Arc Credits total formatted as `CR {balance}` and immediately updates upon any economy balance change.
 
 #### Scenario: Switching catalog category tabs
-- **WHEN** the player clicks a category tab (`IDENTITY DISCS`, `PROGRAM CHASSIS`, or `EXOTIC ARENAS`)
+- **WHEN** the player clicks a category tab (`KINETIC DISCS`, `ATHLETE RIGS`, or `STADIUM ARENAS`)
 - **THEN** the system sets the active category tab state, populates the catalog grid with items belonging to that category, and stages the first item of that category in the 3D preview bay.
 
 #### Scenario: Armory dismiss control in Program Hub
@@ -208,12 +208,12 @@ The system SHALL present a split-pane layout inside the Armory modal containing 
 The system SHALL render dynamic, state-sensitive action controls for the inspected item based on ownership, affordability, milestone locks, and loadout status.
 
 #### Scenario: Inspecting an unowned Bit-purchasable item with sufficient Bits
-- **WHEN** the inspected item is unowned, costs Bits, and the player has enough Bits to afford it
-- **THEN** the action bar displays an enabled `[ FABRICATE // {cost} BITS ]` button.
+- **WHEN** the inspected item is unowned, costs Arc Credits, and the player has enough Credits to afford it
+- **THEN** the action bar displays an enabled `[ ACQUIRE // {cost} CREDITS ]` button.
 
 #### Scenario: Inspecting an unowned Bit-purchasable item with insufficient Bits
-- **WHEN** the inspected item is unowned, costs Bits, but the player has fewer Bits than the required cost
-- **THEN** the action bar displays a disabled `[ FABRICATE // {cost} BITS ]` button accompanied by an amber warning message indicating insufficient Bits.
+- **WHEN** the inspected item is unowned, costs Arc Credits, but the player has fewer Credits than the required cost
+- **THEN** the action bar displays a disabled `[ ACQUIRE // {cost} CREDITS ]` button accompanied by an amber warning message indicating insufficient Credits.
 
 #### Scenario: Inspecting an achievement-gated milestone item
 - **WHEN** the inspected item requires an unearned achievement

@@ -287,9 +287,14 @@ export class AchievementManager {
       retroactive: Boolean(options.retroactive)
     };
 
-    // 1. Distribute Bit currency via EconomyManager
-    if (ach.reward?.bits > 0 && this.economy && typeof this.economy.awardBits === 'function') {
-      this.economy.awardBits(ach.reward.bits, `achievement_${ach.id}`);
+    // 1. Distribute Arc Credits currency via EconomyManager
+    const rewardCredits = ach.reward?.credits ?? ach.reward?.bits ?? 0;
+    if (rewardCredits > 0 && this.economy) {
+      if (typeof this.economy.awardCredits === 'function') {
+        this.economy.awardCredits(rewardCredits, `achievement_${ach.id}`);
+      } else if (typeof this.economy.awardBits === 'function') {
+        this.economy.awardBits(rewardCredits, `achievement_${ach.id}`);
+      }
     }
 
     // 2. Distribute cosmetic skins via ArmoryManager

@@ -110,14 +110,14 @@ export function showModeSelect() {
 export function getMainMenuHtml() {
   return `<div id="identityHeader" class="identity-header"></div>
 <div class="card" id="mainMenu">
-  <h1>TRON</h1><h2>D I S C &nbsp; A R E N A</h2>
+  <h1>ARC</h1><h2>L E A G U E</h2>
   <div class="keys desktop-keys">
-    <b>W A S D</b><span>Move &amp; strafe across the grid</span>
+    <b>W A S D</b><span>Move &amp; strafe across the Arcfield</span>
     <b>Q / E</b><span>Apply curve spin — hook discs around pillars &amp; obstacles</span>
     <b>Mouse</b><span>Turn the camera freely — the crosshair is your aim point</span>
     <b>Wheel</b><span>Adjust look sensitivity</span>
     <b>Arc</b><span>A live dotted trajectory shows every bounce before you throw</span>
-    <b>Left Click</b><span>Throw identity disc (it ricochets &amp; returns)</span>
+    <b>Left Click</b><span>Throw kinetic disc (it ricochets &amp; returns)</span>
     <b>Right Click</b><span>Raise disc shield — deflects incoming</span>
     <b>Space</b><span>Jump — tap twice to air-jump, hold for height</span>
     <b>Shift</b><span>Dash (costs energy)</span>
@@ -126,21 +126,21 @@ export function getMainMenuHtml() {
   <div class="keys mobile-keys" style="display:none">
     <b>DRAG LEFT</b><span>Virtual Analog Stick — Move &amp; strafe</span>
     <b>DRAG RIGHT</b><span>Swipe anywhere to turn &amp; aim camera</span>
-    <b>THROW</b><span>Launch identity disc (ricochets &amp; returns)</span>
+    <b>THROW</b><span>Launch kinetic disc (ricochets &amp; returns)</span>
     <b>L / R</b><span>Curve spin — hook disc around obstacles</span>
     <b>SHIELD</b><span>Raise disc shield — deflect incoming attacks</span>
     <b>JUMP</b><span>Tap to air-jump, hold for maximum height</span>
     <b>DASH</b><span>Instant directional sprint impulse</span>
-    <b>PAUSE</b><span>Tap top right II button to suspend grid</span>
+    <b>PAUSE</b><span>Tap top right II button to suspend simulation</span>
   </div>
   <div class="mode-select" id="mainMenuButtons">
-    <button id="campaignBtn" class="mode-btn campaign-btn">CAMPAIGN SECTORS</button>
-    <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
-    <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
-    <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
+    <button id="campaignBtn" class="mode-btn campaign-btn">LEAGUE CIRCUIT</button>
+    <button id="swarmBtn" class="mode-btn swarm-btn">ENTER ARCFIELD (SURVIVAL)</button>
+    <button id="hostMatchBtn" class="mode-btn multi-btn">HOST ARCFIELD MATCH</button>
+    <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ARCFIELD MATCH</button>
     <!-- Legacy compatibility elements for tests & programmatic navigation -->
-    <button id="armoryBtn" class="mode-btn armory-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ARMORY</button>
-    <button id="achievementsBtn" class="mode-btn achievements-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ACHIEVEMENTS</button>
+    <button id="armoryBtn" class="mode-btn armory-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">OUTFITTING</button>
+    <button id="achievementsBtn" class="mode-btn achievements-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">TROPHY MATRIX</button>
     <button id="duelBtn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="btnSwarmSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>
     <button id="btnDuelSolo" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true"></button>

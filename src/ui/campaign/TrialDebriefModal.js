@@ -126,7 +126,7 @@ export class TrialDebriefModal {
     const grid = this.registry.getGrid(level.gridId) || { name: 'SECTOR' };
 
     const isSuccess = Boolean(result.success);
-    const title = isSuccess ? 'TRIAL CLEARED' : 'DEREZZED // SIMULATION FAILED';
+    const title = isSuccess ? 'TRIAL CLEARED' : 'DE-ALLOCATED // SIMULATION FAILED';
     const subtitle = isSuccess
       ? `${level.name} // SECTOR PROTOCOL CONFIRMED`
       : 'PROGRAM INTEGRITY DEPLETED';

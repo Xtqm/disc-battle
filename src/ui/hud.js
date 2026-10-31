@@ -123,13 +123,13 @@ export function updateOfflineBanner(isOnline, pendingCount = 0) {
 }
 
 /**
- * Spawns an animated kinetic floating neon +Bits indicator on the HUD.
+ * Spawns an animated kinetic floating neon +Credits indicator on the HUD.
  * @param {number} amount
  * @param {string} [label=''] e.g. "PARRY", "BANK SHOT", "CURVE KILL"
  * @param {object} [options]
  * @returns {object|null}
  */
-export function showFloatingNeonBits(amount, label = '', options = {}) {
+export function showFloatingNeonCredits(amount, label = '', options = {}) {
   if (typeof document === 'undefined') return null;
 
   let container = document.getElementById('floatingEconomyLayer');
@@ -171,7 +171,7 @@ export function showFloatingNeonBits(amount, label = '', options = {}) {
   const badge = document.createElement('div');
   badge.className = 'floating-neon-bits';
   const labelText = label ? ` // ${label}` : '';
-  badge.textContent = `+${amount} BITS${labelText}`;
+  badge.textContent = `+${amount} CREDITS${labelText}`;
 
   const jitterX = (Math.random() - 0.5) * 80;
   const posX = options.x !== undefined ? options.x : (typeof window !== 'undefined' && window.innerWidth ? window.innerWidth / 2 + jitterX : 200);
@@ -216,4 +216,6 @@ export function showFloatingNeonBits(amount, label = '', options = {}) {
     }
   };
 }
+
+export const showFloatingNeonBits = showFloatingNeonCredits;
 

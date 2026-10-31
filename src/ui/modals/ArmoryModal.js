@@ -21,9 +21,9 @@ import { state } from '../../core/state.js';
 import { setCursor } from '../../input/InputManager.js';
 
 export const CATEGORY_TABS = Object.freeze([
-  { id: ARMORY_CATEGORIES.DISC_SKINS, label: 'IDENTITY DISCS' },
-  { id: ARMORY_CATEGORIES.CHASSIS_SKINS, label: 'PROGRAM CHASSIS' },
-  { id: ARMORY_CATEGORIES.UNLOCKED_MAPS, label: 'EXOTIC ARENAS' }
+  { id: ARMORY_CATEGORIES.DISC_SKINS, label: 'KINETIC DISCS' },
+  { id: ARMORY_CATEGORIES.CHASSIS_SKINS, label: 'ATHLETE RIGS' },
+  { id: ARMORY_CATEGORIES.UNLOCKED_MAPS, label: 'STADIUM ARENAS' }
 ]);
 
 export class ArmoryModal {
@@ -203,10 +203,12 @@ export class ArmoryModal {
    * @returns {string}
    */
   render() {
-    const balance = typeof this.economy.getBalance === 'function'
-      ? this.economy.getBalance()
-      : (typeof this.economy.getBits === 'function' ? this.economy.getBits() : 0);
-    const formattedBits = `$B ${balance.toLocaleString()}`;
+    const balance = typeof this.economy.getCredits === 'function'
+      ? this.economy.getCredits()
+      : (typeof this.economy.getBalance === 'function'
+        ? this.economy.getBalance()
+        : (typeof this.economy.getBits === 'function' ? this.economy.getBits() : 0));
+    const formattedBits = `CR ${balance.toLocaleString()}`;
 
     return `
       <div class="armory-card" id="armoryCard">
@@ -289,8 +291,8 @@ export class ArmoryModal {
         badgeHtml = `<span class="armory-card-badge badge-equipped">EQUIPPED</span>`;
       } else if (isUnlocked) {
         badgeHtml = `<span class="armory-card-badge badge-owned">OWNED</span>`;
-      } else if (item.unlockType === UNLOCK_TYPES.BITS) {
-        badgeHtml = `<span class="armory-card-badge badge-cost">${item.cost} BITS</span>`;
+      } else if (item.unlockType === UNLOCK_TYPES.BITS || item.unlockType === UNLOCK_TYPES.CREDITS) {
+        badgeHtml = `<span class="armory-card-badge badge-cost">${item.cost} CREDITS</span>`;
       } else {
         badgeHtml = `<span class="armory-card-badge badge-locked">LOCKED</span>`;
       }
@@ -391,20 +393,20 @@ export class ArmoryModal {
       `;
     }
 
-    // 4. Bit Purchasable: check affordability
+    // 4. Credit Purchasable: check affordability
     const canAfford = this.armory.canPurchase(item.id);
     if (canAfford) {
       return `
         <button class="armory-action-btn btn-fabricate" id="armoryActionBtn" data-action="fabricate" data-item-id="${item.id}">
-          [ FABRICATE // ${item.cost} BITS ]
+          [ ACQUIRE // ${item.cost} CREDITS ]
         </button>
       `;
     } else {
       return `
         <button class="armory-action-btn btn-fabricate" id="armoryActionBtn" disabled>
-          [ FABRICATE // ${item.cost} BITS ]
+          [ ACQUIRE // ${item.cost} CREDITS ]
         </button>
-        <div class="armory-action-warning">INSUFFICIENT BITS // HARVEST MORE ON THE GRID</div>
+        <div class="armory-action-warning">INSUFFICIENT CREDITS // COMPETE IN THE ARCFIELD</div>
       `;
     }
   }
@@ -633,10 +635,12 @@ export class ArmoryModal {
   _refreshBitsCounter(flash = false) {
     const counterEl = this.container?.querySelector('#armoryBitsCounter');
     const valEl = this.container?.querySelector('#armoryBitsValue');
-    const balance = typeof this.economy.getBalance === 'function'
-      ? this.economy.getBalance()
-      : (typeof this.economy.getBits === 'function' ? this.economy.getBits() : 0);
-    const formattedBits = `$B ${balance.toLocaleString()}`;
+    const balance = typeof this.economy.getCredits === 'function'
+      ? this.economy.getCredits()
+      : (typeof this.economy.getBalance === 'function'
+        ? this.economy.getBalance()
+        : (typeof this.economy.getBits === 'function' ? this.economy.getBits() : 0));
+    const formattedBits = `CR ${balance.toLocaleString()}`;
 
     if (valEl) {
       valEl.textContent = formattedBits;

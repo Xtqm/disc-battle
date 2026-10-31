@@ -192,7 +192,7 @@ console.log('✓ showAuthTerminal() automatically routes guest users to Auth Wiz
 setTerminalHubTab('loadout');
 assert.ok(mockElements.tabHubLoadout.classList.contains('active'), 'tabHubLoadout must have active class');
 assert.strictEqual(mockElements.tabHubIdent.classList.contains('active'), false, 'tabHubIdent must not be active');
-assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'ARMORY & LOADOUT', 'Header title must update to ARMORY & LOADOUT');
+assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'OUTFITTING & LOADOUT', 'Header title must update to OUTFITTING & LOADOUT');
 assert.notStrictEqual(mockElements.hubLoadoutView.style.display, 'none', 'hubLoadoutView must be displayed');
 assert.strictEqual(mockElements.dossierView.style.display, 'none', 'dossierView must be hidden');
 console.log('✓ setTerminalHubTab("loadout") activates Loadout view and updates header titles');
@@ -201,7 +201,7 @@ console.log('✓ setTerminalHubTab("loadout") activates Loadout view and updates
 setTerminalHubTab('directives');
 assert.ok(mockElements.tabHubDirectives.classList.contains('active'), 'tabHubDirectives must have active class');
 assert.strictEqual(mockElements.tabHubLoadout.classList.contains('active'), false, 'tabHubLoadout must not be active');
-assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'GRID DIRECTIVES', 'Header title must update to GRID DIRECTIVES');
+assert.strictEqual(mockElements.terminalHeaderTitle.textContent, 'TROPHY MATRIX & DIRECTIVES', 'Header title must update to TROPHY MATRIX & DIRECTIVES');
 assert.notStrictEqual(mockElements.hubDirectivesView.style.display, 'none', 'hubDirectivesView must be displayed');
 assert.strictEqual(mockElements.hubLoadoutView.style.display, 'none', 'hubLoadoutView must be hidden');
 console.log('✓ setTerminalHubTab("directives") activates Directives view and updates header titles');

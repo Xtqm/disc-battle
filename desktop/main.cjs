@@ -39,7 +39,7 @@ function createWindow() {
     fullscreen: true,
     autoHideMenuBar: true,
     backgroundColor: '#000000',
-    title: 'TRON :: DISC ARENA',
+    title: 'ARC LEAGUE',
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),

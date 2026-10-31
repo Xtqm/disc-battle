@@ -167,7 +167,7 @@ export function showGameOver(customTitle, customSubtitle) {
   }
   const overlayEl = document.getElementById('overlay');
   if (overlayEl) overlayEl.style.display = 'flex';
-  const title = customTitle || (state.gameMode === 'duel' || state.gameMode === 'duel_ai' ? 'DUEL ELIMINATED' : 'DEREZZED');
+  const title = customTitle || (state.gameMode === 'duel' || state.gameMode === 'duel_ai' ? 'DUEL ELIMINATED' : 'DE-ALLOCATED');
   const subtitle = customSubtitle || state.gameOverReason || 'YOUR DISC WAS CLAIMED';
   const stats = (state.gameMode === 'duel' || state.gameMode === 'duel_ai')
     ? `TIERS CLEARED <b style="color:#fff">${(state.duelTier || state.tier || 1) - 1}</b> &nbsp;·&nbsp; SCORE <b style="color:#fff">${state.score}</b>`

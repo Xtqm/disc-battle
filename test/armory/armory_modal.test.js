@@ -129,11 +129,11 @@ assert.strictEqual(modal.activeCategory, ARMORY_CATEGORIES.DISC_SKINS, 'Defaults
 assert.strictEqual(CATEGORY_TABS.length, 3, 'Must define 3 primary category tabs');
 
 const initialMarkup = modal.render();
-assert(initialMarkup.includes('IDENTITY DISCS'), 'Must include IDENTITY DISCS tab');
-assert(initialMarkup.includes('PROGRAM CHASSIS'), 'Must include PROGRAM CHASSIS tab');
-assert(initialMarkup.includes('EXOTIC ARENAS'), 'Must include EXOTIC ARENAS tab');
-assert(initialMarkup.includes('$B 1,000'), 'Must render initial balance $B 1,000');
-console.log('✓ Top navigation bar tabs and live Bit balance counter rendered.');
+assert(initialMarkup.includes('KINETIC DISCS'), 'Must include KINETIC DISCS tab');
+assert(initialMarkup.includes('ATHLETE RIGS'), 'Must include ATHLETE RIGS tab');
+assert(initialMarkup.includes('STADIUM ARENAS'), 'Must include STADIUM ARENAS tab');
+assert(initialMarkup.includes('CR 1,000'), 'Must render initial balance CR 1,000');
+console.log('✓ Top navigation bar tabs and live Arc Credits balance counter rendered.');
 
 // =========================================================================
 // [Group 3] Split-Pane Layout, Catalog Grid & Lore Dossier
@@ -143,13 +143,13 @@ console.log('\n[Group 3] Testing Split-Pane Catalog Grid & Lore Dossier Renderin
 // Select first item by default
 modal.selectedItemId = 'disc_default';
 const discGridMarkup = modal.renderItemsGrid();
-assert(discGridMarkup.includes('Identity Default'), 'Grid must list Identity Default');
+assert(discGridMarkup.includes('Arc Standard'), 'Grid must list Arc Standard');
 assert(discGridMarkup.includes('Neon Amber'), 'Grid must list Neon Amber');
 assert(discGridMarkup.includes('EQUIPPED'), 'Active equipped disc must have EQUIPPED badge');
-assert(discGridMarkup.includes('400 BITS'), 'Unowned purchasable disc must display cost');
+assert(discGridMarkup.includes('400 CREDITS'), 'Unowned purchasable disc must display cost');
 
 const dossierMarkup = modal.renderItemDossier();
-assert(dossierMarkup.includes('Identity Default'), 'Dossier must show selected item title');
+assert(dossierMarkup.includes('Arc Standard'), 'Dossier must show selected item title');
 assert(dossierMarkup.includes('GLOW: 1.5X'), 'Dossier must render shader glow spec');
 assert(dossierMarkup.includes('HEX: #00f3ff'), 'Dossier must render shader color hex');
 console.log('✓ Catalog grid cards and detailed lore dossier specifications validated.');
@@ -173,21 +173,21 @@ actionBarHtml = modal.renderActionBar();
 assert(actionBarHtml.includes('[ EQUIP TO LOADOUT ]'), 'Owned unequipped item must show [ EQUIP TO LOADOUT ]');
 assert(actionBarHtml.includes('btn-equip'), 'Must use btn-equip action class');
 
-// State 3: Unowned Bit Purchasable (Affordable) -> [ FABRICATE // 600 BITS ]
+// State 3: Unowned Credit Purchasable (Affordable) -> [ ACQUIRE // 600 CREDITS ]
 modal.selectedItemId = 'disc_retro_green'; // cost: 600, player has 1000
 assert.strictEqual(armory.canPurchase('disc_retro_green'), true);
 actionBarHtml = modal.renderActionBar();
-assert(actionBarHtml.includes('[ FABRICATE // 600 BITS ]'), 'Affordable item must show [ FABRICATE // 600 BITS ]');
+assert(actionBarHtml.includes('[ ACQUIRE // 600 CREDITS ]'), 'Affordable item must show [ ACQUIRE // 600 CREDITS ]');
 assert(!actionBarHtml.includes('disabled'), 'Affordable item button must NOT be disabled');
 
-// State 4: Unowned Bit Purchasable (Insufficient Bits) -> Disabled with warning
+// State 4: Unowned Credit Purchasable (Insufficient Credits) -> Disabled with warning
 mem['economy.bits'] = 100; // balance now 100 < 600
 modal.selectedItemId = 'disc_retro_green';
 assert.strictEqual(armory.canPurchase('disc_retro_green'), false);
 actionBarHtml = modal.renderActionBar();
-assert(actionBarHtml.includes('[ FABRICATE // 600 BITS ]'), 'Must show price on button');
-assert(actionBarHtml.includes('disabled'), 'Insufficient bits button must be disabled');
-assert(actionBarHtml.includes('INSUFFICIENT BITS // HARVEST MORE ON THE GRID'), 'Must show amber warning message');
+assert(actionBarHtml.includes('[ ACQUIRE // 600 CREDITS ]'), 'Must show price on button');
+assert(actionBarHtml.includes('disabled'), 'Insufficient credits button must be disabled');
+assert(actionBarHtml.includes('INSUFFICIENT CREDITS // COMPETE IN THE ARCFIELD'), 'Must show amber warning message');
 
 // State 5: Milestone Locked -> [ LOCKED // REQUIRES: ... ]
 modal.selectedItemId = 'disc_corrupted_void'; // achievementId: corrupted_void_mastery
@@ -252,14 +252,14 @@ modal.switchCategory(ARMORY_CATEGORIES.CHASSIS_SKINS);
 assert.strictEqual(modal.activeCategory, ARMORY_CATEGORIES.CHASSIS_SKINS);
 assert.strictEqual(modal.selectedItemId, 'chassis_default');
 const chassisGrid = modal.renderItemsGrid();
-assert(chassisGrid.includes('Combat Enforcer Default'), 'Chassis category must list enforcer default');
+assert(chassisGrid.includes('Striker Rig Default'), 'Chassis category must list striker rig default');
 
 // Switch to Exotic Arenas
 modal.switchCategory(ARMORY_CATEGORIES.UNLOCKED_MAPS);
 assert.strictEqual(modal.activeCategory, ARMORY_CATEGORIES.UNLOCKED_MAPS);
 assert.strictEqual(modal.selectedItemId, 'arena_grid_01');
 const mapsGrid = modal.renderItemsGrid();
-assert(mapsGrid.includes('Grid 01: Core Arena'), 'Maps category must list Grid 01');
+assert(mapsGrid.includes('Arcfield 01: Prime Stadium'), 'Maps category must list Arcfield 01');
 console.log('✓ Category tab switching properly updates catalog grid and selection state.');
 
 // =========================================================================

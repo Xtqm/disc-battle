@@ -1,7 +1,7 @@
 /**
  * ArmoryPreviewScene.js
- * Lightweight Three.js Turntable Preview Renderer for Tron Disc Arena (SPEC-ARMORY-001 Phase 2).
- * Renders an isolated, interactive, rotating 3D preview of any selected Identity Disc or Program Chassis
+ * Lightweight Three.js Turntable Preview Renderer for Arc League (SPEC-ARMORY-001 Phase 2).
+ * Renders an isolated, interactive, rotating 3D preview of any selected Kinetic Disc or Athlete Rig
  * inside the Armory UI with studio lighting, pointer drag controls, and zero-leak WebGL disposal.
  */
 
@@ -143,7 +143,7 @@ export class ArmoryPreviewScene {
   }
 
   /**
-   * Stages an Identity Disc for 3D turntable inspection.
+   * Stages a Kinetic Disc for 3D turntable inspection.
    * @param {string|object} discSkinIdOrConfig
    */
   previewDisc(discSkinIdOrConfig) {
@@ -170,7 +170,7 @@ export class ArmoryPreviewScene {
   }
 
   /**
-   * Stages a Program Chassis rig for 3D turntable inspection.
+   * Stages an Athlete Rig for 3D turntable inspection.
    * @param {string|object} chassisSkinIdOrConfig
    * @param {string|object} [activeDiscSkinId] Optional disc skin to pair with back disc
    */

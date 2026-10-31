@@ -8,6 +8,8 @@
 import { storageManager as defaultStorageManager } from '../storage/StorageManager.js';
 
 export const EconomyEvents = Object.freeze({
+  CREDITS_EARNED: 'CREDITS_EARNED',
+  CREDITS_SPENT: 'CREDITS_SPENT',
   BITS_EARNED: 'BITS_EARNED',
   BITS_SPENT: 'BITS_SPENT',
   XP_GAINED: 'XP_GAINED',
@@ -151,20 +153,28 @@ export class EconomyManager {
   }
 
   // ==========================================
-  // Currency Management (Bits)
+  // Currency Management (Arc Credits / Bits)
   // ==========================================
 
   /**
-   * Retrieves the current Bits balance.
+   * Retrieves the current Arc Credits balance.
    * @returns {number}
    */
-  getBits() {
+  getCredits() {
     this._ensureStorageReady();
-    return this.storage.get('player.currency.bits', 0);
+    return this.storage.get('player.currency.credits', this.storage.get('player.currency.bits', 0));
   }
 
   /**
-   * Checks whether the player has sufficient Bits for a transaction.
+   * Retrieves the current Bits balance (legacy proxy for getCredits).
+   * @returns {number}
+   */
+  getBits() {
+    return this.getCredits();
+  }
+
+  /**
+   * Checks whether the player has sufficient Credits/Bits for a transaction.
    * Non-mutating and defensive against invalid inputs.
    * @param {number} cost
    * @returns {boolean}
@@ -174,18 +184,18 @@ export class EconomyManager {
       return false;
     }
     const intCost = Math.floor(cost);
-    return this.getBits() >= intCost;
+    return this.getCredits() >= intCost;
   }
 
   /**
-   * Awards Bits to the player.
+   * Awards Arc Credits to the player.
    * Guards against negative values, NaN, and non-numeric types.
    * Coerces fractional values to integers.
    * @param {number} amount
    * @param {string} [source='reward']
    * @returns {boolean} True if awarded, false if input was invalid
    */
-  awardBits(amount, source = 'reward') {
+  awardCredits(amount, source = 'reward', isBitsProxy = false) {
     if (typeof amount !== 'number' || !Number.isFinite(amount) || Number.isNaN(amount) || amount <= 0) {
       return false;
     }
@@ -196,39 +206,52 @@ export class EconomyManager {
     }
 
     this._ensureStorageReady();
-    const currentBits = this.getBits();
-    const newBits = currentBits + intAmount;
+    const currentCredits = this.getCredits();
+    const newCredits = currentCredits + intAmount;
 
-    this.storage.set('player.currency.bits', newBits, { immediate: false });
+    this.storage.set('player.currency.credits', newCredits, { immediate: false });
+    this.storage.set('player.currency.bits', newCredits, { immediate: false });
 
     const eventPayload = {
       amount: intAmount,
       source: String(source),
-      balance: newBits,
+      balance: newCredits,
       timestamp: Date.now()
     };
 
     this._addAuditEntry({
-      type: EconomyEvents.BITS_EARNED,
+      type: isBitsProxy ? EconomyEvents.BITS_EARNED : EconomyEvents.CREDITS_EARNED,
       amount: intAmount,
       source: String(source),
-      balanceAfter: newBits
+      balanceAfter: newCredits
     });
 
+    this.emit(EconomyEvents.CREDITS_EARNED, eventPayload);
     this.emit(EconomyEvents.BITS_EARNED, eventPayload);
     return true;
   }
 
   /**
-   * Spends Bits for a specified category and item.
+   * Awards Bits to the player (legacy proxy for awardCredits).
+   * @param {number} amount
+   * @param {string} [source='reward']
+   * @returns {boolean}
+   */
+  awardBits(amount, source = 'reward') {
+    return this.awardCredits(amount, source, true);
+  }
+
+  /**
+   * Spends Arc Credits for a specified category and item.
    * Checks balance, deducts atomically, and logs the transaction.
    * Guards against negative amounts, NaN, and fractional costs.
    * @param {number} cost
    * @param {string} [category='general']
    * @param {string|null} [itemId=null]
+   * @param {boolean} [isBitsProxy=false]
    * @returns {boolean} True if successfully spent, false if insufficient balance or invalid input
    */
-  spendBits(cost, category = 'general', itemId = null) {
+  spendCredits(cost, category = 'general', itemId = null, isBitsProxy = false) {
     if (typeof cost !== 'number' || !Number.isFinite(cost) || Number.isNaN(cost) || cost <= 0) {
       return false;
     }
@@ -243,29 +266,42 @@ export class EconomyManager {
     }
 
     this._ensureStorageReady();
-    const currentBits = this.getBits();
-    const newBits = currentBits - intCost;
+    const currentCredits = this.getCredits();
+    const newCredits = currentCredits - intCost;
 
-    this.storage.set('player.currency.bits', newBits, { immediate: false });
+    this.storage.set('player.currency.credits', newCredits, { immediate: false });
+    this.storage.set('player.currency.bits', newCredits, { immediate: false });
 
     const eventPayload = {
       cost: intCost,
       category: String(category),
       itemId: itemId ? String(itemId) : null,
-      balance: newBits,
+      balance: newCredits,
       timestamp: Date.now()
     };
 
     this._addAuditEntry({
-      type: EconomyEvents.BITS_SPENT,
+      type: isBitsProxy ? EconomyEvents.BITS_SPENT : EconomyEvents.CREDITS_SPENT,
       amount: -intCost,
       category: String(category),
       itemId: itemId ? String(itemId) : null,
-      balanceAfter: newBits
+      balanceAfter: newCredits
     });
 
+    this.emit(EconomyEvents.CREDITS_SPENT, eventPayload);
     this.emit(EconomyEvents.BITS_SPENT, eventPayload);
     return true;
+  }
+
+  /**
+   * Spends Bits for a specified category and item (legacy proxy for spendCredits).
+   * @param {number} cost
+   * @param {string} [category='general']
+   * @param {string|null} [itemId=null]
+   * @returns {boolean}
+   */
+  spendBits(cost, category = 'general', itemId = null) {
+    return this.spendCredits(cost, category, itemId, true);
   }
 
   // ==========================================
@@ -426,11 +462,12 @@ export class EconomyManager {
 
     targetWindow.gameDebug = targetWindow.gameDebug || {};
 
-    targetWindow.gameDebug.addBits = (amount) => {
-      const res = this.awardBits(Number(amount), 'debug_console');
+    targetWindow.gameDebug.addCredits = (amount) => {
+      const res = this.awardCredits(Number(amount), 'debug_console');
       this.storage.save({ immediate: true });
       return res;
     };
+    targetWindow.gameDebug.addBits = targetWindow.gameDebug.addCredits;
 
     targetWindow.gameDebug.setXP = (amount) => {
       const intXP = Math.max(0, Math.floor(Number(amount) || 0));
@@ -460,6 +497,7 @@ export class EconomyManager {
 
     targetWindow.gameDebug.resetEconomy = () => {
       this._ensureStorageReady();
+      this.storage.set('player.currency.credits', 0, { immediate: false });
       this.storage.set('player.currency.bits', 0, { immediate: true });
       this.storage.set('player.level', 1, { immediate: true });
       this.storage.set('player.xp', 0, { immediate: true });

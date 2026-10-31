@@ -147,8 +147,8 @@ export function setTerminalHubTab(tabName) {
     if (statusBanner) statusBanner.style.display = 'none';
     if (consoleMsg) consoleMsg.style.display = 'none';
 
-    if (headerTitle) headerTitle.textContent = 'ARMORY & LOADOUT';
-    if (headerSub) headerSub.textContent = 'CUSTOMIZE IDENTITY DISC & CHASSIS';
+    if (headerTitle) headerTitle.textContent = 'OUTFITTING & LOADOUT';
+    if (headerSub) headerSub.textContent = 'CUSTOMIZE KINETIC DISC & ATHLETE RIG';
 
     if (hubLoadoutView) {
       hubLoadoutView.style.display = 'block';
@@ -170,7 +170,7 @@ export function setTerminalHubTab(tabName) {
     if (statusBanner) statusBanner.style.display = 'none';
     if (consoleMsg) consoleMsg.style.display = 'none';
 
-    if (headerTitle) headerTitle.textContent = 'GRID DIRECTIVES';
+    if (headerTitle) headerTitle.textContent = 'TROPHY MATRIX & DIRECTIVES';
     if (headerSub) headerSub.textContent = 'TROPHY PROGRESSION & REWARD MATRIX';
 
     if (hubDirectivesView) {

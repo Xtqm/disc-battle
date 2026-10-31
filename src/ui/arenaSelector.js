@@ -48,8 +48,8 @@ export const ARENA_MAP_METADATA = Object.freeze({
   arena_derez_chasm: {
     mapId: 'arena_derez_chasm',
     gridId: 'grid_01',
-    name: 'De-rez Chasm',
-    label: 'Exotic: De-rez Chasm'
+    name: 'Vectorfall Abyss',
+    label: 'Exotic: Vectorfall Abyss'
   }
 });
 

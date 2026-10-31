@@ -75,12 +75,12 @@ export const DUEL_ARENA_REGISTRY = Object.freeze({
   arena_derez_chasm: Object.freeze({
     id: 'arena_derez_chasm',
     gridId: 'grid_01',
-    name: 'De-rez Chasm',
+    name: 'Vectorfall Abyss',
     category: 'exotic',
     categoryLabel: 'ARMORY EXOTIC',
     color: '#ff3366',
     glowColor: '#880022',
-    description: 'Narrow high-velocity bridges suspended over an endless de-rez void.',
+    description: 'Narrow high-velocity bridges suspended over an endless null void.',
     unlockInstruction: 'UNLOCK IN ARMORY',
     defaultUnlocked: false
   })

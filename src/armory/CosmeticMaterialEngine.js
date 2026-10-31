@@ -1,6 +1,6 @@
 /**
  * CosmeticMaterialEngine.js
- * Dynamic Three.js Material & Cosmetic Shader Engine for Tron Disc Arena (SPEC-ARMORY-001 Phase 2).
+ * Dynamic Three.js Material & Cosmetic Shader Engine for Arc League (SPEC-ARMORY-001 Phase 2).
  * Translates active Armory loadout selections into live WebGL mesh materials,
  * handles retro wireframe overlays, supplies flight trail shader parameters,
  * and enforces zero-leak WebGL resource disposal.
@@ -12,7 +12,7 @@ import { armoryManager as defaultArmoryManager, ArmoryEvents } from './ArmoryMan
 import { config } from '../core/config.js';
 
 /**
- * PBR surface presets for Program Chassis armor plating.
+ * PBR surface presets for Athlete Rig armor plating.
  */
 export const CHASSIS_PBR_PRESETS = Object.freeze({
   chassis_default: Object.freeze({
@@ -132,7 +132,7 @@ export class CosmeticMaterialEngine {
   }
 
   /**
-   * Sets the active player Identity Disc mesh instance and immediately applies styling.
+   * Sets the active player Kinetic Disc mesh instance and immediately applies styling.
    * @param {THREE.Group|THREE.Mesh} mesh
    */
   setPlayerDiscMesh(mesh) {
@@ -211,7 +211,7 @@ export class CosmeticMaterialEngine {
   }
 
   /**
-   * Applies Disc Skin configuration to an Identity Disc mesh group or sub-mesh.
+   * Applies Disc Skin configuration to a Kinetic Disc mesh group or sub-mesh.
    * Mutates existing colors in-place and manages retro wireframe overlays.
    * @param {THREE.Object3D} discMesh
    * @param {string|object} skinIdOrConfig
@@ -326,7 +326,7 @@ export class CosmeticMaterialEngine {
   }
 
   /**
-   * Applies Program Chassis skin configurations to the player rig.
+   * Applies Athlete Rig skin configurations to the player rig.
    * Adjusts armor plating PBR properties, neon trim emissives, and back-mounted disc.
    * @param {THREE.Group} playerRig
    * @param {string|object} skinIdOrConfig

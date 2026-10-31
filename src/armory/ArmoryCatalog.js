@@ -12,9 +12,17 @@ export const ARMORY_CATEGORIES = Object.freeze({
   DISC_TYPES: 'discTypes'
 });
 
+export const ARMORY_CATEGORY_LABELS = Object.freeze({
+  [ARMORY_CATEGORIES.DISC_SKINS]: 'KINETIC DISCS',
+  [ARMORY_CATEGORIES.CHASSIS_SKINS]: 'ATHLETE RIGS',
+  [ARMORY_CATEGORIES.UNLOCKED_MAPS]: 'STADIUM ARENAS',
+  [ARMORY_CATEGORIES.DISC_TYPES]: 'DISC PROTOCOLS'
+});
+
 export const UNLOCK_TYPES = Object.freeze({
   FREE: 'free',
   BITS: 'bits',
+  CREDITS: 'credits',
   ACHIEVEMENT: 'achievement'
 });
 
@@ -25,9 +33,9 @@ export const ARMORY_CATALOG = Object.freeze({
   discSkins: Object.freeze([
     Object.freeze({
       id: 'disc_default',
-      displayName: 'Identity Default',
+      displayName: 'Arc Standard',
       category: ARMORY_CATEGORIES.DISC_SKINS,
-      description: 'Standard issuance cyan light disc with balanced resonance.',
+      description: 'Standard issuance kinetic disc with balanced resonance for Arcfield matches.',
       unlockType: UNLOCK_TYPES.FREE,
       cost: 0,
       achievementId: null,
@@ -57,9 +65,9 @@ export const ARMORY_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: 'disc_retro_green',
-      displayName: 'Retro Green',
+      displayName: 'Phosphor Green',
       category: ARMORY_CATEGORIES.DISC_SKINS,
-      description: 'Vintage phosphor green terminal glow recalling mainframe origins.',
+      description: 'Vintage phosphor green terminal glow recalling early Sub-Strata origins.',
       unlockType: UNLOCK_TYPES.BITS,
       cost: 600,
       achievementId: null,
@@ -89,9 +97,9 @@ export const ARMORY_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: 'disc_corrupted_void',
-      displayName: 'Corrupted Void',
+      displayName: 'Void Core',
       category: ARMORY_CATEGORIES.DISC_SKINS,
-      description: 'Obsidian frame with fractured crimson subroutines from the deep void.',
+      description: 'Obsidian frame forged from unallocated sectors of the deep void.',
       unlockType: UNLOCK_TYPES.ACHIEVEMENT,
       cost: 0,
       achievementId: 'corrupted_void_mastery',
@@ -108,9 +116,9 @@ export const ARMORY_CATALOG = Object.freeze({
   chassisSkins: Object.freeze([
     Object.freeze({
       id: 'chassis_default',
-      displayName: 'Combat Enforcer Default',
+      displayName: 'Striker Rig Default',
       category: ARMORY_CATEGORIES.CHASSIS_SKINS,
-      description: 'Standard grid warrior chassis with balanced aerodynamic plating.',
+      description: 'Standard Arc League athlete chassis with balanced aerodynamic plating.',
       unlockType: UNLOCK_TYPES.FREE,
       cost: 0,
       achievementId: null,
@@ -124,9 +132,9 @@ export const ARMORY_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: 'chassis_infiltrator',
-      displayName: 'Infiltrator Scout',
+      displayName: 'Vanguard Scout',
       category: ARMORY_CATEGORIES.CHASSIS_SKINS,
-      description: 'Sleek stealth chassis minimizing radar cross-section with matte finish.',
+      description: 'Sleek stealth athlete frame minimizing radar cross-section with matte finish.',
       unlockType: UNLOCK_TYPES.BITS,
       cost: 500,
       achievementId: null,
@@ -140,9 +148,9 @@ export const ARMORY_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: 'chassis_iso_guardian',
-      displayName: 'ISO Guardian',
+      displayName: 'Aegis Guardian',
       category: ARMORY_CATEGORIES.CHASSIS_SKINS,
-      description: 'Reinforced isomorphic armor with radiant solar circuit highlights.',
+      description: 'Reinforced kinetic frame with radiant solar circuit highlights.',
       unlockType: UNLOCK_TYPES.BITS,
       cost: 750,
       achievementId: null,
@@ -156,9 +164,9 @@ export const ARMORY_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: 'chassis_black_guard',
-      displayName: 'Black Guard',
+      displayName: 'Obsidian Enforcer',
       category: ARMORY_CATEGORIES.CHASSIS_SKINS,
-      description: 'Intimidating system enforcer plating with aggressive thermal flares.',
+      description: 'Intimidating pro-circuit plating with aggressive thermal flares.',
       unlockType: UNLOCK_TYPES.BITS,
       cost: 1200,
       achievementId: null,
@@ -174,7 +182,7 @@ export const ARMORY_CATALOG = Object.freeze({
       id: 'chassis_arbiter',
       displayName: 'Sovereign Arbiter',
       category: ARMORY_CATEGORIES.CHASSIS_SKINS,
-      description: 'Opulent ivory and gold champion frame awarded for mastering Grid 01.',
+      description: 'Opulent ivory and gold champion frame awarded for mastering Circuit 01.',
       unlockType: UNLOCK_TYPES.ACHIEVEMENT,
       cost: 0,
       achievementId: 'grid_01_mastery',
@@ -191,9 +199,9 @@ export const ARMORY_CATALOG = Object.freeze({
   unlockedMaps: Object.freeze([
     Object.freeze({
       id: 'arena_grid_01',
-      displayName: 'Grid 01: Core Arena',
+      displayName: 'Arcfield 01: Prime Stadium',
       category: ARMORY_CATEGORIES.UNLOCKED_MAPS,
-      description: 'The canonical 92m x 92m gladiatorial combat grounds.',
+      description: 'The canonical 92m x 92m premier digital sport arena.',
       unlockType: UNLOCK_TYPES.FREE,
       cost: 0,
       achievementId: null,
@@ -223,9 +231,9 @@ export const ARMORY_CATALOG = Object.freeze({
     }),
     Object.freeze({
       id: 'arena_derez_chasm',
-      displayName: 'De-rez Chasm',
+      displayName: 'Vectorfall Abyss',
       category: ARMORY_CATEGORIES.UNLOCKED_MAPS,
-      description: 'Narrow high-velocity bridges suspended over an endless de-rez void.',
+      description: 'Narrow high-velocity bridges suspended over an endless null void.',
       unlockType: UNLOCK_TYPES.BITS,
       cost: 1500,
       achievementId: null,

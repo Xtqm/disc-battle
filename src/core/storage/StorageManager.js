@@ -181,7 +181,13 @@ export class StorageManager {
     if (legacy.userId) base.player.id = String(legacy.userId);
     if (legacy.handle) base.player.handle = String(legacy.handle);
     if (typeof legacy.level === 'number') base.player.level = legacy.level;
-    if (typeof legacy.bits === 'number') base.player.currency.bits = legacy.bits;
+    if (typeof legacy.credits === 'number') {
+      base.player.currency.credits = legacy.credits;
+      base.player.currency.bits = legacy.credits;
+    } else if (typeof legacy.bits === 'number') {
+      base.player.currency.bits = legacy.bits;
+      base.player.currency.credits = legacy.bits;
+    }
 
     if (Array.isArray(legacy.inventory)) {
       base.inventory.discs = legacy.inventory
@@ -204,7 +210,8 @@ export class StorageManager {
       base.stats.highestWave = legacy.stats.highestWave ?? legacy.stats.swarmHighestWave ?? 1;
       base.stats.swarmHighestWave = legacy.stats.swarmHighestWave ?? legacy.stats.highestWave ?? 1;
       base.stats.highestScore = legacy.stats.totalScore ?? 0;
-      base.stats.totalDerezzes = legacy.stats.totalDerezzes ?? 0;
+      base.stats.totalDerezzes = legacy.stats.totalDeallocations ?? legacy.stats.totalDerezzes ?? 0;
+      base.stats.totalDeallocations = legacy.stats.totalDeallocations ?? legacy.stats.totalDerezzes ?? 0;
       base.stats.parriesExecuted = legacy.stats.parriesExecuted ?? 0;
       base.stats.curveEliminations = legacy.stats.curveEliminations ?? 0;
     }
@@ -354,6 +361,15 @@ export class StorageManager {
       parsed.inventory.unlockedMaps = ['arena_grid_01'];
     }
 
+    if (parsed && parsed.player && parsed.player.currency) {
+      if (typeof parsed.player.currency.credits !== 'number') {
+        parsed.player.currency.credits = typeof parsed.player.currency.bits === 'number' ? parsed.player.currency.bits : 0;
+      }
+      if (typeof parsed.player.currency.bits !== 'number') {
+        parsed.player.currency.bits = parsed.player.currency.credits;
+      }
+    }
+
     if (parsed && parsed.stats) {
       if (typeof parsed.stats.swarmHighestWave !== 'number') {
         parsed.stats.swarmHighestWave = typeof parsed.stats.highestWave === 'number' ? parsed.stats.highestWave : 1;
@@ -362,7 +378,10 @@ export class StorageManager {
         parsed.stats.highestWave = parsed.stats.swarmHighestWave;
       }
       if (typeof parsed.stats.totalDerezzes !== 'number') {
-        parsed.stats.totalDerezzes = 0;
+        parsed.stats.totalDerezzes = typeof parsed.stats.totalDeallocations === 'number' ? parsed.stats.totalDeallocations : 0;
+      }
+      if (typeof parsed.stats.totalDeallocations !== 'number') {
+        parsed.stats.totalDeallocations = parsed.stats.totalDerezzes;
       }
       if (typeof parsed.stats.parriesExecuted !== 'number') {
         parsed.stats.parriesExecuted = 0;
@@ -510,6 +529,13 @@ export class StorageManager {
       curr = curr[segment];
     }
 
+    if (curr === undefined) {
+      if (path === 'player.currency.credits') return this.get('player.currency.bits', defaultValue);
+      if (path === 'player.currency.bits') return this.get('player.currency.credits', defaultValue);
+      if (path === 'stats.totalDeallocations') return this.get('stats.totalDerezzes', defaultValue);
+      if (path === 'stats.totalDerezzes') return this.get('stats.totalDeallocations', defaultValue);
+    }
+
     return curr !== undefined ? deepClone(curr) : defaultValue;
   }
 
@@ -544,6 +570,16 @@ export class StorageManager {
 
     const previousValue = curr[lastKey] !== undefined ? deepClone(curr[lastKey]) : undefined;
     curr[lastKey] = deepClone(value);
+
+    if (path === 'player.currency.credits') {
+      curr.bits = deepClone(value);
+    } else if (path === 'player.currency.bits') {
+      curr.credits = deepClone(value);
+    } else if (path === 'stats.totalDeallocations') {
+      curr.totalDerezzes = deepClone(value);
+    } else if (path === 'stats.totalDerezzes') {
+      curr.totalDeallocations = deepClone(value);
+    }
 
     this.emit(StorageEvents.MUTATED, {
       path,

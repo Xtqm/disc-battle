@@ -1,6 +1,6 @@
 {
-  "appId": "com.tron.disc-arena",
-  "productName": "TRON :: DISC ARENA",
+  "appId": "com.arcleague.game",
+  "productName": "ARC LEAGUE",
   "directories": {
     "output": "dist"
   },

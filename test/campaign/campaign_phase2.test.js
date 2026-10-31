@@ -370,7 +370,7 @@ assert(uiManagerSrc.includes('trialDebriefModal'), 'UIManager exports trialDebri
 
 const menusSrc = fs.readFileSync(new URL('../../src/ui/menus.js', import.meta.url), 'utf8');
 assert(menusSrc.includes('id="campaignBtn"'), 'menus.js getMainMenuHtml contains campaignBtn');
-assert(menusSrc.includes('CAMPAIGN SECTORS'), 'menus.js displays CAMPAIGN SECTORS button text');
+assert(menusSrc.includes('LEAGUE CIRCUIT') || menusSrc.includes('CAMPAIGN SECTORS'), 'menus.js displays LEAGUE CIRCUIT button text');
 assert(menusSrc.includes('gridSelectorModal.show()'), 'menus.js binds campaignBtn to gridSelectorModal.show()');
 assert(menusSrc.includes('window.__tronShowCampaignSectors'), 'menus.js exports __tronShowCampaignSectors');
 

@@ -26,17 +26,18 @@ export const LAUNCH_ACHIEVEMENTS = Object.freeze([
   Object.freeze({
     id: 'ach_first_blood',
     title: 'Initial Execution',
-    description: 'De-rez first hostile program',
+    description: 'De-allocate first hostile rival',
     category: ACHIEVEMENT_CATEGORIES.COMBAT,
     icon: '⚡',
     target: 1,
-    metricKey: 'stats.totalDerezzes',
+    metricKey: 'stats.totalDeallocations',
     reward: Object.freeze({
+      credits: 100,
       bits: 100,
       cosmetic: null
     }),
     evaluate: (state) => {
-      const current = Number(state?.stats?.totalDerezzes || 0);
+      const current = Number(state?.stats?.totalDeallocations || state?.stats?.totalDerezzes || 0);
       const target = 1;
       return {
         current,
@@ -56,6 +57,7 @@ export const LAUNCH_ACHIEVEMENTS = Object.freeze([
     target: 25,
     metricKey: 'stats.curveEliminations',
     reward: Object.freeze({
+      credits: 300,
       bits: 300,
       cosmetic: null
     }),
@@ -80,6 +82,7 @@ export const LAUNCH_ACHIEVEMENTS = Object.freeze([
     target: 50,
     metricKey: 'stats.parriesExecuted',
     reward: Object.freeze({
+      credits: 250,
       bits: 250,
       cosmetic: null
     }),
@@ -98,12 +101,13 @@ export const LAUNCH_ACHIEVEMENTS = Object.freeze([
   Object.freeze({
     id: 'ach_untouchable',
     title: 'Flawless Subroutine',
-    description: 'Complete any Grid trial with 100% integrity',
+    description: 'Complete any Circuit trial with 100% integrity',
     category: ACHIEVEMENT_CATEGORIES.CAMPAIGN,
     icon: '💎',
     target: 1,
     metricKey: 'campaign.levelRecords',
     reward: Object.freeze({
+      credits: 500,
       bits: 500,
       cosmetic: null
     }),
@@ -136,11 +140,12 @@ export const LAUNCH_ACHIEVEMENTS = Object.freeze([
     target: 15,
     metricKey: 'stats.swarmHighestWave',
     reward: Object.freeze({
+      credits: 750,
       bits: 750,
       cosmetic: Object.freeze({
         category: 'discSkins',
         itemId: 'disc_corrupted_void',
-        displayName: 'Corrupted Void'
+        displayName: 'Void Core'
       })
     }),
     evaluate: (state) => {
@@ -161,12 +166,13 @@ export const LAUNCH_ACHIEVEMENTS = Object.freeze([
   Object.freeze({
     id: 'ach_grid_one_master',
     title: 'Outlands Conqueror',
-    description: 'Earn all 18 stars across Grid 01',
+    description: 'Earn all 18 stars across Circuit 01',
     category: ACHIEVEMENT_CATEGORIES.CAMPAIGN,
     icon: '👑',
     target: 18,
     metricKey: 'campaign.levelRecords',
     reward: Object.freeze({
+      credits: 1000,
       bits: 1000,
       cosmetic: Object.freeze({
         category: 'chassisSkins',
