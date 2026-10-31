@@ -84,6 +84,36 @@ export class StorageManager {
     memoryStorage.delete(key);
   }
 
+  /**
+   * Check if running in native Electron desktop environment
+   * @returns {boolean}
+   */
+  _isDesktop() {
+    return typeof window !== 'undefined' && !!(window.electronDesktop?.isDesktop);
+  }
+
+  /**
+   * Initialize native desktop filesystem storage on desktop startup
+   * @returns {Promise<boolean>}
+   */
+  async initDesktop() {
+    if (!this._isDesktop() || !window.electronDesktop.loadProfile) {
+      return false;
+    }
+    try {
+      const res = await window.electronDesktop.loadProfile();
+      if (res && res.success && res.data) {
+        this.importState(res.data);
+        return true;
+      } else if (this.state) {
+        window.electronDesktop.saveProfile(this.state).catch(() => {});
+      }
+    } catch (err) {
+      console.warn('StorageManager: Desktop loadProfile error:', err);
+    }
+    return false;
+  }
+
   // ==========================================
   // Event Emitter
   // ==========================================
@@ -409,6 +439,17 @@ export class StorageManager {
     this._setItem(this.storageKey, raw);
     this._broadcastCrossTab(raw);
 
+    // Save to native OS filesystem on desktop
+    if (this._isDesktop()) {
+      try {
+        if (options.immediate && window.electronDesktop.saveProfileSync) {
+          window.electronDesktop.saveProfileSync(this.state);
+        } else if (window.electronDesktop.saveProfile) {
+          window.electronDesktop.saveProfile(this.state).catch(() => {});
+        }
+      } catch (_) {}
+    }
+
     this.emit(StorageEvents.SAVED, {
       state: deepClone(this.state),
       timestamp: Date.now(),
@@ -609,5 +650,8 @@ export class StorageManager {
 
 // Export singleton instance as default runtime orchestrator
 export const storageManager = new StorageManager();
+if (typeof window !== 'undefined') {
+  storageManager.initDesktop().catch(() => {});
+}
 export const defaultStorageManager = storageManager;
 export { StorageEvents } from './schema.js';

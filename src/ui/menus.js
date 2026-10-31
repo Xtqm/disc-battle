@@ -6,6 +6,7 @@ import { updateIdentityHeader, showAuthTerminal } from './authTerminal.js';
 import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
 import { armoryModal } from './modals/ArmoryModal.js';
 import { achievementsModal } from './modals/AchievementsModal.js';
+import { settingsModal } from './modals/SettingsModal.js';
 
 // Setup Campaign UI navigation transitions
 gridSelectorModal.setOnSelectGrid((gridId) => levelSelectView.show(gridId));
@@ -17,7 +18,7 @@ trialDebriefModal.setOnReturnToGrid((gridId) => levelSelectView.show(gridId));
 armoryModal.setOnBackToMenu(() => showModeSelectMenu());
 achievementsModal.setOnBackToMenu(() => showModeSelectMenu());
 
-export { armoryModal, achievementsModal };
+export { armoryModal, achievementsModal, settingsModal };
 
 export {
   ARENA_MAP_METADATA,
@@ -251,9 +252,16 @@ export function bindMainMenuEvents() {
     showAuthTerminal('directives');
   };
 
+  const openSettings = (e) => {
+    e.stopPropagation();
+    if (e.cancelable) e.preventDefault();
+    settingsModal.show();
+  };
+
   bind('campaignBtn', openCampaign);
   bind('armoryBtn', openArmory);
   bind('achievementsBtn', openAchievements);
+  bind('settingsBtn', openSettings);
   bind('swarmBtn', startSwarm);
   bind('hostMatchBtn', openHostModal);
   bind('joinOnlineBtn', openJoinModal);

@@ -1,5 +1,24 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
+const fs = require('fs');
+const fsPromises = require('fs').promises;
+
+// Save file path resolvers
+function getSaveDir() {
+  const dir = path.join(app.getPath('userData'), 'saves');
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+  return dir;
+}
+
+function getProfilePath() {
+  return path.join(getSaveDir(), 'profile.json');
+}
+
+function getBackupProfilePath() {
+  return path.join(getSaveDir(), 'profile.backup.json');
+}
 
 // Hardware acceleration and GPU switches
 app.commandLine.appendSwitch('enable-gpu-rasterization');
@@ -98,6 +117,51 @@ function createWindow() {
 ipcMain.on('desktop:toggle-fullscreen', () => {
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.setFullScreen(!mainWindow.isFullScreen());
+  }
+});
+
+ipcMain.handle('desktop:load-profile', async () => {
+  try {
+    const profilePath = getProfilePath();
+    if (fs.existsSync(profilePath)) {
+      const data = await fsPromises.readFile(profilePath, 'utf8');
+      return { success: true, data: JSON.parse(data) };
+    }
+    return { success: true, data: null };
+  } catch (err) {
+    console.error('Failed to load desktop profile:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('desktop:save-profile', async (_event, payload) => {
+  try {
+    const profilePath = getProfilePath();
+    const backupPath = getBackupProfilePath();
+    const jsonStr = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+
+    // If profile exists, rotate to backup before write
+    if (fs.existsSync(profilePath)) {
+      try {
+        await fsPromises.copyFile(profilePath, backupPath);
+      } catch (_) {}
+    }
+
+    await fsPromises.writeFile(profilePath, jsonStr, 'utf8');
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to save desktop profile:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.on('desktop:save-profile-sync', (_event, payload) => {
+  try {
+    const profilePath = getProfilePath();
+    const jsonStr = typeof payload === 'string' ? payload : JSON.stringify(payload, null, 2);
+    fs.writeFileSync(profilePath, jsonStr, 'utf8');
+  } catch (err) {
+    console.error('Failed to sync-save desktop profile:', err);
   }
 });
 

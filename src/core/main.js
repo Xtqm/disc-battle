@@ -10,7 +10,7 @@ import { updateFoes, spawnDuelBoss, spawnWave, killFoe } from '../entities/Bot.j
 import { updateDiscs, spawnDisc } from '../entities/Disc.js';
 import { simulatePath, trajLine, updateThreatPaths, updateTrajectory } from '../physics/trajectory.js';
 import { InputManager, initInput, isLocked, getPlayerCurveIntent, sens, touchMove, updateCurveButtons } from '../input/InputManager.js';
-import { pollGamepads, isButtonPressed, isButtonJustPressed, GAMEPAD_BUTTONS } from '../input/gamepad.js';
+import { pollGamepads, isButtonPressed, isButtonJustPressed, GAMEPAD_BUTTONS, updateGamepadUINavigation } from '../input/gamepad.js';
 import { initNetwork, initMockNetwork, getRoomRef, roomGetDoc } from '../network/firebaseSetup.js';
 import { onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer, startMultiplayerDuel } from '../network/roomManager.js';
 import { syncNetworkState, onTileDestabilizedByHost, updateRemotePlayers } from '../network/sync.js';
@@ -25,6 +25,7 @@ import { offlineSyncQueue } from '../storage/OfflineSyncQueue.js';
 import { crossTabSync } from '../storage/CrossTabSync.js';
 import { initAuthTerminal, showAuthTerminal, hideAuthTerminal, isAuthTerminalOpen, updateIdentityHeader } from '../ui/authTerminal.js';
 import { achievementManager } from '../achievements/AchievementManager.js';
+import { settingsManager } from './settings.js';
 
 
 export const clock = new THREE.Clock();
@@ -79,6 +80,11 @@ export function handleGamepadInput(dt) {
         }
       }
     }
+  }
+
+  if (state.paused || !state.running) {
+    updateGamepadUINavigation();
+    return;
   }
 
   // Edge-triggered combat actions during active play
@@ -229,8 +235,21 @@ export function update(dt) {
   }
 }
 
+let lastRenderTime = 0;
+
 export function loop() {
   requestAnimationFrame(loop);
+
+  const fpsCap = Number(settingsManager.get('fpsCap', 60));
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  if (fpsCap > 0 && lastRenderTime > 0) {
+    const minInterval = 1000 / fpsCap;
+    if (now - lastRenderTime < minInterval - 1.5) {
+      return;
+    }
+  }
+  lastRenderTime = now;
+
   let dt = clock.getDelta();
   if (state.justResumed) {
     dt = 0;
@@ -243,6 +262,8 @@ export function loop() {
   } else if (state.running && state.paused) {
     handleGamepadInput(dt);
   } else if (!state.running) {
+    pollGamepads();
+    updateGamepadUINavigation();
     state.time += dt;
     camera.position.set(Math.sin(state.time * .12) * 34, 14, Math.cos(state.time * .12) * 34);
     camera.lookAt(0, 2, 0);
@@ -262,6 +283,7 @@ export function initApp() {
     bindMenuButtons();
     initAuthTerminal();
     achievementManager.init();
+    settingsManager.load();
 
     if (state.isTouchDevice && typeof document !== 'undefined' && document.body) {
       document.body.classList.add('touch-device');

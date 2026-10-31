@@ -316,3 +316,74 @@ export function resetGamepad() {
     state.gamepadBlocking = false;
   }
 }
+
+let lastNavTime = 0;
+const NAV_DEBOUNCE_MS = 200;
+
+/**
+ * Handle gamepad menu and modal navigation.
+ */
+export function updateGamepadUINavigation() {
+  if (typeof document === 'undefined') return;
+
+  const candidates = [
+    document.getElementById('settingsModal'),
+    document.getElementById('achievementsModal'),
+    document.getElementById('armoryModal'),
+    document.getElementById('pauseMenu'),
+    document.getElementById('hostModal'),
+    document.getElementById('overlay')
+  ];
+
+  const activeContainer = candidates.find(el => el && el.style && el.style.display !== 'none');
+  if (!activeContainer) return;
+
+  const focusables = Array.from(activeContainer.querySelectorAll('button, .btn, .mode-btn, input'))
+    .filter(el => {
+      if (el.style && el.style.display === 'none') return false;
+      if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return false;
+      return true;
+    });
+
+  if (focusables.length === 0) return;
+
+  let focusedIndex = focusables.findIndex(el => el.classList.contains('gamepad-focus'));
+  if (focusedIndex === -1) {
+    focusedIndex = 0;
+    focusables[0].classList.add('gamepad-focus');
+  }
+
+  const now = Date.now();
+  const upPressed = isButtonJustPressed(GAMEPAD_BUTTONS.UP) || (cachedLeftStick.y < -0.6 && now - lastNavTime > NAV_DEBOUNCE_MS);
+  const downPressed = isButtonJustPressed(GAMEPAD_BUTTONS.DOWN) || (cachedLeftStick.y > 0.6 && now - lastNavTime > NAV_DEBOUNCE_MS);
+
+  if (upPressed) {
+    lastNavTime = now;
+    focusables[focusedIndex].classList.remove('gamepad-focus');
+    focusedIndex = (focusedIndex - 1 + focusables.length) % focusables.length;
+    focusables[focusedIndex].classList.add('gamepad-focus');
+    focusables[focusedIndex].focus();
+  } else if (downPressed) {
+    lastNavTime = now;
+    focusables[focusedIndex].classList.remove('gamepad-focus');
+    focusedIndex = (focusedIndex + 1) % focusables.length;
+    focusables[focusedIndex].classList.add('gamepad-focus');
+    focusables[focusedIndex].focus();
+  }
+
+  // Button A / South (Confirm)
+  if (isButtonJustPressed(GAMEPAD_BUTTONS.SOUTH)) {
+    const el = focusables[focusedIndex];
+    if (el) {
+      el.click();
+    }
+  }
+
+  // Button B / East (Cancel / Dismiss)
+  if (isButtonJustPressed(GAMEPAD_BUTTONS.EAST)) {
+    const closeBtn = activeContainer.querySelector('#closeSettingsBtn, #closeSettingsX, .close-btn, #resumeBtn');
+    if (closeBtn) {
+      closeBtn.click();
+    }
+  }
+}

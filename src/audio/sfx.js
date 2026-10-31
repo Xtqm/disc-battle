@@ -1,4 +1,4 @@
-import { getAudioCtx } from './synth.js';
+import { getAudioCtx, getSFXDestination } from './synth.js';
 
 export function playDeRezSound() {
   const ctx = getAudioCtx();
@@ -12,7 +12,7 @@ export function playDeRezSound() {
     gain.gain.setValueAtTime(0.35, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.85);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start();
     osc.stop(ctx.currentTime + 0.85);
   } catch (_) {}
@@ -30,7 +30,7 @@ export function playWarningSound() {
     gain.gain.setValueAtTime(0.18, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.22);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start();
     osc.stop(ctx.currentTime + 0.22);
   } catch (_) {}
@@ -48,7 +48,7 @@ export function playTileDropSound() {
     gain.gain.setValueAtTime(0.25, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.01, ctx.currentTime + 0.55);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start();
     osc.stop(ctx.currentTime + 0.55);
   } catch (_) {}
@@ -67,7 +67,7 @@ export function playCatchDiscSound(pitch = 1.0) {
     gain.gain.setValueAtTime(0.25, ctx.currentTime);
     gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.08);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start();
     osc.stop(ctx.currentTime + 0.08);
   } catch (_) {}
@@ -86,7 +86,7 @@ export function playTerminalOpenSound() {
     gain.gain.linearRampToValueAtTime(0.2, ctx.currentTime + 0.05);
     gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.22);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start();
     osc.stop(ctx.currentTime + 0.22);
   } catch (_) {}
@@ -103,7 +103,7 @@ export function playTerminalKeySound() {
     gain.gain.setValueAtTime(0.08, ctx.currentTime);
     gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.025);
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start();
     osc.stop(ctx.currentTime + 0.025);
   } catch (_) {}
@@ -122,7 +122,7 @@ export function playAccessGrantedSound() {
     gain1.gain.setValueAtTime(0.2, now);
     gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
     osc1.connect(gain1);
-    gain1.connect(ctx.destination);
+    gain1.connect(getSFXDestination(ctx));
     osc1.start(now);
     osc1.stop(now + 0.25);
 
@@ -134,7 +134,7 @@ export function playAccessGrantedSound() {
     gain2.gain.setValueAtTime(0.22, now + 0.1);
     gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
     osc2.connect(gain2);
-    gain2.connect(ctx.destination);
+    gain2.connect(getSFXDestination(ctx));
     osc2.start(now + 0.1);
     osc2.stop(now + 0.38);
   } catch (_) {}
@@ -159,7 +159,7 @@ export function playErrorBuzzSound() {
 
     osc1.connect(gain);
     osc2.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
 
     osc1.start(now);
     osc2.start(now);
@@ -196,7 +196,7 @@ export function playStarIgniteSound(tier = 1) {
       gain.gain.exponentialRampToValueAtTime(0.001, now + duration);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(getSFXDestination(ctx));
       osc.start(now + (idx * 0.04));
       osc.stop(now + duration);
     });
@@ -219,7 +219,7 @@ export function playBitAccrualSound() {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start(now);
     osc.stop(now + 0.09);
   } catch (_) {}
@@ -242,7 +242,7 @@ export function playMissionBriefSweepSound() {
     gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
     osc.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(getSFXDestination(ctx));
     osc.start(now);
     osc.stop(now + 0.22);
   } catch (_) {}
@@ -265,7 +265,7 @@ export function playFabricateSound() {
     sweepGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
 
     sweepOsc.connect(sweepGain);
-    sweepGain.connect(ctx.destination);
+    sweepGain.connect(getSFXDestination(ctx));
     sweepOsc.start(now);
     sweepOsc.stop(now + 0.32);
 
@@ -284,7 +284,7 @@ export function playFabricateSound() {
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.35);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(getSFXDestination(ctx));
       osc.start(startTime);
       osc.stop(startTime + 0.35);
     });
@@ -306,7 +306,7 @@ export function playEquipSound() {
     clickGain.gain.exponentialRampToValueAtTime(0.001, now + 0.035);
 
     clickOsc.connect(clickGain);
-    clickGain.connect(ctx.destination);
+    clickGain.connect(getSFXDestination(ctx));
     clickOsc.start(now);
     clickOsc.stop(now + 0.035);
 
@@ -322,7 +322,7 @@ export function playEquipSound() {
     chimeGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
     chimeOsc.connect(chimeGain);
-    chimeGain.connect(ctx.destination);
+    chimeGain.connect(getSFXDestination(ctx));
     chimeOsc.start(now + 0.02);
     chimeOsc.stop(now + 0.22);
   } catch (_) {}
@@ -350,7 +350,7 @@ export function playAchievementFanfare() {
       gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
 
       osc.connect(gain);
-      gain.connect(ctx.destination);
+      gain.connect(getSFXDestination(ctx));
       osc.start(startTime);
       osc.stop(startTime + duration);
     });

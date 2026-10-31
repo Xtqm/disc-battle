@@ -10,7 +10,10 @@ contextBridge.exposeInMainWorld('electronDesktop', {
     ipcRenderer.on('desktop:focus-change', (_event, isFocused) => {
       callback(isFocused);
     });
-  }
+  },
+  loadProfile: () => ipcRenderer.invoke('desktop:load-profile'),
+  saveProfile: (payload) => ipcRenderer.invoke('desktop:save-profile', payload),
+  saveProfileSync: (payload) => ipcRenderer.send('desktop:save-profile-sync', payload)
 });
 
 // Suppress unintended drag & drop on window

@@ -321,6 +321,13 @@
     box-shadow:0 0 22px rgba(79,242,255,.6), inset 0 0 12px rgba(79,242,255,.25);
     transform:translateY(-2px);
   }
+  .gamepad-focus, :focus-visible.gamepad-focus {
+    outline: 2px solid var(--cyan) !important;
+    background: rgba(79,242,255,.32) !important;
+    color: #fff !important;
+    box-shadow: 0 0 24px var(--cyan), inset 0 0 16px rgba(79,242,255,.4) !important;
+    transform: scale(1.02);
+  }
   #restartBtn {
     border-color:var(--orange); color:#ffb37a;
     box-shadow:0 0 14px rgba(255,123,26,.22), inset 0 0 10px rgba(255,123,26,.1);
@@ -2438,6 +2445,7 @@
     <div class="menu-actions">
       <button id="resumeBtn" class="btn">RESUME</button>
       <button id="pauseFullscreenBtn" class="btn fullscreen-btn" title="Toggle Fullscreen">FULLSCREEN</button>
+      <button id="pauseSettingsBtn" class="btn">SETTINGS</button>
       <button id="restartBtn" class="btn">RESTART MATCH</button>
       <button id="modeSelectBtn" class="btn">MODE SELECT</button>
     </div>
@@ -2694,6 +2702,7 @@
     <button id="swarmBtn" class="mode-btn swarm-btn">ENTER SWARM (WAVES)</button>
     <button id="hostMatchBtn" class="mode-btn multi-btn">HOST MATCH</button>
     <button id="joinOnlineBtn" class="mode-btn multi-btn">JOIN ONLINE MATCH</button>
+    <button id="settingsBtn" class="mode-btn settings-btn" style="border-color:rgba(79,242,255,0.7);">SETTINGS</button>
     <!-- Legacy compatibility elements for tests & programmatic navigation -->
     <button id="armoryBtn" class="mode-btn armory-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ARMORY</button>
     <button id="achievementsBtn" class="mode-btn achievements-btn" style="display:none;min-width:44px;min-height:44px;" aria-hidden="true">ACHIEVEMENTS</button>

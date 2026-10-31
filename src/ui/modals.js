@@ -2,6 +2,7 @@ import { state } from '../core/state.js';
 import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { el } from './hud.js';
 import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
+import { settingsModal } from './modals/SettingsModal.js';
 
 export function requestFullScreen() {
   const elem = document.documentElement;
@@ -279,6 +280,14 @@ export function bindPauseAndModalEvents() {
   if (pauseFullscreenBtn) {
     pauseFullscreenBtn.onclick = onFullscreenToggleClick;
     pauseFullscreenBtn.ontouchstart = onFullscreenToggleClick;
+  }
+
+  const pauseSettingsBtn = document.getElementById('pauseSettingsBtn');
+  if (pauseSettingsBtn) {
+    pauseSettingsBtn.onclick = (e) => {
+      e.stopPropagation();
+      settingsModal.show();
+    };
   }
 
   resumeBtn = document.getElementById('resumeBtn');
