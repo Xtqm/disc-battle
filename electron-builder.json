@@ -1,0 +1,27 @@
+{
+  "appId": "com.tron.disc-arena",
+  "productName": "TRON :: DISC ARENA",
+  "directories": {
+    "output": "dist"
+  },
+  "files": [
+    "index.html",
+    "desktop/**/*",
+    "src/**/*",
+    "assets/**/*",
+    "vendor/**/*",
+    "package.json"
+  ],
+  "win": {
+    "target": [
+      "portable",
+      "nsis"
+    ]
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true
+  }
+}

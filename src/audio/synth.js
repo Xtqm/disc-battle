@@ -2,7 +2,10 @@ import { state } from '../core/state.js';
 
 export function getAudioCtx() {
   if (!state.audioCtx && typeof window !== 'undefined' && (window.AudioContext || window.webkitAudioContext)) {
-    try { state.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+    try {
+      state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      window.__tronAudioCtx = state.audioCtx;
+    } catch (_) {}
   }
   if (state.audioCtx && state.audioCtx.state === 'suspended') {
     state.audioCtx.resume().catch(() => {});

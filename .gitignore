@@ -1,4 +1,5 @@
 node_modules/
+dist/
 tron_disc_arena_master_project_summary.md
 .env
 tron/.env
