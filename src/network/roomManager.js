@@ -360,14 +360,13 @@ export function startMultiplayerDuel(role, roomCode, mode = '1v1') {
   state.gameOverReason = '';
 
   const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
-  const side = new THREE.Vector3(-fwd.z, 0, fwd.x);
-  const camOff = new THREE.Vector3()
-    .addScaledVector(fwd, -4.2)
-    .addScaledVector(side, 1.35)
-    .setY(2.2 - state.player.pitch * 5.0);
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const back = new THREE.Vector3(-fwd.x, 0, -fwd.z);
+  const camOff = back.multiplyScalar(9.0)
+    .addScaledVector(right, 1.7)
+    .setY(4.3 - state.player.pitch * 5.0);
   camera.position.copy(state.player.pos).add(camOff);
-  const look = state.player.pos.clone().add(new THREE.Vector3(0, 2.0, 0)).addScaledVector(side, 1.7).addScaledVector(fwd, 14);
-  camera.lookAt(look);
+  camera.rotation.set(state.player.pitch, state.player.yaw, 0, 'YXZ');
 
   updateHUD();
   if (typeof window !== 'undefined' && window.__tronStartCountdown) {

@@ -28,6 +28,8 @@ Object.defineProperty(state, 'sens', {
 
 export const isLocked = () => !!(canvas && typeof document !== 'undefined' && document.pointerLockElement === canvas);
 
+export const MAX_MOUSE_DELTA = 180;
+
 export function tryLock() {
   if (state.isTouchDevice) return;
   if (!canvas) return;
@@ -37,11 +39,6 @@ export function tryLock() {
   } catch (err) {
     lockFailed = true;
   }
-  setTimeout(() => {
-    if (typeof document !== 'undefined' && document.pointerLockElement !== canvas) {
-      lockFailed = true;
-    }
-  }, 400);
 }
 
 export function setCursor() {
@@ -60,8 +57,10 @@ export function focusGame() {
 }
 
 export function look(dx, dy) {
-  state.player.yaw -= dx * sens;
-  state.player.pitch = THREE.MathUtils.clamp(state.player.pitch - dy * sens * (state.invertY ? -1 : 1), -0.6, 0.55);
+  const cdx = THREE.MathUtils.clamp(dx, -MAX_MOUSE_DELTA, MAX_MOUSE_DELTA);
+  const cdy = THREE.MathUtils.clamp(dy, -MAX_MOUSE_DELTA, MAX_MOUSE_DELTA);
+  state.player.yaw -= cdx * sens;
+  state.player.pitch = THREE.MathUtils.clamp(state.player.pitch - cdy * sens * (state.invertY ? -1 : 1), -0.6, 0.55);
   if (state.player.yaw > Math.PI) state.player.yaw -= Math.PI * 2;
   if (state.player.yaw < -Math.PI) state.player.yaw += Math.PI * 2;
 }
@@ -105,6 +104,7 @@ export function initMouse(targetCanvas) {
     if (state.isTouchDevice) return;
     const locked = isLocked();
     if (locked) {
+      lockFailed = false;
       const um = document.getElementById('unlockedMenu');
       if (um) um.style.display = 'none';
     } else if (state.running && !state.paused && !lockFailed) {

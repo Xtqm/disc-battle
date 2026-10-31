@@ -4,14 +4,16 @@ import { config } from '../core/config.js';
 import { makeProgram } from './materials.js';
 import { cosmeticMaterialEngine } from '../armory/CosmeticMaterialEngine.js';
 
-export const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, state.isTouchDevice ? 1.5 : 2));
-renderer.setSize(typeof innerWidth !== 'undefined' ? innerWidth : 800, typeof innerHeight !== 'undefined' ? innerHeight : 600);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+export const renderer = typeof document !== 'undefined' ? new THREE.WebGLRenderer({ antialias: true }) : null;
+if (renderer) {
+  renderer.setPixelRatio(Math.min(typeof window !== 'undefined' ? window.devicePixelRatio : 1, state.isTouchDevice ? 1.5 : 2));
+  renderer.setSize(typeof innerWidth !== 'undefined' ? innerWidth : 800, typeof innerHeight !== 'undefined' ? innerHeight : 600);
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
-if (typeof document !== 'undefined' && document.body && !renderer.domElement.parentElement) {
-  document.body.appendChild(renderer.domElement);
+  if (typeof document !== 'undefined' && document.body && !renderer.domElement.parentElement) {
+    document.body.appendChild(renderer.domElement);
+  }
 }
 
 export const scene = new THREE.Scene();
@@ -90,26 +92,47 @@ if (typeof window !== 'undefined') {
   document.addEventListener('MSFullscreenChange', onResize);
 }
 
-export function updateCamera(dt) {
+export function updateCamera(dt, snap = false) {
   const DIST = 9.0, HEIGHT = 4.3, SHOULDER = 1.7;
-  const back = new THREE.Vector3(Math.sin(state.player.yaw), 0, Math.cos(state.player.yaw));
-  const side = new THREE.Vector3(-back.z, 0, back.x);
-  const camOff = back.multiplyScalar(DIST)
-    .addScaledVector(side, SHOULDER)
-    .setY(HEIGHT - state.player.pitch * 5.0);
-  const desired = state.player.pos.clone().add(camOff);
-  desired.y += state.player.y * 0.85;
+  const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
+  const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+  const back = new THREE.Vector3(-fwd.x, 0, -fwd.z);
+
+  const pivot = state.player.pos.clone();
+  pivot.y += 1.8 + state.player.y * 0.85;
+
+  const camOff = back.clone().multiplyScalar(DIST)
+    .addScaledVector(right, SHOULDER)
+    .setY(HEIGHT - 1.8 - state.player.pitch * 5.0);
+
+  // Soft boundary compression along boom to prevent wall clipping and player pass-through
+  const maxArena = config.ARENA - 2;
+  let scale = 1.0;
+  for (const axis of ['x', 'z']) {
+    const rawVal = pivot[axis] + camOff[axis];
+    if (rawVal > maxArena && camOff[axis] > 1e-4) {
+      const s = (maxArena - pivot[axis]) / camOff[axis];
+      if (s < scale) scale = s;
+    } else if (rawVal < -maxArena && camOff[axis] < -1e-4) {
+      const s = (-maxArena - pivot[axis]) / camOff[axis];
+      if (s < scale) scale = s;
+    }
+  }
+  scale = THREE.MathUtils.clamp(scale, 0.3, 1.0);
+
+  const desired = pivot.clone().add(camOff.clone().multiplyScalar(scale));
   desired.y = Math.max(1.4, desired.y);
-  desired.x = THREE.MathUtils.clamp(desired.x, -config.ARENA + 2, config.ARENA - 2);
-  desired.z = THREE.MathUtils.clamp(desired.z, -config.ARENA + 2, config.ARENA - 2);
-  camera.position.lerp(desired, 1 - Math.pow(.000000015, dt));
-  const fwdV = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
-  const sideV = new THREE.Vector3(-fwdV.z, 0, fwdV.x);
-  const look = state.player.pos.clone()
-    .add(new THREE.Vector3(0, 2.0 + state.player.y + state.player.pitch * 7, 0))
-    .addScaledVector(sideV, 1.7)
-    .addScaledVector(fwdV, 14);
-  camera.lookAt(look);
+  desired.x = THREE.MathUtils.clamp(desired.x, -maxArena, maxArena);
+  desired.z = THREE.MathUtils.clamp(desired.z, -maxArena, maxArena);
+
+  if (snap) {
+    camera.position.copy(desired);
+  } else {
+    camera.position.lerp(desired, 1 - Math.pow(.000000015, dt));
+  }
+
+  // Set rotation directly from pitch/yaw using Euler YXZ to eliminate gimbal lock and lookAt singularities
+  camera.rotation.set(state.player.pitch, state.player.yaw, 0, 'YXZ');
 
   if (state.shakeAmt > 0) {
     camera.position.x += (Math.random() - .5) * state.shakeAmt;
@@ -117,6 +140,10 @@ export function updateCamera(dt) {
     camera.position.z += (Math.random() - .5) * state.shakeAmt;
     state.shakeAmt = Math.max(0, state.shakeAmt - dt * 2.2);
   }
+}
+
+export function snapCamera() {
+  updateCamera(0, true);
 }
 
 export function initGraphics() {

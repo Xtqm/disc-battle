@@ -1,7 +1,7 @@
 import * as THREE from '../../vendor/three.module.js';
 import { state, player } from '../core/state.js';
 import { config } from '../core/config.js';
-import { scene, camera } from '../graphics/scene.js';
+import { scene, camera, snapCamera } from '../graphics/scene.js';
 import { resolveCircle } from '../physics/collision.js';
 import { burst } from '../graphics/particles.js';
 import { playDeRezSound } from '../audio/sfx.js';
@@ -352,6 +352,7 @@ export function resetRound(spawnX = 0, spawnZ = 14, yaw = Math.PI) {
     state.player.obj.position.copy(state.player.pos);
     state.player.obj.rotation.y = state.player.yaw;
   }
+  snapCamera();
 
   rebuildArenaTiles();
 
