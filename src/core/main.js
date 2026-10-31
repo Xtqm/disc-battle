@@ -10,6 +10,7 @@ import { updateFoes, spawnDuelBoss, spawnWave, killFoe } from '../entities/Bot.j
 import { updateDiscs, spawnDisc } from '../entities/Disc.js';
 import { simulatePath, trajLine, updateThreatPaths, updateTrajectory } from '../physics/trajectory.js';
 import { InputManager, initInput, isLocked, getPlayerCurveIntent, sens, touchMove, updateCurveButtons } from '../input/InputManager.js';
+import { pollGamepads, isButtonPressed, isButtonJustPressed, GAMEPAD_BUTTONS } from '../input/gamepad.js';
 import { initNetwork, initMockNetwork, getRoomRef, roomGetDoc } from '../network/firebaseSetup.js';
 import { onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer, startMultiplayerDuel } from '../network/roomManager.js';
 import { syncNetworkState, onTileDestabilizedByHost, updateRemotePlayers } from '../network/sync.js';
@@ -54,8 +55,57 @@ if (typeof window !== 'undefined') {
   window.__tronStartCountdown = startCountdown;
 }
 
+export function handleGamepadInput(dt) {
+  pollGamepads();
+
+  // Edge-triggered Pause (Options / Start Button 9)
+  if (isButtonJustPressed(GAMEPAD_BUTTONS.START)) {
+    if (state.running) {
+      const now = performance.now();
+      if (now - state.lastPauseToggle > 180) {
+        state.lastPauseToggle = now;
+        if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
+          if (typeof document !== 'undefined' && document.pointerLockElement) {
+            document.exitPointerLock();
+          }
+        } else {
+          if (state.paused) {
+            if (typeof window !== 'undefined' && window.__tronResumeGame) window.__tronResumeGame();
+            else resumeGame();
+          } else {
+            if (typeof window !== 'undefined' && window.__tronPauseGame) window.__tronPauseGame();
+            else pauseGame();
+          }
+        }
+      }
+    }
+  }
+
+  // Edge-triggered combat actions during active play
+  if (state.running && !state.paused && state.countdownTimer <= 0) {
+    // Throw disc on R2 just pressed
+    if (isButtonJustPressed(GAMEPAD_BUTTONS.R2)) {
+      if (state.player.hasDisc && state.player.alive) {
+        throwDisc();
+      }
+    }
+
+    // Jump on South button
+    if (isButtonJustPressed(GAMEPAD_BUTTONS.SOUTH)) {
+      state.gamepadJumpRequested = true;
+    }
+    state.gamepadJumpHeld = isButtonPressed(GAMEPAD_BUTTONS.SOUTH);
+
+    // Dash on East or West button
+    if (isButtonJustPressed(GAMEPAD_BUTTONS.EAST) || isButtonJustPressed(GAMEPAD_BUTTONS.WEST)) {
+      state.gamepadDashRequested = true;
+    }
+  }
+}
+
 export function update(dt) {
   state.time += dt;
+  handleGamepadInput(dt);
 
   // Countdown & Freeze logic
   if (state.countdownTimer > 0) {
@@ -190,6 +240,8 @@ export function loop() {
 
   if (state.running && !state.paused) {
     update(dt);
+  } else if (state.running && state.paused) {
+    handleGamepadInput(dt);
   } else if (!state.running) {
     state.time += dt;
     camera.position.set(Math.sin(state.time * .12) * 34, 14, Math.cos(state.time * .12) * 34);

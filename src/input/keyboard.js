@@ -3,8 +3,8 @@ import { state } from '../core/state.js';
 export const EAT = ['Space','KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyP','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','F1'];
 
 export function getPlayerCurveIntent() {
-  const q = !!state.keys.KeyQ || state.touchCurveL;
-  const e = !!state.keys.KeyE || state.touchCurveR;
+  const q = !!state.keys.KeyQ || state.touchCurveL || state.gamepadCurveL;
+  const e = !!state.keys.KeyE || state.touchCurveR || state.gamepadCurveR;
   if (q && !e) return -1.0;
   if (e && !q) return 1.0;
   return 0.0;

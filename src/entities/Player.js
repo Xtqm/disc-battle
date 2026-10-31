@@ -11,6 +11,7 @@ import { getTileAt, rebuildArenaTiles, pillars } from './Arena.js';
 import { spawnDisc } from './Disc.js';
 import { getPlayerCurveIntent } from '../input/keyboard.js';
 import { touchMove, updateCurveButtons, updateTouchMomentum } from '../input/touch.js';
+import { getLeftStick, getRightStick, playGamepadHaptics } from '../input/gamepad.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
 import { showMultiplayerDefeat } from '../network/roomManager.js';
 import { updateHUD } from '../ui/hud.js';
@@ -24,6 +25,22 @@ export function updatePlayer(dt) {
   }
 
   updateTouchMomentum(dt);
+
+  // Gamepad Right Stick Look (Continuous rate scaled by dt)
+  const rs = getRightStick();
+  if (rs && rs.mag > 0) {
+    const yawSens = state.gamepadSensYaw || 2.4;
+    const pitchSens = state.gamepadSensPitch || 1.8;
+    state.player.yaw -= rs.x * yawSens * dt;
+    state.player.pitch = THREE.MathUtils.clamp(
+      state.player.pitch - rs.y * pitchSens * dt * (state.invertY ? -1 : 1),
+      -0.6,
+      0.55
+    );
+    if (state.player.yaw > Math.PI) state.player.yaw -= Math.PI * 2;
+    if (state.player.yaw < -Math.PI) state.player.yaw += Math.PI * 2;
+  }
+
   const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
   const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
   const wish = new THREE.Vector3();
@@ -38,9 +55,15 @@ export function updatePlayer(dt) {
       wish.addScaledVector(fwd, -touchMove.y);
       wish.addScaledVector(right, touchMove.x);
     }
+
+    const padStick = getLeftStick();
+    if (padStick && (padStick.x !== 0 || padStick.y !== 0)) {
+      wish.addScaledVector(fwd, -padStick.y);
+      wish.addScaledVector(right, padStick.x);
+    }
   }
 
-  const stickDeflection = Math.hypot(touchMove.x, touchMove.y);
+  const stickDeflection = Math.max(Math.hypot(touchMove.x, touchMove.y), getLeftStick().mag);
   const hasKeys = state.keys.KeyW || state.keys.KeyS || state.keys.KeyA || state.keys.KeyD;
   if (wish.lengthSq() > 0) wish.normalize();
 
@@ -64,7 +87,10 @@ export function updatePlayer(dt) {
 
   // Vertical physics: jump / double-jump / gravity
   const GRAV = 30, JUMP_V = 11.5;
-  if ((state.keys.Space || state.touchJumpHeld) && !state.player.jumpHeld) state.player.jumpBuf = 0.15;
+  const jumpRequested = !!(state.keys.Space || state.touchJumpHeld || state.gamepadJumpRequested);
+  const jumpHeld = !!(state.keys.Space || state.touchJumpHeld || state.gamepadJumpHeld);
+  if (jumpRequested && !state.player.jumpHeld) state.player.jumpBuf = 0.15;
+  state.gamepadJumpRequested = false;
   state.player.jumpBuf = Math.max(0, (state.player.jumpBuf || 0) - dt);
   state.player.coyote = state.player.grounded ? 0.12 : Math.max(0, (state.player.coyote || 0) - dt);
   const canJump = state.player.jumps < 2 || state.player.coyote > 0;
@@ -82,8 +108,8 @@ export function updatePlayer(dt) {
     burst(state.player.pos.clone().setY(state.player.y + .2), config.CYAN, state.player.jumps === 1 ? 12 : 18, 5);
     shake(.08);
   }
-  state.player.jumpHeld = !!state.keys.Space || state.touchJumpHeld;
-  if ((state.keys.Space || state.touchJumpHeld) && state.player.vy > 0) state.player.vy -= GRAV * 0.55 * dt;
+  state.player.jumpHeld = jumpHeld;
+  if (jumpHeld && state.player.vy > 0) state.player.vy -= GRAV * 0.55 * dt;
   else state.player.vy -= GRAV * dt;
   state.player.y += state.player.vy * dt;
 
@@ -112,13 +138,14 @@ export function updatePlayer(dt) {
     damagePlayer(999);
   }
 
-  let speed = (state.player.blocking || state.touchBlocking) ? 5.5 : 12;
+  const isBlocking = !!(state.player.blocking || state.touchBlocking || state.gamepadBlocking);
+  let speed = isBlocking ? 5.5 : 12;
   if (!hasKeys && stickDeflection > 0) {
     speed *= Math.min(1, Math.max(0.3, stickDeflection));
   }
   if (!state.player.grounded) speed *= 0.82;
   state.player.dashCd -= dt;
-  const isDashTriggered = (state.keys.ShiftLeft || state.keys.ShiftRight || state.touchDashRequested);
+  const isDashTriggered = (state.keys.ShiftLeft || state.keys.ShiftRight || state.touchDashRequested || state.gamepadDashRequested);
   if (isDashTriggered && state.player.energy > 25 && state.player.dashCd <= 0) {
     let dashDir = wish.clone();
     if (dashDir.lengthSq() < 1e-4) dashDir.copy(fwd);
@@ -133,8 +160,10 @@ export function updatePlayer(dt) {
     shake(.18);
     burst(state.player.pos.clone().setY(state.player.y + .4), config.CYAN, 14, 5);
     if (inRecoveryZone) message('RECOVERY DASH');
+    playGamepadHaptics({ duration: 110, weakMagnitude: 0.5, strongMagnitude: 0.7 });
   }
   state.touchDashRequested = false;
+  state.gamepadDashRequested = false;
   state.player.energy = Math.min(100, state.player.energy + dt * 14);
 
   const target = wish.multiplyScalar(speed);
@@ -156,7 +185,7 @@ export function updatePlayer(dt) {
       speed: state.player.vel.length(),
       vy: state.player.vy,
       grounded: state.player.grounded,
-      blocking: !!(state.player.blocking || state.touchBlocking),
+      blocking: !!(state.player.blocking || state.touchBlocking || state.gamepadBlocking),
       hurt: state.player.invuln > 0 ? 0.2 : 0,
       time: state.time
     });
@@ -185,6 +214,7 @@ export function throwDisc() {
     window.__lastThrowDot = dir.clone().normalize().dot(aim.point.clone().sub(origin).normalize());
   }
   shake(0.12);
+  playGamepadHaptics({ duration: 90, weakMagnitude: 0.25, strongMagnitude: 0.4 });
   if (state.touchCurveL || state.touchCurveR) {
     state.touchCurveL = false;
     state.touchCurveR = false;
@@ -274,6 +304,7 @@ export function damagePlayer(amount, from) {
   state.player.hurtFlash = 1;
   burst(state.player.pos.clone().setY(state.player.y + 1.6), config.CYAN, 18, 8);
   shake(0.35);
+  playGamepadHaptics({ duration: 200, weakMagnitude: 0.6, strongMagnitude: 0.9 });
 
   if (state.player.hp <= 0) {
     state.player.hp = 0;

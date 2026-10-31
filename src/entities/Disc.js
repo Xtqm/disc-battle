@@ -13,6 +13,7 @@ import { SFX } from '../audio/sfx.js';
 import { getRoomRef, roomUpdateDoc } from '../network/firebaseSetup.js';
 import { cosmeticMaterialEngine, disposeHierarchy } from '../armory/CosmeticMaterialEngine.js';
 import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
+import { playGamepadHaptics } from '../input/gamepad.js';
 
 export function applyDamageToTarget(f, dmg, D) {
   if (f.bossController) {
@@ -413,9 +414,11 @@ export function updateDiscs(dt) {
       if (!isTeammate && !D.returning && D.pos.distanceTo(pc) < config.PLAYER_R + config.DISC_R + .35) {
         const toDisc = D.pos.clone().sub(pc).setY(0).normalize();
         const facing = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
-        if (state.player.blocking && state.player.hasDisc && toDisc.dot(facing) > .35) {
+        const isPlayerBlocking = !!(state.player.blocking || state.touchBlocking || state.gamepadBlocking);
+        if (isPlayerBlocking && state.player.hasDisc && toDisc.dot(facing) > .35) {
           burst(D.pos.clone(), config.WHITE, 30, 12);
           shake(.25);
+          playGamepadHaptics({ duration: 160, weakMagnitude: 0.6, strongMagnitude: 0.85 });
           state.score += 50;
           duelEconomyBridge.rewardParry();
           D.originalOwner = (D.owner !== 'player') ? D.owner : (D.originalOwner || state.foes[0]);

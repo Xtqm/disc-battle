@@ -50,6 +50,7 @@ const TEST_DOMAINS = {
     'ui/achievements_modal.test.js'
   ],
   gameplay: [
+    'gameplay/gamepad.test.js',
     'gameplay/mouse_camera_input.test.js',
     'gameplay/camera_combat_stability.test.js',
     'gameplay/physics_and_combat.test.js',
