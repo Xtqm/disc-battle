@@ -64,6 +64,9 @@ export class AchievementManager {
     // Run retroactive reconciliation for veteran players
     this.reconcileAchievements({ silent: true });
 
+    // Synchronize stored achievements with Steam platform bridge
+    this._syncUnlockedAchievementsToSteam();
+
     this.isInitialized = true;
   }
 
@@ -319,7 +322,39 @@ export class AchievementManager {
       }
     }
 
+    // 6. Forward unlock to Steamworks bridge if running in desktop environment
+    if (typeof window !== 'undefined' && window.electronDesktop && typeof window.electronDesktop.steamUnlockAchievement === 'function') {
+      try {
+        window.electronDesktop.steamUnlockAchievement(ach.id).catch((err) => {
+          console.warn('[AchievementManager] Steam achievement unlock failed:', err);
+        });
+      } catch (err) {
+        console.warn('[AchievementManager] Steam achievement invocation error:', err);
+      }
+    }
+
     return true;
+  }
+
+  /**
+   * Synchronizes all previously unlocked achievements from storage to the Steamworks bridge.
+   * @private
+   */
+  _syncUnlockedAchievementsToSteam() {
+    if (typeof window === 'undefined' || !window.electronDesktop || typeof window.electronDesktop.steamUnlockAchievement !== 'function') {
+      return;
+    }
+    const currentList = this.storage.get('achievements', []);
+    if (!Array.isArray(currentList)) return;
+
+    for (const item of currentList) {
+      const id = typeof item === 'string' ? item : item?.id;
+      if (id) {
+        try {
+          window.electronDesktop.steamUnlockAchievement(id).catch(() => {});
+        } catch (_) {}
+      }
+    }
   }
 }
 

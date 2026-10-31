@@ -13,7 +13,11 @@ contextBridge.exposeInMainWorld('electronDesktop', {
   },
   loadProfile: () => ipcRenderer.invoke('desktop:load-profile'),
   saveProfile: (payload) => ipcRenderer.invoke('desktop:save-profile', payload),
-  saveProfileSync: (payload) => ipcRenderer.send('desktop:save-profile-sync', payload)
+  saveProfileSync: (payload) => ipcRenderer.send('desktop:save-profile-sync', payload),
+  // Steamworks methods
+  steamGetStatus: () => ipcRenderer.invoke('steam:get-status'),
+  steamUnlockAchievement: (achievementId) => ipcRenderer.invoke('steam:unlock-achievement', achievementId),
+  steamSetRichPresence: (key, value) => ipcRenderer.invoke('steam:set-rich-presence', key, value)
 });
 
 // Suppress unintended drag & drop on window

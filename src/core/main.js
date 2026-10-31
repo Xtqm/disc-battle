@@ -26,6 +26,7 @@ import { crossTabSync } from '../storage/CrossTabSync.js';
 import { initAuthTerminal, showAuthTerminal, hideAuthTerminal, isAuthTerminalOpen, updateIdentityHeader } from '../ui/authTerminal.js';
 import { achievementManager } from '../achievements/AchievementManager.js';
 import { settingsManager } from './settings.js';
+import { updateSteamRichPresence } from './steamTelemetry.js';
 
 
 export const clock = new THREE.Clock();
@@ -284,6 +285,7 @@ export function initApp() {
     initAuthTerminal();
     achievementManager.init();
     settingsManager.load();
+    updateSteamRichPresence('In Main Menu');
 
     if (state.isTouchDevice && typeof document !== 'undefined' && document.body) {
       document.body.classList.add('touch-device');

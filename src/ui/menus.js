@@ -7,6 +7,7 @@ import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } fr
 import { armoryModal } from './modals/ArmoryModal.js';
 import { achievementsModal } from './modals/AchievementsModal.js';
 import { settingsModal } from './modals/SettingsModal.js';
+import { updateSteamRichPresence, syncGameStateRichPresence } from '../core/steamTelemetry.js';
 
 // Setup Campaign UI navigation transitions
 gridSelectorModal.setOnSelectGrid((gridId) => levelSelectView.show(gridId));
@@ -66,6 +67,7 @@ export function startMode(mode) {
   }
   state.paused = false;
   state.justResumed = true;
+  syncGameStateRichPresence();
   tryLock();
   focusGame();
 }
@@ -96,6 +98,7 @@ export function showModeSelect() {
   state.armoryModalOpen = false;
   state.paused = false;
   state.running = false;
+  updateSteamRichPresence('In Main Menu');
   teardownMultiplayer();
   if (typeof document !== 'undefined' && document.pointerLockElement) {
     document.exitPointerLock();
@@ -147,6 +150,7 @@ export function getMainMenuHtml() {
 }
 
 export function showModeSelectMenu() {
+  updateSteamRichPresence('In Main Menu');
   const hm = document.getElementById('hostModal');
   if (hm) hm.style.display = 'none';
   const rm = document.getElementById('roomModal');

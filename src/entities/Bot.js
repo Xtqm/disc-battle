@@ -15,6 +15,7 @@ import { ArbiterBossController, ARBITER_CONFIGS } from '../ai/ArbiterBossControl
 import { swarmEconomyBridge } from '../modes/SwarmEconomyBridge.js';
 import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 import { storageManager } from '../core/storage/StorageManager.js';
+import { syncGameStateRichPresence } from '../core/steamTelemetry.js';
 export { ArbiterBossController, ARBITER_CONFIGS };
 
 export function getPillarCoverPoint(pillar, playerPos, out) {
@@ -240,6 +241,7 @@ export function killFoe(f) {
       const completedWave = state.wave;
       swarmEconomyBridge.processWaveCompletion(completedWave);
       state.wave++;
+      syncGameStateRichPresence();
       message('CYCLE ' + state.wave);
       if (typeof window !== 'undefined' && window.__tronResetRound) {
         window.__tronResetRound(0, 14, Math.PI);
@@ -252,6 +254,7 @@ export function killFoe(f) {
   } else {
     if (state.foes.length === 0) {
       state.wave++;
+      syncGameStateRichPresence();
       message('CYCLE ' + state.wave);
       if (typeof window !== 'undefined' && window.__tronResetRound) {
         window.__tronResetRound(0, 14, Math.PI);

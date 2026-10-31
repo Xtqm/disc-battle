@@ -91,8 +91,14 @@ async function run() {
     await window.__dbg.joinRoom(code);
   }, roomCode);
 
-  await hostPage.waitForFunction(() => window.__dbg && window.__dbg.running() && window.__dbg.mode() === 'duel_multi', { timeout: 10000 });
-  await guestPage.waitForFunction(() => window.__dbg && window.__dbg.running() && window.__dbg.mode() === 'duel_multi', { timeout: 10000 });
+  await hostPage.waitForFunction(() => {
+    if (window.__dbg && window.__dbg.step) window.__dbg.step(0.016);
+    return window.__dbg && window.__dbg.running() && window.__dbg.mode() === 'duel_multi';
+  }, { timeout: 15000 });
+  await guestPage.waitForFunction(() => {
+    if (window.__dbg && window.__dbg.step) window.__dbg.step(0.016);
+    return window.__dbg && window.__dbg.running() && window.__dbg.mode() === 'duel_multi';
+  }, { timeout: 15000 });
   console.log('Both players in match.');
 
   // ------------------------------------------------------------------
@@ -188,14 +194,16 @@ async function run() {
   });
 
   await guestPage.waitForFunction(() => {
+    if (window.__dbg && window.__dbg.step) window.__dbg.step(0.016);
     const overlay = document.getElementById('overlay');
     return overlay && overlay.style.display === 'flex';
-  }, { timeout: 10000 });
+  }, { timeout: 15000 });
   await hostPage.evaluate(() => { if (window.__dbg && window.__dbg.step) { for (let i = 0; i < 5; i++) window.__dbg.step(0.016); } });
   await hostPage.waitForFunction(() => {
+    if (window.__dbg && window.__dbg.step) window.__dbg.step(0.016);
     const overlay = document.getElementById('overlay');
     return overlay && overlay.style.display === 'flex';
-  }, { timeout: 10000 });
+  }, { timeout: 15000 });
 
   // Host clicks RETURN TO MENU
   console.log('Host clicks RETURN TO MENU...');

@@ -12,11 +12,13 @@
     "test:campaign": "node test/runner.js campaign",
     "test:gameplay": "node test/runner.js gameplay",
     "desktop:dev": "electron .",
-    "desktop:build": "electron-builder --win"
+    "desktop:build": "electron-builder --win",
+    "desktop:steam": "node desktop/build-steam.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.3",
-    "puppeteer": "^23.11.1"
+    "puppeteer": "^23.11.1",
+    "steamworks.js": "^0.4.0"
   },
   "devDependencies": {
     "electron": "^45.2.1",

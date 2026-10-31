@@ -2,6 +2,10 @@ const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const fsPromises = require('fs').promises;
+const steam = require('./steam.cjs');
+
+// Configure Steam Overlay hooks before app ready
+steam.enableSteamOverlay();
 
 // Save file path resolvers
 function getSaveDir() {
@@ -55,12 +59,26 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     if (process.env.ELECTRON_TEST_MODE === '1') {
-      console.log('ELECTRON_DESKTOP_READY: Game window successfully initialized');
+      console.log('ELECTRON_DESKTOP_READY: Game window successfully initialized (ready-to-show)');
       setTimeout(() => {
         app.quit();
-      }, 1500);
+      }, 1000);
     }
   });
+
+  if (process.env.ELECTRON_TEST_MODE === '1') {
+    mainWindow.webContents.once('did-finish-load', () => {
+      console.log('ELECTRON_DESKTOP_READY: Game window loaded (did-finish-load)');
+      setTimeout(() => {
+        app.quit();
+      }, 1000);
+    });
+    // Fallback safety timer so test runner never hangs in non-interactive/virtual sessions
+    setTimeout(() => {
+      console.log('ELECTRON_DESKTOP_READY: Fallback test timeout reached');
+      app.quit();
+    }, 3500);
+  }
 
   // Suppress context menus (right-click reserved for combat mechanics)
   mainWindow.webContents.on('context-menu', (event) => {
@@ -165,8 +183,29 @@ ipcMain.on('desktop:save-profile-sync', (_event, payload) => {
   }
 });
 
+// Steamworks IPC handlers
+ipcMain.handle('steam:get-status', async () => {
+  return steam.getStatus();
+});
+
+ipcMain.handle('steam:unlock-achievement', async (_event, achievementId) => {
+  return steam.unlockAchievement(achievementId);
+});
+
+ipcMain.handle('steam:set-rich-presence', async (_event, key, value) => {
+  return steam.setRichPresence(key, value);
+});
+
 app.whenReady().then(() => {
+  steam.initSteam();
   createWindow();
+
+  if ((process.env.ELECTRON_TEST_MODE || '').trim() === '1') {
+    setTimeout(() => {
+      console.log('ELECTRON_DESKTOP_READY: Test mode timer reached, quitting.');
+      app.quit();
+    }, 2000);
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -3,6 +3,7 @@ import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { el } from './hud.js';
 import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 import { settingsModal } from './modals/SettingsModal.js';
+import { syncGameStateRichPresence } from '../core/steamTelemetry.js';
 
 export function requestFullScreen() {
   const elem = document.documentElement;
@@ -110,6 +111,7 @@ export function pauseGame() {
   if (!state.running || state.paused) return;
   state.paused = true;
   state.lastPauseToggle = performance.now();
+  syncGameStateRichPresence();
   const pm = document.getElementById('pauseMenu');
   if (pm) {
     pm.style.display = 'flex';
@@ -126,6 +128,7 @@ export function resumeGame() {
   if (!state.running || !state.paused) return;
   state.paused = false;
   state.lastPauseToggle = performance.now();
+  syncGameStateRichPresence();
   const pm = document.getElementById('pauseMenu');
   if (pm) pm.style.display = 'none';
   const am = document.getElementById('authModal');
