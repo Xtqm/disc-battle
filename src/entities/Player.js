@@ -218,6 +218,10 @@ export function throwDisc() {
   const aim = aimTarget();
   const chest = state.player.pos.clone().add(new THREE.Vector3(0, 1.7 + state.player.y, 0));
   const dir = aim.point.clone().sub(chest).normalize();
+  if (_rd.y >= -0.35 && dir.y < -0.04) {
+    dir.y = Math.max(-0.04, _rd.y);
+    dir.normalize();
+  }
   const origin = chest.clone().add(dir.clone().multiplyScalar(1.1));
   const curve = getPlayerCurveIntent();
   const vel = dir.clone().multiplyScalar(38);
@@ -234,21 +238,30 @@ export function throwDisc() {
   }
 
   // Network sync throw for multiplayer
-  if ((state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') && state.db && state.currentRoomId && state.currentUser) {
-    const roomRef = getRoomRef(state.currentRoomId);
-    roomUpdateDoc(roomRef, {
-      lastThrow: {
-        id: Math.random().toString(36).substring(2, 9),
-        sender: state.playerRole,
-        x: +origin.x.toFixed(2),
-        y: +origin.y.toFixed(2),
-        z: +origin.z.toFixed(2),
-        vx: +vel.x.toFixed(2),
-        vy: +vel.y.toFixed(2),
-        vz: +vel.z.toFixed(2),
-        curve: +curve.toFixed(2)
-      }
-    }).catch(err => console.warn("Throw sync err:", err));
+  if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
+    const throwData = {
+      id: Math.random().toString(36).substring(2, 9),
+      sender: state.playerRole,
+      x: +origin.x.toFixed(2),
+      y: +origin.y.toFixed(2),
+      z: +origin.z.toFixed(2),
+      vx: +vel.x.toFixed(2),
+      vy: +vel.y.toFixed(2),
+      vz: +vel.z.toFixed(2),
+      curve: +curve.toFixed(2)
+    };
+
+    if (state.webrtcPeer && state.webrtcPeer.connectionState === 'connected') {
+      state.webrtcPeer.sendReliable({
+        type: 'DISC_THROW',
+        lastThrow: throwData
+      });
+    } else if (state.db && state.currentRoomId && state.currentUser) {
+      const roomRef = getRoomRef(state.currentRoomId);
+      roomUpdateDoc(roomRef, {
+        lastThrow: throwData
+      }).catch(err => console.warn("Throw sync err:", err));
+    }
   }
 }
 
@@ -361,6 +374,12 @@ export function damagePlayer(amount, from) {
           if (state.gameMode === 'duel_multi') {
             payload.winner = state.playerRole === 'p1' ? 'p2' : 'p1';
           }
+        }
+        if (state.webrtcPeer && state.webrtcPeer.connectionState === 'connected') {
+          state.webrtcPeer.sendReliable({
+            type: 'GAME_OVER_EVENT',
+            payload
+          });
         }
         roomUpdateDoc(roomRef, payload).catch(err => console.warn("Game over sync err:", err));
       }

@@ -6,6 +6,8 @@ import { getTileAt, pillars, sectorHazardBuilder } from '../entities/Arena.js';
 import { tmp } from '../graphics/materials.js';
 import { getPlayerCurveIntent } from '../input/keyboard.js';
 
+const _trajCamDir = new THREE.Vector3();
+
 export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, curve = 0) {
   const p = origin.clone(), v = vel.clone();
   const pts = [p.clone()], bounceAt = [];
@@ -17,8 +19,8 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
     t += step;
 
     if (k) {
-      const vx = v.x, vy = v.y, vz = v.z;
-      const speed = Math.hypot(vx, vy, vz);
+      const vx = v.x, vz = v.z;
+      // 2D horizontal Magnus normalization
       const hSpeed = Math.hypot(vx, vz);
       if (hSpeed > 1e-4) {
         const nx = -vz / hSpeed;
@@ -26,11 +28,11 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
         const latAcc = k * config.CURVE_ACCEL * step;
         let nvx = vx + nx * latAcc;
         let nvz = vz + nz * latAcc;
-        const newSpeed = Math.hypot(nvx, vy, nvz);
-        if (newSpeed > 1e-4) {
-          const s = speed / newSpeed;
+        const newHSpeed = Math.hypot(nvx, nvz);
+        if (newHSpeed > 1e-4) {
+          const s = hSpeed / newHSpeed;
           v.x = nvx * s;
-          v.y = vy * s;
+          // vy preserved in horizontal Magnus normalization
           v.z = nvz * s;
         }
       }
@@ -52,10 +54,11 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
         p.y = yFloor;
         if (v.y < 0) {
           const sig = Math.abs(v.y) >= 1.0;
-          v.y = -v.y * 0.65;
-          v.x *= 0.95;
-          v.z *= 0.95;
-          if (Math.abs(v.y) < 1.0) v.y = 0;
+          v.y = 0;
+          k = 0;
+          v.x *= 0.98;
+          v.z *= 0.98;
+          // Surface glide maintains horizontal velocity without vertical rebound
           if (sig) {
             bounces++;
             bounceAt.push(p.clone());
@@ -191,6 +194,11 @@ export function updateTrajectory(aim, dt) {
 
   const chest = state.player.pos.clone().setY(1.7 + state.player.y);
   const dir = aim.point.clone().sub(chest).normalize();
+  camera.getWorldDirection(_trajCamDir);
+  if (_trajCamDir.y >= -0.35 && dir.y < -0.04) {
+    dir.y = Math.max(-0.04, _trajCamDir.y);
+    dir.normalize();
+  }
   const origin = chest.clone().addScaledVector(dir, 1.1);
   const curve = getPlayerCurveIntent();
   const sim = simulatePath(origin, dir.clone().multiplyScalar(38), 3, 1.5, 1 / 90, curve);

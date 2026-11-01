@@ -7,7 +7,7 @@ Governs Identity Disc flight mechanics, trajectory calculation, lateral curve fo
 ## Requirements
 
 ### Requirement: Trajectory Prediction Parity
-The system SHALL compute aim trajectory predictions using the exact same discrete physical integration steps, launch-relative altitude cruise stabilization, near-parallax floor raycast protection, maximum ricochet limits, and collision surfaces as live thrown projectiles.
+The system SHALL compute aim trajectory predictions using the exact same discrete physical integration steps, launch-relative altitude cruise stabilization, launch pitch clamping, near-parallax floor raycast protection, maximum ricochet limits, and collision surfaces as live thrown projectiles.
 
 #### Scenario: Aim line matches actual throw
 - **WHEN** the player aims and throws an identity disc along a predicted trajectory
@@ -29,8 +29,12 @@ The system SHALL compute aim trajectory predictions using the exact same discret
 - **WHEN** the third-person camera ray intersects the arena floor plane within the near-parallax avoidance zone (< 8.0m in front of the thrower)
 - **THEN** the floor intersection is ignored for aim targeting, projecting the aim vector forward into the arena rather than aiming down into the thrower's feet.
 
+#### Scenario: Launch pitch clamp against floor dive
+- **WHEN** the third-person camera ray intersects the floor plane or targets close-range surfaces
+- **THEN** the vertical component of the throw direction vector is clamped so the projectile launches horizontally at chest elevation rather than angling sharply down into the ground.
+
 ### Requirement: Magnus Effect Curving
-The system SHALL apply lateral horizontal acceleration perpendicular to disc velocity when curve controls are engaged across keyboard, touch, and gamepad, strictly decoupled from character strafe inputs, and provide active curve bracket feedback.
+The system SHALL apply lateral horizontal acceleration perpendicular to disc velocity when curve controls are engaged, conserve kinetic speed strictly within the horizontal plane, decouple curve calculations from vertical velocity, and provide active curve bracket feedback.
 
 #### Scenario: Dedicated curve throw
 - **WHEN** the player activates hook left (Q, gamepad L1, or touch) or hook right (E, gamepad R1, or touch) during a throw
@@ -40,8 +44,12 @@ The system SHALL apply lateral horizontal acceleration perpendicular to disc vel
 - **WHEN** curve intent is engaged on keyboard, touch, or gamepad controller
 - **THEN** the crosshair displays the active curve bracket indicator corresponding to the engaged hook direction.
 
+#### Scenario: Horizontal speed conservation
+- **WHEN** lateral Magnus acceleration curves a disc in flight
+- **THEN** speed conservation scaling is computed strictly over horizontal velocity components, preserving vertical pitch velocity and ensuring uniform hook radius regardless of vertical motion.
+
 ### Requirement: Surface Ricochets and Restitution
-The system SHALL reflect discs specularly off vertical boundaries and pillars, invert vertical velocity with restitution dampening upon floor impact, and stabilize cruising altitude relative to the initial launch elevation rather than a fixed floor height.
+The system SHALL reflect discs specularly off vertical boundaries and pillars, trigger destructible floor tile degradation upon floor contact, dissipate curve spin on the floor, and resolve vertical floor contact into a smooth surface glide or stabilized elevation rather than unbounded upward rebound.
 
 #### Scenario: Specular wall reflection
 - **WHEN** a disc collides with an intact wall or pillar
@@ -49,11 +57,15 @@ The system SHALL reflect discs specularly off vertical boundaries and pillars, i
 
 #### Scenario: Floor bounce dampening
 - **WHEN** a disc contacts the arena floor surface
-- **THEN** vertical velocity is inverted with damping restitution while horizontal velocity is preserved with surface friction.
+- **THEN** vertical velocity is damped to prevent skyward ricochet, lateral curve spin is dissipated, and the disc glides smoothly across intact tiles.
 
 #### Scenario: Launch-relative altitude stabilization
 - **WHEN** an airborne or bouncing disc stabilizes its vertical elevation in flight
 - **THEN** altitude dampening smoothly restores position toward the projectile's initial launch elevation (`launchY`).
+
+#### Scenario: Floor impact triggers tile degradation
+- **WHEN** an identity disc contacts an intact arena floor tile
+- **THEN** the disc triggers tile degradation on that floor tile, causing it to enter the warning state.
 
 ### Requirement: Rear-Strike Multiplier
 The system SHALL inflict double damage (2x critical multiplier) when an identity disc strikes an opponent's rear hemisphere after completing at least one ricochet.

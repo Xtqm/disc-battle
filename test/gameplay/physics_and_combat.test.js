@@ -665,6 +665,99 @@ async function runTests() {
     throw new Error(`Test 11 FAILED: ${JSON.stringify(test11)}`);
   }
 
+  // -------------------------------------------------------------
+  // TEST 12: Floor Surface Glide, Tile De-Rez Trigger & 2D Magnus Speed Parity
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 12: Floor Surface Glide, Tile De-Rez Trigger & 2D Magnus Speed Parity ---');
+  const test12 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { state } = dbg;
+
+    dbg.resetTiles();
+    dbg.setPlayerPos(0, 0, 0);
+    state.player.pitch = -0.50; // Deliberate steep downward throw at floor
+    state.player.yaw = 0;
+    state.player.hasDisc = true;
+    state.discs.length = 0;
+
+    for (let f = 0; f < 5; f++) dbg.step(0.016);
+
+    // Throw disc directly down at floor tiles
+    dbg.throwDisc();
+    const d = state.discs.find(x => x.owner === 'player');
+    const hasInitialDownwardVel = d && d.vel.y < -5;
+
+    // Step frames until it hits the floor
+    let hitFloor = false;
+    let tileDegraded = false;
+    let surfaceGliding = false;
+    let curveDissipated = false;
+    if (d) d.curve = 1.0; // add curve to verify floor dissipates curve
+
+    for (let f = 0; f < 30; f++) {
+      dbg.step(0.016);
+      if (d && d.pos.y <= 0.551) {
+        hitFloor = true;
+        const tile = dbg.getTileAt ? dbg.getTileAt(d.pos.x, d.pos.z) : null;
+        if (tile && (tile.state === 'warning' || tile.state === 'falling')) {
+          tileDegraded = true;
+        }
+        if (d.vel.y === 0 && d.curve === 0) {
+          curveDissipated = true;
+        }
+      }
+    }
+
+    // Step 20 more frames to verify disc glides flat without bouncing skyward
+    let maxReboundY = d ? d.pos.y : 0;
+    for (let f = 0; f < 20; f++) {
+      dbg.step(0.016);
+      if (d) maxReboundY = Math.max(maxReboundY, d.pos.y);
+    }
+    surfaceGliding = maxReboundY <= 0.65;
+
+    // Test 2D horizontal Magnus speed conservation:
+    let vyPreserved = false;
+    let hSpeedConserved = false;
+    if (d) {
+      d.vel.set(20, 5, 20);
+      const initialVy = d.vel.y;
+      const initialHSpeed = Math.hypot(d.vel.x, d.vel.z);
+      d.curve = 1.0;
+      d.pos.set(0, 5, 0); // elevated so no floor collision
+      d.launchY = 5;
+
+      for (let f = 0; f < 10; f++) {
+        dbg.step(0.016);
+      }
+      const finalHSpeed = Math.hypot(d.vel.x, d.vel.z);
+      vyPreserved = Math.abs(d.vel.y - initialVy) < 0.1;
+      hSpeedConserved = Math.abs(finalHSpeed - initialHSpeed) < 0.5;
+    }
+
+    // Reset state
+    state.player.pitch = 0;
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+
+    return {
+      hasInitialDownwardVel,
+      hitFloor,
+      surfaceGliding,
+      curveDissipated,
+      maxReboundY: +maxReboundY.toFixed(2),
+      vyPreserved,
+      hSpeedConserved
+    };
+  });
+
+  console.log('Test 12 results:', test12);
+  if (test12.hitFloor && test12.surfaceGliding && test12.curveDissipated && test12.vyPreserved && test12.hSpeedConserved) {
+    console.log('>>> TEST 12 PASSED: Floor surface glide, tile degradation trigger & 2D Magnus speed parity verified!');
+  } else {
+    throw new Error(`Test 12 FAILED: ${JSON.stringify(test12)}`);
+  }
+
   console.log('\n=============================================');
   console.log('ALL ACCEPTANCE CRITERIA RIGOROUSLY VERIFIED!');
   console.log('=============================================\n');

@@ -129,8 +129,8 @@ export function updateDiscs(dt) {
         continue;
       }
     } else if (D.curve) {
-      const vx = D.vel.x, vy = D.vel.y, vz = D.vel.z;
-      const speed = Math.hypot(vx, vy, vz);
+      const vx = D.vel.x, vz = D.vel.z;
+      // 2D horizontal Magnus normalization
       const hSpeed = Math.hypot(vx, vz);
       if (hSpeed > 1e-4) {
         const nx = -vz / hSpeed;
@@ -138,11 +138,11 @@ export function updateDiscs(dt) {
         const latAcc = D.curve * config.CURVE_ACCEL * dt;
         let nvx = vx + nx * latAcc;
         let nvz = vz + nz * latAcc;
-        const newSpeed = Math.hypot(nvx, vy, nvz);
-        if (newSpeed > 1e-4) {
-          const s = speed / newSpeed;
+        const newHSpeed = Math.hypot(nvx, nvz);
+        if (newHSpeed > 1e-4) {
+          const s = hSpeed / newHSpeed;
           D.vel.x = nvx * s;
-          D.vel.y = vy * s;
+          // vy preserved in horizontal Magnus normalization
           D.vel.z = nvz * s;
         }
       }
@@ -175,10 +175,12 @@ export function updateDiscs(dt) {
         D.pos.y = yFloor;
         if (D.vel.y < 0) {
           const significant = Math.abs(D.vel.y) >= 1.0;
-          D.vel.y = -D.vel.y * 0.65;
-          D.vel.x *= 0.95;
-          D.vel.z *= 0.95;
-          if (Math.abs(D.vel.y) < 1.0) D.vel.y = 0;
+          D.vel.y = 0;
+          D.curve = 0;
+          D.launchY = yFloor;
+          D.vel.x *= 0.98;
+          D.vel.z *= 0.98;
+          // Surface glide maintains horizontal velocity without vertical rebound
           if (significant && !D.returning) {
             D.bounces++;
             if (D.hitFoes) D.hitFoes.clear();
@@ -466,20 +468,26 @@ export function updateDiscs(dt) {
           }
 
           if (state.gameMode === 'duel_multi' || state.gameMode === 'duos_multi') {
-            if (state.db && state.currentRoomId && state.currentUser) {
+            const parryThrow = {
+              id: Math.random().toString(36).substring(2, 9),
+              sender: state.playerRole,
+              x: +D.pos.x.toFixed(2),
+              y: +D.pos.y.toFixed(2),
+              z: +D.pos.z.toFixed(2),
+              vx: +D.vel.x.toFixed(2),
+              vy: +D.vel.y.toFixed(2),
+              vz: +D.vel.z.toFixed(2),
+              curve: 0
+            };
+            if (state.webrtcPeer && state.webrtcPeer.connectionState === 'connected') {
+              state.webrtcPeer.sendReliable({
+                type: 'DISC_PARRY',
+                lastThrow: parryThrow
+              });
+            } else if (state.db && state.currentRoomId && state.currentUser) {
               const roomRef = getRoomRef(state.currentRoomId);
               roomUpdateDoc(roomRef, {
-                lastThrow: {
-                  id: Math.random().toString(36).substring(2, 9),
-                  sender: state.playerRole,
-                  x: +D.pos.x.toFixed(2),
-                  y: +D.pos.y.toFixed(2),
-                  z: +D.pos.z.toFixed(2),
-                  vx: +D.vel.x.toFixed(2),
-                  vy: +D.vel.y.toFixed(2),
-                  vz: +D.vel.z.toFixed(2),
-                  curve: 0
-                }
+                lastThrow: parryThrow
               }).catch(err => console.warn("Parry sync err:", err));
             }
           }
