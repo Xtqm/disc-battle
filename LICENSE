@@ -1,0 +1,45 @@
+MIT License (Code) & Proprietary Assets / Trademark Notice
+
+==============================================================================
+PART 1: CODE & ENGINE LICENSE (MIT)
+==============================================================================
+
+Copyright (c) 2026 Caleb
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+==============================================================================
+PART 2: GAME ASSETS, LORE & TRADEMARK RESERVATION (ALL RIGHTS RESERVED)
+==============================================================================
+
+Copyright (c) 2026 Caleb. All rights reserved.
+
+The following proprietary game assets, branding, and creative works are
+EXCLUDED from the MIT License grant above and may NOT be redistributed,
+resold, repackaged, or used in commercial products without prior written
+permission from the copyright holder:
+
+1. The "Arc League" name, brand identity, typography, and logos.
+2. The narrative universe, lore, characters, and text contained in LORE.md.
+3. 3D humanoid rigs, custom geometry, cosmetic shaders, and materials.
+4. Procedural audio synthesis sound design and music configurations.
+5. Distribution packaging and store marketing materials.
+
+You are welcome to inspect the code, learn from the architecture, contribute
+pull requests, and run the client for personal enjoyment.

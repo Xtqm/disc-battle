@@ -10,6 +10,7 @@
     "test:economy": "node test/runner.js economy",
     "test:armory": "node test/runner.js armory",
     "test:campaign": "node test/runner.js campaign",
+    "test:network": "node test/runner.js network",
     "test:gameplay": "node test/runner.js gameplay",
     "desktop:dev": "electron .",
     "desktop:build": "electron-builder --win",

@@ -37,6 +37,12 @@ const TEST_DOMAINS = {
   graphics: [
     'graphics/humanoid_rig.test.js'
   ],
+  network: [
+    'network/webrtc_peer.test.js',
+    'network/signaling_bridge.test.js',
+    'network/matchmaking_queue.test.js',
+    'network/warmup_sparring.test.js'
+  ],
   campaign: [
     'campaign/campaign_phase1.test.js',
     'campaign/campaign_phase2.test.js',

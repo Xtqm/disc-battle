@@ -1,7 +1,7 @@
 import { state } from '../core/state.js';
 import { tryLock, focusGame, setCursor } from '../input/InputManager.js';
 import { requestFullScreen, toggleFullScreen, isFullScreen, bindPauseAndModalEvents } from './modals.js';
-import { showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer } from '../network/roomManager.js';
+import { showJoinInputModal, onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer, startMatchmakingWithWarmup } from '../network/roomManager.js';
 import { updateIdentityHeader, showAuthTerminal } from './authTerminal.js';
 import { gridSelectorModal, levelSelectView, campaignHUD, trialDebriefModal } from './campaign/index.js';
 import { armoryModal } from './modals/ArmoryModal.js';
@@ -70,6 +70,10 @@ export function startMode(mode) {
   syncGameStateRichPresence();
   tryLock();
   focusGame();
+}
+
+if (typeof window !== 'undefined') {
+  window.__tronStartMode = startMode;
 }
 
 export function startGame() {
@@ -283,6 +287,18 @@ export function bindMainMenuEvents() {
 
   // Host setup modal bindings
   const hm = document.getElementById('hostModal');
+  const quickMatchBtn = document.getElementById('quickMatchBtn');
+  if (quickMatchBtn) {
+    quickMatchBtn.onclick = (e) => {
+      e.stopPropagation(); if (e.cancelable) e.preventDefault();
+      if (state.isTouchDevice) {
+        requestFullScreen();
+      }
+      if (hm) hm.style.display = 'none';
+      startMatchmakingWithWarmup();
+    };
+  }
+
   const practiceBtn = document.getElementById('practiceBtn');
   if (practiceBtn) {
     practiceBtn.onclick = (e) => {

@@ -12,6 +12,10 @@ import { shake } from '../ui/UIManager.js';
 import { updateHUD, message, el } from '../ui/hud.js';
 import { requestFullScreen } from '../ui/modals.js';
 import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
+import { WebRTCPeer } from './webrtcPeer.js';
+import { SignalingBridge } from './signalingBridge.js';
+import { handleIncomingFastPacket } from './sync.js';
+import { matchmakingQueue, registerMatchmakingCombatHandlers } from './matchmakingQueue.js';
 
 export function generateRoomCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -86,6 +90,164 @@ export function showJoinInputModal() {
   }
 }
 
+export function handleRemoteThrow(t) {
+  if (!t || t.id === state.lastProcessedThrowId || t.sender === state.playerRole) return;
+  state.lastProcessedThrowId = t.id;
+  const opp = state.multiPlayers[t.sender];
+  if (opp) {
+    const origin = new THREE.Vector3(t.x, t.y, t.z);
+    const vel = new THREE.Vector3(t.vx, t.vy, t.vz);
+    const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? config.CYAN : config.PURPLE, t.curve || 0);
+    oppDisc.remoteThrowId = t.id;
+    opp.hasDisc = false;
+    if (opp.obj && opp.obj.userData && opp.obj.userData.backDisc) {
+      opp.obj.userData.backDisc.visible = false;
+    }
+    shake(0.08);
+  }
+}
+
+export function handleRemoteTileDestabilized(tileData) {
+  if (!tileData || state.playerRole === 'p1') return;
+  const fallenList = tileData.fallen || [tileData.tile];
+  for (const item of fallenList) {
+    const [ix, iz] = Array.isArray(item) ? item : item.split('_').map(Number);
+    const tileKey = `${ix}_${iz}`;
+    const t = tiles.get(tileKey);
+    if (t && t.state === config.TILE_INTACT) {
+      triggerTileWarning(t, config.PURPLE);
+    }
+  }
+}
+
+registerMatchmakingCombatHandlers(handleRemoteThrow, handleRemoteTileDestabilized);
+
+export function transitionFromWarmupToPeerMatch(role, opponentId) {
+  if (typeof document !== 'undefined') {
+    const banner = document.getElementById('matchmakingQueueHUD');
+    if (banner) banner.style.display = 'none';
+  }
+  const roomCode = 'MATCH_' + Math.random().toString(36).substring(2, 6).toUpperCase();
+  startMultiplayerDuel(role, roomCode, '1v1');
+  message('CHALLENGER CONNECTED — FIGHT!');
+}
+
+export function startMatchmakingWithWarmup() {
+  if (state.isTouchDevice) {
+    requestFullScreen();
+  }
+  if (typeof window !== 'undefined' && window.__tronStartMode) {
+    window.__tronStartMode('duel_ai');
+  }
+
+  let banner = typeof document !== 'undefined' ? document.getElementById('matchmakingQueueHUD') : null;
+  if (!banner && typeof document !== 'undefined') {
+    banner = document.createElement('div');
+    banner.id = 'matchmakingQueueHUD';
+    banner.style.position = 'fixed';
+    banner.style.top = '20px';
+    banner.style.left = '50%';
+    banner.style.transform = 'translateX(-50%)';
+    banner.style.zIndex = '9999';
+    banner.style.background = 'rgba(10, 15, 25, 0.85)';
+    banner.style.border = '1px solid #00ffff';
+    banner.style.boxShadow = '0 0 15px rgba(0, 255, 255, 0.4)';
+    banner.style.padding = '8px 18px';
+    banner.style.borderRadius = '4px';
+    banner.style.pointerEvents = 'auto';
+    document.body.appendChild(banner);
+  }
+  if (banner) banner.style.display = 'block';
+
+  matchmakingQueue.startQueue({
+    onMatchSuccess: ({ role, opponentId }) => {
+      transitionFromWarmupToPeerMatch(role, opponentId);
+    }
+  });
+
+  message('SEARCHING FOR OPPONENT // WARM-UP SPARRING ACTIVE');
+}
+
+export function initWebRTCPeerSession(isHost, roomCode) {
+  if (state.webrtcPeer) {
+    try { state.webrtcPeer.close(); } catch (_) {}
+    state.webrtcPeer = null;
+  }
+  if (state.signalingBridge) {
+    try { state.signalingBridge.disconnect(); } catch (_) {}
+    state.signalingBridge = null;
+  }
+
+  const role = isHost ? 'p1' : (state.playerRole || 'p2');
+  const peer = new WebRTCPeer({
+    isHost,
+    onFastMessage: (data) => {
+      handleIncomingFastPacket(data);
+    },
+    onReliableMessage: (msg) => {
+      if (!msg) return;
+      if (msg.type === 'DISC_THROW' || msg.type === 'DISC_PARRY') {
+        handleRemoteThrow(msg.lastThrow);
+      } else if (msg.type === 'TILE_DESTABILIZED') {
+        handleRemoteTileDestabilized(msg);
+      } else if (msg.type === 'GAME_OVER_EVENT') {
+        if (msg.winner && msg.winner === state.playerRole) {
+          showMultiplayerVictory();
+        }
+      }
+    },
+    onConnectionChange: (connState) => {
+      console.log(`WebRTC Peer connection state: ${connState}`);
+      if (connState === 'connected') {
+        message('P2P WEBRTC CONNECTED');
+      }
+    }
+  });
+
+  const bridge = new SignalingBridge({
+    peerId: role,
+    roomCode
+  });
+
+  peer.onLocalCandidate = (candidate) => {
+    bridge.sendCandidate(candidate);
+  };
+
+  bridge.onOffer = async (offer, senderId) => {
+    if (!isHost) {
+      const answer = await peer.createAnswer(offer);
+      bridge.sendAnswer(answer, senderId);
+    }
+  };
+
+  bridge.onAnswer = async (answer) => {
+    if (isHost) {
+      await peer.setAnswer(answer);
+    }
+  };
+
+  bridge.onCandidate = async (candidate) => {
+    await peer.addIceCandidate(candidate);
+  };
+
+  bridge.onPeerJoined = async (peerId) => {
+    if (isHost && peer.connectionState !== 'connected') {
+      try {
+        const offer = await peer.createOffer();
+        bridge.sendOffer(offer, peerId);
+      } catch (err) {
+        console.warn('Error creating WebRTC offer:', err);
+      }
+    }
+  };
+
+  bridge.connect(roomCode);
+
+  state.webrtcPeer = peer;
+  state.signalingBridge = bridge;
+  return { peer, bridge };
+}
+
 export async function onClickCreateRoom(e, mode = '1v1') {
   if (state.isTouchDevice) {
     requestFullScreen();
@@ -104,6 +266,7 @@ export async function onClickCreateRoom(e, mode = '1v1') {
     state.currentRoomId = code;
     state.playerRole = 'p1';
     state.roomFallenTiles = [];
+    initWebRTCPeerSession(true, code);
 
     const roomRef = getRoomRef(code);
     await roomSetDoc(roomRef, {
@@ -204,6 +367,7 @@ export async function onClickConfirmJoin(e) {
     state.playerRole = assignedRole;
     state.roomFallenTiles = data.fallen || [];
     state.gameMode = data.mode === '2v2' ? 'duos_multi' : 'duel_multi';
+    initWebRTCPeerSession(false, code);
 
     const patch = {
       [`players.${assignedRole}`]: state.currentUser.uid
@@ -730,6 +894,14 @@ export function showMultiplayerDefeat(data = null) {
 }
 
 export function teardownMultiplayer() {
+  if (state.webrtcPeer) {
+    try { state.webrtcPeer.close(); } catch (_) {}
+    state.webrtcPeer = null;
+  }
+  if (state.signalingBridge) {
+    try { state.signalingBridge.disconnect(); } catch (_) {}
+    state.signalingBridge = null;
+  }
   if (state.roomUnsubscribe) {
     state.roomUnsubscribe();
     state.roomUnsubscribe = null;
