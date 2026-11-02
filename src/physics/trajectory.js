@@ -13,6 +13,7 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
   const pts = [p.clone()], bounceAt = [];
   let bounces = 0, t = 0, hitFoe = null;
   let k = curve;
+  let cruiseY = origin.y !== undefined ? origin.y : 1.7;
   const lim = config.ARENA - 1.5;
 
   while (t < tMax && bounces < maxBounces) {
@@ -41,7 +42,7 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
 
     p.addScaledVector(v, step);
     if (p.y > config.DISC_R) {
-      const cruiseY = origin.y !== undefined ? origin.y : 1.7;
+
       p.y += (cruiseY - p.y) * Math.min(1, step * 2.2);
     }
 
@@ -51,14 +52,15 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
       const tile = getTileAt(p.x, p.z);
       const isSolid = tile && tile.state !== config.TILE_FALLEN && tile.state !== config.TILE_REBUILDING;
       if (isSolid) {
-        p.y = yFloor;
+        p.y = yFloor + 0.05;
         if (v.y < 0) {
           const sig = Math.abs(v.y) >= 1.0;
-          v.y = 0;
+          v.y = 3.5;
           k = 0;
+          cruiseY = 1.7;
           v.x *= 0.98;
           v.z *= 0.98;
-          // Surface glide maintains horizontal velocity without vertical rebound
+          // Rebound upward away from floor into stabilized cruise elevation
           if (sig) {
             bounces++;
             bounceAt.push(p.clone());

@@ -616,9 +616,9 @@ async function runTests() {
   }
 
   // -------------------------------------------------------------
-  // TEST 12: Floor Surface Glide, Tile De-Rez Trigger & 2D Magnus Speed Parity
+  // TEST 12: Floor Impact Rebound, Single-Tile De-Rez & 2D Magnus Speed Parity
   // -------------------------------------------------------------
-  console.log('\n--- TEST 12: Floor Surface Glide, Tile De-Rez Trigger & 2D Magnus Speed Parity ---');
+  console.log('\n--- TEST 12: Floor Impact Rebound, Single-Tile De-Rez & 2D Magnus Speed Parity ---');
   const test12 = await page.evaluate(async () => {
     const dbg = window.__dbg;
     const { state } = dbg;
@@ -639,33 +639,30 @@ async function runTests() {
 
     // Step frames until it hits the floor
     let hitFloor = false;
-    let tileDegraded = false;
-    let surfaceGliding = false;
     let curveDissipated = false;
     if (d) d.curve = 1.0; // add curve to verify floor dissipates curve
 
     for (let f = 0; f < 30; f++) {
       dbg.step(0.016);
-      if (d && d.pos.y <= 0.551) {
+      if (d && (d.bounces > 0 || d.vel.y > 0)) {
         hitFloor = true;
-        const tile = dbg.getTileAt ? dbg.getTileAt(d.pos.x, d.pos.z) : null;
-        if (tile && (tile.state === 'warning' || tile.state === 'falling')) {
-          tileDegraded = true;
-        }
-        if (d.vel.y === 0 && d.curve === 0) {
+        if (d.curve === 0) {
           curveDissipated = true;
         }
       }
     }
 
-    // Step 20 more frames to verify disc glides flat without bouncing skyward
+    // Step 40 more frames to verify disc rebounds upward back toward chest height
     let maxReboundY = d ? d.pos.y : 0;
-    for (let f = 0; f < 20; f++) {
+    for (let f = 0; f < 40; f++) {
       dbg.step(0.016);
       if (d) maxReboundY = Math.max(maxReboundY, d.pos.y);
     }
-    surfaceGliding = maxReboundY <= 0.65;
+    const reboundedToChestHeight = maxReboundY >= 1.5;
 
+    // Verify exactly ONE floor tile was degraded (state !== 0 / TILE_INTACT)
+    const degradedTiles = Array.from(dbg.tiles().values()).filter(t => t.state !== 0);
+    const singleTileDegraded = degradedTiles.length === 1;
     // Test 2D horizontal Magnus speed conservation:
     let vyPreserved = false;
     let hSpeedConserved = false;
@@ -693,7 +690,9 @@ async function runTests() {
     return {
       hasInitialDownwardVel,
       hitFloor,
-      surfaceGliding,
+      singleTileDegraded,
+      degradedTileCount: degradedTiles.length,
+      reboundedToChestHeight,
       curveDissipated,
       maxReboundY: +maxReboundY.toFixed(2),
       vyPreserved,
@@ -702,8 +701,8 @@ async function runTests() {
   });
 
   console.log('Test 12 results:', test12);
-  if (test12.hitFloor && test12.surfaceGliding && test12.curveDissipated && test12.vyPreserved && test12.hSpeedConserved) {
-    console.log('>>> TEST 12 PASSED: Floor surface glide, tile degradation trigger & 2D Magnus speed parity verified!');
+  if (test12.hitFloor && test12.singleTileDegraded && test12.reboundedToChestHeight && test12.curveDissipated && test12.vyPreserved && test12.hSpeedConserved) {
+    console.log('>>> TEST 12 PASSED: Floor impact rebound, single-tile de-rez & 2D Magnus speed parity verified!');
   } else {
     throw new Error(`Test 12 FAILED: ${JSON.stringify(test12)}`);
   }

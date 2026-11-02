@@ -172,15 +172,15 @@ export function updateDiscs(dt) {
             onTileDestabilizedByHost(tile.ix, tile.iz);
           }
         }
-        D.pos.y = yFloor;
+        D.pos.y = yFloor + 0.05;
         if (D.vel.y < 0) {
           const significant = Math.abs(D.vel.y) >= 1.0;
-          D.vel.y = 0;
+          D.vel.y = 3.5;
           D.curve = 0;
-          D.launchY = yFloor;
+          D.launchY = 1.7;
           D.vel.x *= 0.98;
           D.vel.z *= 0.98;
-          // Surface glide maintains horizontal velocity without vertical rebound
+          // Rebound upward away from floor into stabilized cruise elevation
           if (significant && !D.returning) {
             D.bounces++;
             if (D.hitFoes) D.hitFoes.clear();
