@@ -147,6 +147,10 @@ async function runTerminalIntegrationTests() {
       const u = window.__TRON__.currentUser();
       return u && !u.isAnonymous && u.handle === 'TRON_WARRIOR';
     });
+    await page.waitForFunction(() => {
+      const modal = document.getElementById('authModal');
+      return modal && modal.style.display === 'none';
+    });
 
     const authHeaderState = await page.evaluate(() => {
       const header = document.getElementById('identityHeader');
