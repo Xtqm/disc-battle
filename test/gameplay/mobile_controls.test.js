@@ -1,68 +1,18 @@
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import puppeteer from 'puppeteer';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function createServer(port) {
-  const mimeTypes = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml'
-  };
-
-  const repoRoot = path.resolve(__dirname, '../../');
-  const server = http.createServer((req, res) => {
-    let reqPath = req.url.split('?')[0];
-    if (reqPath === '/') reqPath = '/index.html';
-    const filePath = path.join(repoRoot, reqPath);
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-      res.end(data);
-    });
-  });
-
-  return new Promise((resolve) => {
-    server.listen(port, () => resolve(server));
-  });
-}
+import { withBrowserTest } from '../helpers/browserHarness.js';
 
 async function runMobileTests() {
-  const PORT = 8093;
-  const server = await createServer(PORT);
-  console.log(`Test server running at http://localhost:${PORT}`);
+  await withBrowserTest(async ({ page, baseUrl }) => {
+    // Set mobile landscape viewport and touch support
+    await page.setViewport({
+      width: 844,
+      height: 390,
+      isMobile: true,
+      hasTouch: true,
+      deviceScaleFactor: 3
+    });
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader']
-  });
-
-  const page = await browser.newPage();
-  // Set mobile landscape viewport and touch support
-  await page.setViewport({
-    width: 844,
-    height: 390,
-    isMobile: true,
-    hasTouch: true,
-    deviceScaleFactor: 3
-  });
-
-  await page.goto(`http://localhost:${PORT}/index.html`);
-  await new Promise(r => setTimeout(r, 1000));
+    await page.goto(`${baseUrl}/index.html`);
+    await new Promise(r => setTimeout(r, 1000));
 
   await page.waitForFunction(() => !!window.__dbg && !!window.__dbg.duelBoss);
   console.log('Game initialized, window.__dbg ready.');
@@ -771,9 +721,7 @@ async function runMobileTests() {
   console.log('\n======================================================');
   console.log('ALL MOBILE ACCEPTANCE CRITERIA VERIFIED SUCCESSFULLY!');
   console.log('======================================================\n');
-
-  await browser.close();
-  server.close();
+  });
 }
 
 runMobileTests().catch(err => {

@@ -43,8 +43,12 @@ The system SHALL manage native lifecycle events, ensuring clean process terminat
 - **THEN** procedural synthesizer audio output is suspended until the window regains focus.
 
 ### Requirement: Executable Packaging Configuration
-The system SHALL provide packaging configurations via electron-builder to generate a standalone Windows desktop executable.
+The system SHALL provide packaging configurations via electron-builder to generate standalone desktop executables for Windows, Linux, and macOS platforms.
 
 #### Scenario: Distribution packaging build
-- **WHEN** the developer executes `npm run desktop:build`
-- **THEN** a standalone Windows executable package is generated in the distribution output directory.
+- **WHEN** the developer executes `npm run desktop:build` on a target OS
+- **THEN** a standalone executable distribution package (NSIS and portable for Windows, AppImage for Linux, DMG for macOS) is generated in the `dist` directory.
+
+#### Scenario: Multi-platform build execution
+- **WHEN** multi-platform packaging is executed in a continuous integration environment across matrix runners
+- **THEN** platform-specific binary bundles and installer packages are generated without packaging configuration errors.

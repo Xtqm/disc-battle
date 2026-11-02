@@ -1,6 +1,7 @@
 {
   "appId": "com.arcleague.game",
   "productName": "ARC LEAGUE",
+  "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
   "directories": {
     "output": "dist"
   },
@@ -23,5 +24,17 @@
     "allowToChangeInstallationDirectory": true,
     "createDesktopShortcut": true,
     "createStartMenuShortcut": true
+  },
+  "linux": {
+    "target": [
+      "AppImage"
+    ],
+    "category": "Game"
+  },
+  "mac": {
+    "target": [
+      "dmg"
+    ],
+    "category": "public.app-category.action-games"
   }
 }

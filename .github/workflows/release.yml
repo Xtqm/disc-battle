@@ -1,0 +1,109 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-desktop:
+    name: Build Desktop Artifacts (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            build_flag: '--win'
+            artifact_glob: 'dist/*.exe'
+          - os: ubuntu-latest
+            build_flag: '--linux'
+            artifact_glob: 'dist/*.AppImage'
+          - os: macos-latest
+            build_flag: '--mac'
+            artifact_glob: 'dist/*.dmg'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Package desktop distribution binary
+        run: npx electron-builder ${{ matrix.build_flag }}
+
+      - name: Compute SHA-256 checksum (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Get-ChildItem -Path dist/*.exe | ForEach-Object {
+            $hash = (Get-FileHash -Path $_.FullName -Algorithm SHA256).Hash.ToLower()
+            "$hash  $($_.Name)" | Out-File -FilePath "dist/$($_.Name).sha256" -Encoding utf8
+          }
+
+      - name: Compute SHA-256 checksum (POSIX)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cd dist
+          for file in *.AppImage *.dmg; do
+            if [ -f "$file" ]; then
+              sha256sum "$file" > "$file.sha256"
+            fi
+          done
+
+      - name: Upload packaging artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.os }}
+          path: |
+            ${{ matrix.artifact_glob }}
+            dist/*.sha256
+          if-no-files-found: error
+
+  publish-release:
+    name: Publish GitHub Release
+    needs: build-desktop
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Consolidate distribution packages and checksums
+        run: |
+          mkdir -p dist-release
+          find release-artifacts -type f \( -name "*.exe" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.sha256" \) -exec cp {} dist-release/ \;
+          cd dist-release
+          cat *.sha256 > SHA256SUMS.txt
+          ls -la
+
+      - name: Create GitHub Release Draft
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          prerelease: false
+          name: Arc League Release ${{ github.ref_name }}
+          generate_release_notes: true
+          files: |
+            dist-release/*.exe
+            dist-release/*.AppImage
+            dist-release/*.dmg
+            dist-release/SHA256SUMS.txt
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,58 +1,7 @@
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import puppeteer from 'puppeteer';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function createServer(port) {
-  const mimeTypes = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml'
-  };
-
-  const repoRoot = path.resolve(__dirname, '../../');
-  const server = http.createServer((req, res) => {
-    let reqPath = req.url.split('?')[0];
-    if (reqPath === '/') reqPath = '/index.html';
-    const filePath = path.join(repoRoot, reqPath);
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-      res.end(data);
-    });
-  });
-
-  return new Promise((resolve) => {
-    server.listen(port, () => resolve(server));
-  });
-}
+import { withBrowserTest } from '../helpers/browserHarness.js';
 
 async function runTests() {
-  const PORT = 8097;
-  const server = await createServer(PORT);
-  console.log(`Test server running at http://localhost:${PORT}`);
-
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader']
-  });
-
-  try {
-    const page = await browser.newPage();
+  await withBrowserTest(async ({ page, baseUrl }) => {
     // Mobile landscape viewport (iPhone landscape: 844x390)
     await page.setViewport({
       width: 844,
@@ -62,7 +11,7 @@ async function runTests() {
       deviceScaleFactor: 3
     });
 
-    await page.goto(`http://localhost:${PORT}/index.html`);
+    await page.goto(`${baseUrl}/index.html`);
     await new Promise(r => setTimeout(r, 1000));
 
     await page.waitForFunction(() => !!window.__dbg && !!window.__dbg.duelBoss);
@@ -408,11 +357,7 @@ async function runTests() {
     console.log('\n======================================================');
     console.log('ALL MOBILE MODAL SCROLLING ACCEPTANCE CRITERIA VERIFIED! 🚀');
     console.log('======================================================');
-
-  } finally {
-    await browser.close();
-    server.close();
-  }
+  });
 }
 
 runTests().catch(err => {

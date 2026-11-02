@@ -1,67 +1,17 @@
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import puppeteer from 'puppeteer';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function createServer(port) {
-  const mimeTypes = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml'
-  };
-
-  const server = http.createServer((req, res) => {
-    let reqPath = req.url.split('?')[0];
-    if (reqPath === '/') reqPath = '/index.html';
-    const repoRoot = path.resolve(__dirname, '../../');
-    const filePath = path.join(repoRoot, reqPath);
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-      res.end(data);
-    });
-  });
-
-  return new Promise((resolve) => {
-    server.listen(port, () => resolve(server));
-  });
-}
+import { withBrowserTest } from '../helpers/browserHarness.js';
 
 async function runMultiplayerTests() {
-  const PORT = 8094;
-  const server = await createServer(PORT);
-  console.log(`Multiplayer test server running at http://localhost:${PORT}`);
+  await withBrowserTest(async ({ browser, page: hostPage, baseUrl }) => {
+    console.log('Launching Host (P1) and Guest (P2) browser pages...');
+    const guestPage = await browser.newPage();
 
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader']
-  });
+    await hostPage.goto(`${baseUrl}/index.html`);
+    await guestPage.goto(`${baseUrl}/index.html`);
+    await new Promise(r => setTimeout(r, 1000));
 
-  console.log('Launching Host (P1) and Guest (P2) browser pages...');
-  const hostPage = await browser.newPage();
-  const guestPage = await browser.newPage();
-
-  await hostPage.goto(`http://localhost:${PORT}/index.html`);
-  await guestPage.goto(`http://localhost:${PORT}/index.html`);
-  await new Promise(r => setTimeout(r, 1000));
-
-  await hostPage.waitForFunction(() => !!window.__dbg && !!window.__dbg.createRoom);
-  await guestPage.waitForFunction(() => !!window.__dbg && !!window.__dbg.joinRoom);
-  console.log('Both client pages loaded and window.__dbg ready.');
+    await hostPage.waitForFunction(() => !!window.__dbg && !!window.__dbg.createRoom);
+    await guestPage.waitForFunction(() => !!window.__dbg && !!window.__dbg.joinRoom);
+    console.log('Both client pages loaded and window.__dbg ready.');
 
   // -------------------------------------------------------------
   // TEST 1: Room Creation & 4-Character Code Generation
@@ -405,9 +355,7 @@ async function runMultiplayerTests() {
   console.log('\n========================================================');
   console.log('ALL 1v1 MULTIPLAYER DUEL ACCEPTANCE CRITERIA VERIFIED!');
   console.log('========================================================\n');
-
-  await browser.close();
-  server.close();
+  });
 }
 
 runMultiplayerTests().catch(err => {

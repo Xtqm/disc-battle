@@ -1,45 +1,4 @@
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import puppeteer from 'puppeteer';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function createServer(port) {
-  const mimeTypes = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml'
-  };
-
-  const repoRoot = path.resolve(__dirname, '../../');
-  const server = http.createServer((req, res) => {
-    let reqPath = req.url.split('?')[0];
-    if (reqPath === '/') reqPath = '/index.html';
-    const filePath = path.join(repoRoot, reqPath);
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-      res.end(data);
-    });
-  });
-
-  return new Promise((resolve) => {
-    server.listen(port, () => resolve(server));
-  });
-}
+import { withBrowserTest } from '../helpers/browserHarness.js';
 
 async function inspectClient(page, name) {
   return await page.evaluate((clientName) => {
@@ -67,21 +26,14 @@ async function inspectClient(page, name) {
 }
 
 async function run() {
-  const PORT = 8089;
-  const server = await createServer(PORT);
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader']
-  });
+  await withBrowserTest(async ({ browser, page: hostPage, baseUrl }) => {
+    const guestPage = await browser.newPage();
 
-  const hostPage = await browser.newPage();
-  const guestPage = await browser.newPage();
+    await hostPage.goto(`${baseUrl}/index.html`);
+    await guestPage.goto(`${baseUrl}/index.html`);
+    await new Promise(r => setTimeout(r, 1000));
 
-  await hostPage.goto(`http://localhost:${PORT}/index.html`);
-  await guestPage.goto(`http://localhost:${PORT}/index.html`);
-  await new Promise(r => setTimeout(r, 1000));
-
-  await hostPage.evaluate(async () => {
+    await hostPage.evaluate(async () => {
     await window.__dbg.createRoom();
   });
   const roomCode = await hostPage.evaluate(() => window.__dbg.currentRoomId());
@@ -233,9 +185,7 @@ async function run() {
   console.log('\n======================================================');
   console.log('ALL REMATCH & POST-MATCH SPECIFICATIONS FULLY VERIFIED!');
   console.log('======================================================\n');
-
-  await browser.close();
-  server.close();
+  });
 }
 
 run().catch(err => {

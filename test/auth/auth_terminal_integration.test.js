@@ -1,60 +1,8 @@
-import http from 'http';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import puppeteer from 'puppeteer';
 import assert from 'assert';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-function createServer(port) {
-  const mimeTypes = {
-    '.html': 'text/html',
-    '.js': 'application/javascript',
-    '.css': 'text/css',
-    '.json': 'application/json',
-    '.png': 'image/png',
-    '.jpg': 'image/jpeg',
-    '.svg': 'image/svg+xml'
-  };
-
-  const repoRoot = path.resolve(__dirname, '../../');
-  const server = http.createServer((req, res) => {
-    let reqPath = req.url.split('?')[0];
-    if (reqPath === '/') reqPath = '/index.html';
-    const filePath = path.join(repoRoot, reqPath);
-
-    fs.readFile(filePath, (err, data) => {
-      if (err) {
-        res.writeHead(404);
-        res.end('Not found');
-        return;
-      }
-      const ext = path.extname(filePath).toLowerCase();
-      res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-      res.end(data);
-    });
-  });
-
-  return new Promise((resolve) => {
-    server.listen(port, () => resolve(server));
-  });
-}
+import { withBrowserTest } from '../helpers/browserHarness.js';
 
 async function runTerminalIntegrationTests() {
-  const PORT = 8098;
-  const server = await createServer(PORT);
-  console.log(`Auth Terminal integration test server running at http://localhost:${PORT}`);
-
-  const browser = await puppeteer.launch({
-    headless: 'new',
-    pipe: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox', '--use-gl=angle', '--use-angle=swiftshader']
-  });
-
-  try {
-    const page = await browser.newPage();
+  await withBrowserTest(async ({ page, baseUrl }) => {
     page.on('console', msg => console.log('BROWSER CONSOLE:', msg.text()));
     page.on('pageerror', err => console.error('BROWSER ERROR:', err));
 
@@ -71,7 +19,7 @@ async function runTerminalIntegrationTests() {
     });
 
     console.log('\n--- 1. Testing Main Menu Identity Header on Cold Boot ---');
-    await page.goto(`http://localhost:${PORT}/index.html`);
+    await page.goto(`${baseUrl}/index.html`);
     await page.waitForFunction(() => !!window.__TRON__ && window.__TRON__.currentUser());
 
     const initialHeaderState = await page.evaluate(() => {
@@ -372,10 +320,7 @@ async function runTerminalIntegrationTests() {
     console.log('✓ [X] button cleanly dismisses terminal and returns player to Main Menu');
 
     console.log('\n=== ALL TERMINAL INTEGRATION TESTS PASSED ===');
-  } finally {
-    await browser.close();
-    server.close();
-  }
+  });
 }
 
 runTerminalIntegrationTests().catch(err => {

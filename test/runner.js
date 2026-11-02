@@ -65,8 +65,7 @@ const TEST_DOMAINS = {
     'gameplay/mobile_modal_scrolling.test.js',
     'gameplay/multiplayer.test.js',
     'gameplay/rematch.test.js',
-    'gameplay/unified_flow.test.js',
-    'ui/duel_map_selector.test.js'
+    'gameplay/unified_flow.test.js'
   ]
 };
 

@@ -1,0 +1,142 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit Tests (${{ matrix.os }} - Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [20.x, 22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Storage Domain Tests
+        run: npm run test:storage
+
+      - name: Run Economy Domain Tests
+        run: npm run test:economy
+
+      - name: Run Armory Domain Tests
+        run: npm run test:armory
+
+      - name: Run Graphics Domain Tests
+        run: npm run test:graphics
+
+      - name: Run Campaign Domain Tests
+        run: npm run test:campaign
+
+      - name: Run Achievements Domain Tests
+        run: npm run test:achievements
+
+      - name: Run Network Domain Tests
+        run: npm run test:network
+
+  integration-tests:
+    name: Headless Integration Tests (Ubuntu - SwiftShader)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium system libraries for SwiftShader & WebGL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libasound2t64 \
+            libatk1.0-0 \
+            libatk-bridge2.0-0 \
+            libcairo2 \
+            libcups2 \
+            libdrm2 \
+            libgbm1 \
+            libgl1 \
+            libgl1-mesa-dri \
+            libgl1-mesa-glx \
+            libgtk-3-0 \
+            libnspr4 \
+            libnss3 \
+            libpango-1.0-0 \
+            libx11-xcb1 \
+            libxcomposite1 \
+            libxcursor1 \
+            libxdamage1 \
+            libxfixes3 \
+            libxi6 \
+            libxrandr2 \
+            libxrender1 \
+            libxss1 \
+            libxtst6 \
+            xvfb || true
+
+      - name: Cache Puppeteer Chrome binary
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: ${{ runner.os }}-puppeteer-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-puppeteer-
+
+      - name: Run Auth Integration Test Suite
+        run: xvfb-run --auto-servernum npm run test:auth
+
+      - name: Run Gameplay Integration Test Suite
+        run: xvfb-run --auto-servernum npm run test:gameplay
+
+  desktop-smoke:
+    name: Desktop Shell Smoke Test (Windows)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify Electron Desktop Window Boot & Auto-Exit
+        shell: pwsh
+        run: |
+          $env:ELECTRON_TEST_MODE = "1"
+          npx electron .
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "Electron window boot test failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          Write-Host "Electron desktop smoke test passed cleanly."

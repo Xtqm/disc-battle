@@ -1,6 +1,8 @@
 {
   "name": "arc-league",
   "version": "1.0.1",
+  "description": "ARC LEAGUE - Cyberpunk Combat Arena & Kinetic Disc League",
+  "author": "Arc League Team",
   "type": "module",
   "main": "desktop/main.cjs",
   "scripts": {
@@ -9,11 +11,14 @@
     "test:storage": "node test/runner.js storage",
     "test:economy": "node test/runner.js economy",
     "test:armory": "node test/runner.js armory",
+    "test:graphics": "node test/runner.js graphics",
     "test:campaign": "node test/runner.js campaign",
+    "test:achievements": "node test/runner.js achievements",
     "test:network": "node test/runner.js network",
     "test:gameplay": "node test/runner.js gameplay",
     "desktop:dev": "electron .",
     "desktop:build": "electron-builder --win",
+    "desktop:build:all": "electron-builder -mwl",
     "desktop:steam": "node desktop/build-steam.cjs"
   },
   "dependencies": {
