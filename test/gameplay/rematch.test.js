@@ -136,6 +136,12 @@ async function run() {
   }
   console.log('>>> STEP 3 PASSED: Both clients successfully restarted match cleanly into new round!');
 
+  // The rematch starts a new round with the normal pre-fight countdown.
+  // Finish it before forcing the next elimination; damage is ignored while
+  // the countdown is active.
+  await hostPage.evaluate(() => window.__dbg.finishCountdown());
+  await guestPage.evaluate(() => window.__dbg.finishCountdown());
+
   // ------------------------------------------------------------------
   // STEP 4: End round again, test Graceful Exit (Return to Menu)
   // ------------------------------------------------------------------
