@@ -357,6 +357,67 @@ export function playAchievementFanfare() {
   } catch (_) {}
 }
 
+export function playChargeWindupSound(progress = 0) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    const baseFreq = 320 + progress * 680;
+    osc.frequency.setValueAtTime(baseFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(baseFreq * 1.08, now + 0.08);
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.08 + progress * 0.12, now + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    osc.connect(gain);
+    gain.connect(getSFXDestination(ctx));
+    osc.start(now);
+    osc.stop(now + 0.08);
+  } catch (_) {}
+}
+
+export function playChargeBlastSound(charge = 0) {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = charge >= 0.85 ? 'sawtooth' : 'triangle';
+    const startFreq = 280 + charge * 420;
+    osc.frequency.setValueAtTime(startFreq, now);
+    osc.frequency.exponentialRampToValueAtTime(45, now + 0.35);
+    gain.gain.setValueAtTime(0.01, now);
+    gain.gain.linearRampToValueAtTime(0.25 + charge * 0.25, now + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+    osc.connect(gain);
+    gain.connect(getSFXDestination(ctx));
+    osc.start(now);
+    osc.stop(now + 0.35);
+  } catch (_) {}
+}
+
+export function playGuardCrushSound() {
+  const ctx = getAudioCtx();
+  if (!ctx) return;
+  try {
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(140, now);
+    osc.frequency.exponentialRampToValueAtTime(25, now + 0.45);
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc.connect(gain);
+    gain.connect(getSFXDestination(ctx));
+    osc.start(now);
+    osc.stop(now + 0.45);
+  } catch (_) {}
+}
+
 export const SFX = {
   catchDisc: (pitch = 1.0) => playCatchDiscSound(pitch),
   countdownTick: () => playCatchDiscSound(0.65), // pitched down
@@ -370,7 +431,10 @@ export const SFX = {
   missionBriefSweep: () => playMissionBriefSweepSound(),
   fabricate: () => playFabricateSound(),
   equip: () => playEquipSound(),
-  achievementFanfare: () => playAchievementFanfare()
+  achievementFanfare: () => playAchievementFanfare(),
+  chargeWindup: (progress = 0) => playChargeWindupSound(progress),
+  chargeBlast: (charge = 0) => playChargeBlastSound(charge),
+  guardCrush: () => playGuardCrushSound()
 };
 
 if (typeof window !== 'undefined') {

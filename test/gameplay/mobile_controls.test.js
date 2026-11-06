@@ -410,6 +410,7 @@ async function runMobileTests() {
     const initialDiscs = dbg.discs().length;
     const btnThrow = document.getElementById('btnThrow');
     btnThrow.dispatchEvent(new TouchEvent('touchstart', { cancelable: true, bubbles: true }));
+    btnThrow.dispatchEvent(new TouchEvent('touchend', { cancelable: true, bubbles: true }));
     dbg.step(0.016);
     const discThrown = dbg.discs().length === initialDiscs + 1;
     // Check curve reset after throw

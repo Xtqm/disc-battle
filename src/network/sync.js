@@ -22,6 +22,8 @@ export function handleIncomingFastPacket(data) {
   opp.hp = s.hp;
   opp.blocking = s.blocking;
   opp.hasDisc = s.hasDisc;
+  opp.chargingThrow = s.chargingThrow;
+  opp.throwCharge = s.throwCharge;
 }
 
 /**
@@ -48,7 +50,9 @@ export function syncNetworkState(dt) {
     pitch: +state.player.pitch.toFixed(2),
     hp: state.player.hp,
     blocking: state.player.blocking,
-    hasDisc: state.player.hasDisc
+    hasDisc: state.player.hasDisc,
+    chargingThrow: !!state.player.chargingThrow,
+    throwCharge: +(state.player.throwCharge || 0).toFixed(2)
   };
 
   // 1. Direct WebRTC DataChannel (Zero cloud database writes)

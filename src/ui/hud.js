@@ -83,6 +83,34 @@ export function updateCrosshair(aim, traj) {
     const eHeld = (!!state.keys.KeyE || state.touchCurveR || state.gamepadCurveR) && !(!!state.keys.KeyQ || state.touchCurveL || state.gamepadCurveL);
     ch.classList.toggle('curve-l', qHeld);
     ch.classList.toggle('curve-r', eHeld);
+
+    const charge = state.player.throwCharge || 0;
+    const isCharging = state.player.chargingThrow && charge > 0;
+    const arcSvg = document.getElementById('chargeArc');
+    if (arcSvg) {
+      if (isCharging) {
+        arcSvg.style.display = 'block';
+        const circle = arcSvg.querySelector('circle');
+        if (circle) {
+          const circumference = 113.1;
+          const offset = circumference * (1 - charge);
+          circle.style.strokeDashoffset = offset.toFixed(1);
+          if (charge >= 0.85) {
+            circle.setAttribute('stroke', '#ffffff');
+            circle.style.filter = 'drop-shadow(0 0 8px #ffffff) drop-shadow(0 0 4px var(--orange))';
+            circle.setAttribute('stroke-width', '3.5');
+          } else {
+            circle.setAttribute('stroke', 'var(--cyan)');
+            circle.style.filter = 'drop-shadow(0 0 6px var(--cyan))';
+            circle.setAttribute('stroke-width', '2.5');
+          }
+        }
+      } else {
+        arcSvg.style.display = 'none';
+      }
+    }
+    ch.classList.toggle('guard-crush-ready', charge >= 0.85);
+
     const range = document.getElementById('range');
     if (range) range.textContent = aim.dist < 300 ? Math.round(aim.dist) + 'M' : '';
   }

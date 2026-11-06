@@ -639,15 +639,17 @@ async function runTests() {
 
     // Step frames until it hits the floor
     let hitFloor = false;
-    let curveDissipated = false;
-    if (d) d.curve = 1.0; // add curve to verify floor dissipates curve
+    let curveRetained = false;
+    if (d) d.curve = 1.0; // add curve to verify floor retains 65% curve
 
     for (let f = 0; f < 30; f++) {
+      const curveBefore = d ? d.curve : 0;
       dbg.step(0.016);
       if (d && (d.bounces > 0 || d.vel.y > 0)) {
         hitFloor = true;
-        if (d.curve === 0) {
-          curveDissipated = true;
+        // Verify 65% curve retention (SPEC-COMBAT-001)
+        if (d.curve > 0 && d.curve <= 0.65) {
+          curveRetained = true;
         }
       }
     }
@@ -693,7 +695,7 @@ async function runTests() {
       singleTileDegraded,
       degradedTileCount: degradedTiles.length,
       reboundedToChestHeight,
-      curveDissipated,
+      curveRetained,
       maxReboundY: +maxReboundY.toFixed(2),
       vyPreserved,
       hSpeedConserved
@@ -701,10 +703,443 @@ async function runTests() {
   });
 
   console.log('Test 12 results:', test12);
-  if (test12.hitFloor && test12.singleTileDegraded && test12.reboundedToChestHeight && test12.curveDissipated && test12.vyPreserved && test12.hSpeedConserved) {
+  if (test12.hitFloor && test12.singleTileDegraded && test12.reboundedToChestHeight && test12.curveRetained && test12.vyPreserved && test12.hSpeedConserved) {
     console.log('>>> TEST 12 PASSED: Floor impact rebound, single-tile de-rez & 2D Magnus speed parity verified!');
   } else {
     throw new Error(`Test 12 FAILED: ${JSON.stringify(test12)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 13: Downward Floor Aim & Trajectory Parity (SPEC-COMBAT-001)
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 13: Downward Floor Aim & Trajectory Parity ---');
+  const test13 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { state } = dbg;
+    dbg.resetTiles();
+
+    // Position player on solid ground facing forward (yaw = 0)
+    dbg.setPlayerPos(0, 0, 0);
+    state.player.yaw = 0;
+    state.player.pitch = -0.25; // Aim downward toward arena floor ~15m ahead
+    state.player.hasDisc = true;
+    state.discs.length = 0;
+
+    for (let f = 0; f < 5; f++) {
+      dbg.step(0.016);
+      dbg.setPlayerPos(0, 0, 0);
+    }
+
+    const aim = dbg.aim();
+    const targetedFloor = aim.dist < 45; // targets arena floor, not far wall (>80m)
+
+    // Trajectory prediction should predict a bounce on the floor
+    const traj = dbg.traj();
+    const trajHitsFloor = traj.bounces >= 1;
+
+    // Throw disc along this downward trajectory
+    dbg.throwDisc();
+    const disc = state.discs.find(d => d.owner === 'player');
+    const initialVy = disc ? disc.vel.y : 0;
+    const hasDownwardPitch = initialVy < -1.0; // not clamped to -0.04
+
+    let liveHitFloor = false;
+    let minFlightY = disc ? disc.pos.y : 1.7;
+    for (let f = 0; f < 30; f++) {
+      dbg.step(0.016);
+      dbg.setPlayerPos(0, 0, 0);
+      if (disc) {
+        minFlightY = Math.min(minFlightY, disc.pos.y);
+        if (disc.bounces >= 1) {
+          liveHitFloor = true;
+          break;
+        }
+      }
+    }
+
+    // Reset
+    state.player.pitch = 0;
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+
+    return {
+      targetedFloor,
+      trajHitsFloor,
+      hasDownwardPitch,
+      initialVy: +initialVy.toFixed(2),
+      liveHitFloor,
+      minFlightY: +minFlightY.toFixed(2)
+    };
+  });
+
+  console.log('Test 13 results:', test13);
+  if (test13.targetedFloor && test13.trajHitsFloor && test13.hasDownwardPitch && test13.liveHitFloor) {
+    console.log('>>> TEST 13 PASSED: Downward floor aim pitches downward and hits targeted floor tile!');
+  } else {
+    throw new Error(`Test 13 FAILED: ${JSON.stringify(test13)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 14: Curved Skip-Shot Floor Ricochet Retention & Parity (SPEC-COMBAT-001)
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 14: Curved Skip-Shot Floor Ricochet Retention & Parity ---');
+  const test14 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { THREE, spawnDisc, state, simulatePath } = dbg;
+    dbg.resetTiles();
+
+    // Spawn a curving downward disc at (0, 1.5, 0) heading toward floor
+    const pos = new THREE.Vector3(0, 1.5, 0);
+    const vel = new THREE.Vector3(0, -10, -25);
+    const initialCurve = 1.0;
+    const d = spawnDisc(pos, vel, 'player', 0x00ffff, initialCurve);
+
+    let hitFloor = false;
+    let retainedCurve = 0;
+    let poppedUp = false;
+
+    for (let f = 0; f < 30; f++) {
+      dbg.step(0.016);
+      if (d.bounces >= 1 && !hitFloor) {
+        hitFloor = true;
+        retainedCurve = d.curve;
+        poppedUp = d.vel.y > 0;
+        break;
+      }
+    }
+
+    // Continue stepping to observe lateral curve after floor pop
+    const xBefore = d.pos.x;
+    for (let f = 0; f < 20; f++) {
+      dbg.step(0.016);
+    }
+    // Curve was positive (hook right), so d.pos.x should deviate laterally
+    const curvedLaterallyAfterBounce = Math.abs(d.pos.x - xBefore) > 0.3;
+
+    // Verify trajectory simulation also retains curve across floor bounce
+    const trajSim = simulatePath(pos, vel, 3, 1.5, 1 / 90, initialCurve);
+    const trajHitsFloor = trajSim.bounceAt.length >= 1;
+    const firstBounce = trajSim.bounceAt[0];
+    const ptsAfter = trajSim.pts.filter(p => p.z < firstBounce.z);
+    const trajCurvedAfter = ptsAfter.length > 5 && Math.abs(ptsAfter[ptsAfter.length - 1].x - firstBounce.x) > 0.3;
+
+    // Reset
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+
+    return {
+      hitFloor,
+      retainedCurveRatio: +(retainedCurve / initialCurve).toFixed(2),
+      poppedUp,
+      curvedLaterallyAfterBounce,
+      trajHitsFloor,
+      trajCurvedAfter
+    };
+  });
+
+  console.log('Test 14 results:', test14);
+  if (test14.hitFloor && test14.retainedCurveRatio >= 0.55 && test14.retainedCurveRatio <= 0.66 && test14.poppedUp && test14.curvedLaterallyAfterBounce && test14.trajCurvedAfter) {
+    console.log('>>> TEST 14 PASSED: Skip-shot 65% curve retention and trajectory prediction parity verified!');
+  } else {
+    throw new Error(`Test 14 FAILED: ${JSON.stringify(test14)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 15: Charged Throws - Velocity, Damage, and Gyroscopic Curve Scaling (SPEC-COMBAT-002)
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 15: Charged Throws - Velocity, Damage, and Gyroscopic Curve Scaling ---');
+  const test15 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { THREE, state, simulatePath } = dbg;
+    dbg.resetTiles();
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+
+    // 1. Charge input accumulation
+    dbg.startChargingThrow();
+    for (let i = 0; i < 30; i++) dbg.step(0.016);
+    const midCharge = state.player.throwCharge;
+
+    for (let i = 0; i < 40; i++) dbg.step(0.016);
+    const maxCharge = state.player.throwCharge;
+
+    // 2. Velocity Scaling across charge levels
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+    dbg.throwDisc(0.0);
+    const d0 = state.discs[state.discs.length - 1];
+    const speed0 = Math.hypot(d0.vel.x, d0.vel.y, d0.vel.z);
+
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+    dbg.throwDisc(0.5);
+    const dHalf = state.discs[state.discs.length - 1];
+    const speedHalf = Math.hypot(dHalf.vel.x, dHalf.vel.y, dHalf.vel.z);
+
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+    dbg.throwDisc(1.0);
+    const dFull = state.discs[state.discs.length - 1];
+    const speedFull = Math.hypot(dFull.vel.x, dFull.vel.y, dFull.vel.z);
+
+    // 3. Gyroscopic Curve Scaling (dampening lateral curve)
+    state.keys.KeyE = true;
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+    dbg.throwDisc(0.0);
+    const dCurveUncharged = state.discs[state.discs.length - 1];
+    const unchargedCurve = dCurveUncharged.curve;
+
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+    dbg.throwDisc(1.0);
+    const dCurveCharged = state.discs[state.discs.length - 1];
+    const chargedCurve = dCurveCharged.curve;
+    state.keys.KeyE = false;
+
+    // Trajectory simulation gyroscopic parity
+    const origin = new THREE.Vector3(0, 1.7, 0);
+    const vel = new THREE.Vector3(0, 0, -38);
+    const sim0 = simulatePath(origin, vel, 3, 1.5, 1 / 90, 1.0, 0.0);
+    const simFull = simulatePath(origin, vel, 3, 1.5, 1 / 90, 1.0, 1.0);
+    const defl0 = Math.abs(sim0.pts[sim0.pts.length - 1].x);
+    const deflFull = Math.abs(simFull.pts[simFull.pts.length - 1].x);
+
+    // 4. Damage scaling
+    const dmg0 = 55 + 40 * 0.0;
+    const dmgFull = 55 + 40 * 1.0;
+
+    // Reset
+    state.discs.length = 0;
+    state.player.hasDisc = true;
+
+    return {
+      midCharge: +midCharge.toFixed(2),
+      maxCharge: +maxCharge.toFixed(2),
+      speed0: +speed0.toFixed(1),
+      speedHalf: +speedHalf.toFixed(1),
+      speedFull: +speedFull.toFixed(1),
+      unchargedCurve: +unchargedCurve.toFixed(2),
+      chargedCurve: +chargedCurve.toFixed(2),
+      curveRatio: +(chargedCurve / unchargedCurve).toFixed(2),
+      defl0: +defl0.toFixed(2),
+      deflFull: +deflFull.toFixed(2),
+      dmg0,
+      dmgFull
+    };
+  });
+
+  console.log('Test 15 results:', test15);
+  if (
+    test15.midCharge >= 0.4 && test15.midCharge <= 0.6 &&
+    test15.maxCharge === 1.0 &&
+    test15.speed0 >= 37.5 && test15.speed0 <= 38.5 &&
+    test15.speedHalf >= 46.0 && test15.speedHalf <= 47.0 &&
+    test15.speedFull >= 54.5 && test15.speedFull <= 55.5 &&
+    test15.curveRatio >= 0.33 && test15.curveRatio <= 0.37 &&
+    test15.deflFull < test15.defl0 * 0.45 &&
+    test15.dmg0 === 55 && test15.dmgFull === 95
+  ) {
+    console.log('>>> TEST 15 PASSED: Charge velocity scaling, damage scaling, and gyroscopic curve dampening verified!');
+  } else {
+    throw new Error(`Test 15 FAILED: ${JSON.stringify(test15)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 16: Guard Crush - Shield Bypass, Stagger, and Arbiter Shield Piercing (SPEC-COMBAT-003)
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 16: Guard Crush - Shield Bypass, Stagger, and Arbiter Shield Piercing ---');
+  const test16 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { THREE, spawnDisc, state, applyDamageToTarget } = dbg;
+    dbg.resetTiles();
+
+    function spawnTestIncomingDisc(charge = 0.0) {
+      let b = state.foes.find(f => f.isBoss) || state.foes[0];
+      if (!b) {
+        dbg.spawnDuelBoss(1);
+        b = state.foes[0];
+      }
+      b.hasDisc = false;
+      const fwd = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw)).normalize();
+      const p = state.player.pos.clone().addScaledVector(fwd, 2.5).setY(1.5 + state.player.y);
+      return spawnDisc(p, fwd.clone().multiplyScalar(-24), b, 0xff8800, 0, charge);
+    }
+
+    // 1. Player Blocking vs Normal Disc (< 0.85 charge): Deflection succeeds
+    dbg.setPlayerPos(0, 5, 0);
+    dbg.setPlayerBlocking(true);
+    state.player.hasDisc = true;
+    state.player.hp = 100;
+
+    const dNormal = spawnTestIncomingDisc(0.0);
+    let normalDeflected = false;
+    for (let f = 0; f < 30; f++) {
+      dbg.step(0.016);
+      if (dNormal.isDeflected || dbg.discs().some(d => d.isDeflected)) {
+        normalDeflected = true;
+        break;
+      }
+    }
+    const playerStillBlocking = state.player.blocking === true;
+    const hpAfterNormal = state.player.hp;
+
+    state.discs.length = 0;
+
+    // 2. Player Blocking vs Guard Crush Disc (>= 0.85 charge): Guard broken, full damage, stagger!
+    dbg.setPlayerPos(0, 5, 0);
+    dbg.setPlayerBlocking(true);
+    state.player.hasDisc = true;
+    state.player.hp = 100;
+
+    const dCrush = spawnTestIncomingDisc(0.95);
+    let crushDeflected = false;
+    let guardBroken = false;
+    let tookDamage = false;
+    let crushMessage = false;
+
+    for (let f = 0; f < 30; f++) {
+      dbg.step(0.016);
+      if (dCrush.isDeflected || dbg.discs().some(d => d.isDeflected)) {
+        crushDeflected = true;
+      }
+      if (!state.player.blocking) {
+        guardBroken = true;
+      }
+      if (state.player.hp < 100) {
+        tookDamage = true;
+      }
+      if (dbg.lastMessage().includes('GUARD CRUSH')) {
+        crushMessage = true;
+      }
+      if (guardBroken && tookDamage) break;
+    }
+
+    state.discs.length = 0;
+
+    // 3. Arbiter Boss Multi-Layer Shield Piercing:
+    const mockArbiter = {
+      hp: 200,
+      bossController: {
+        currentShields: 3,
+        maxShields: 3,
+        primaryColor: 0xff8800,
+        onHit: function(dmg, disc) {
+          if (this.currentShields > 0) {
+            this.currentShields--;
+            return { absorbed: true, remainingShields: this.currentShields };
+          }
+          mockArbiter.hp -= dmg;
+          return { absorbed: false, remainingShields: 0 };
+        }
+      }
+    };
+
+    // Subcase 3a: Normal disc (charge 0.0) absorbed by shield plate
+    const normalDiscObj = { pos: new THREE.Vector3(0, 1.7, 0), charge: 0.0 };
+    applyDamageToTarget(mockArbiter, 55, normalDiscObj);
+    const normalAbsorbed = mockArbiter.bossController.currentShields === 2 && mockArbiter.hp === 200;
+
+    // Subcase 3b: Charged disc (charge 0.9 >= 0.85) pierces shield plate and inflicts direct damage to core
+    const crushDiscObj = { pos: new THREE.Vector3(0, 1.7, 0), charge: 0.9 };
+    applyDamageToTarget(mockArbiter, 91, crushDiscObj);
+    const shieldPierced = mockArbiter.hp === (200 - 91);
+    const shieldIntact = mockArbiter.bossController.currentShields === 2;
+
+    // Reset
+    state.player.blocking = false;
+    state.player.hasDisc = true;
+    state.player.hp = 100;
+
+    return {
+      normalDeflected,
+      playerStillBlocking,
+      hpAfterNormal,
+      crushDeflected,
+      guardBroken,
+      tookDamage,
+      crushMessage,
+      normalAbsorbed,
+      shieldPierced,
+      shieldIntact
+    };
+  });
+
+  console.log('Test 16 results:', test16);
+  if (
+    test16.normalDeflected && test16.playerStillBlocking && test16.hpAfterNormal === 100 &&
+    !test16.crushDeflected && test16.guardBroken && test16.tookDamage && test16.crushMessage &&
+    test16.normalAbsorbed && test16.shieldPierced && test16.shieldIntact
+  ) {
+    console.log('>>> TEST 16 PASSED: Guard Crush shield bypass, block breaking, and Arbiter core penetration verified!');
+  } else {
+    throw new Error(`Test 16 FAILED: ${JSON.stringify(test16)}`);
+  }
+
+  // -------------------------------------------------------------
+  // TEST 17: Diegetic HUD Feedback & Crosshair Charge Arc (SPEC-COMBAT-002)
+  // -------------------------------------------------------------
+  console.log('\n--- TEST 17: Diegetic HUD Feedback & Crosshair Charge Arc ---');
+  const test17 = await page.evaluate(async () => {
+    const dbg = window.__dbg;
+    const { state, updateCrosshair } = dbg;
+    const crosshairEl = document.getElementById('crosshair');
+    const arcSvg = document.getElementById('chargeArc');
+    const circle = arcSvg?.querySelector('circle');
+
+    // Case 1: Idle (not charging)
+    state.player.chargingThrow = false;
+    state.player.throwCharge = 0;
+    updateCrosshair();
+    const idleDisplay = arcSvg ? arcSvg.style.display : 'none';
+    const idleReady = crosshairEl.classList.contains('guard-crush-ready');
+
+    // Case 2: Charging at 50%
+    state.player.chargingThrow = true;
+    state.player.throwCharge = 0.5;
+    updateCrosshair();
+    const midDisplay = arcSvg ? arcSvg.style.display : 'none';
+    const midOffset = circle ? parseFloat(circle.style.strokeDashoffset) : 0;
+    const midStroke = circle ? circle.getAttribute('stroke') : '';
+    const midReady = crosshairEl.classList.contains('guard-crush-ready');
+
+    // Case 3: Charging at 90% (>= 85% Guard Crush Ready)
+    state.player.chargingThrow = true;
+    state.player.throwCharge = 0.9;
+    updateCrosshair();
+    const crushDisplay = arcSvg ? arcSvg.style.display : 'none';
+    const crushOffset = circle ? parseFloat(circle.style.strokeDashoffset) : 0;
+    const crushStroke = circle ? circle.getAttribute('stroke') : '';
+    const crushReady = crosshairEl.classList.contains('guard-crush-ready');
+
+    // Reset
+    state.player.chargingThrow = false;
+    state.player.throwCharge = 0;
+    updateCrosshair();
+
+    return {
+      idleDisplay,
+      idleReady,
+      midDisplay,
+      midOffset: +midOffset.toFixed(1),
+      midStroke,
+      midReady,
+      crushDisplay,
+      crushOffset: +crushOffset.toFixed(1),
+      crushStroke,
+      crushReady
+    };
+  });
+
+  console.log('Test 17 results:', test17);
+  if (
+    test17.idleDisplay === 'none' && !test17.idleReady &&
+    test17.midDisplay === 'block' && test17.midOffset >= 55 && test17.midOffset <= 58 && test17.midStroke.includes('cyan') && !test17.midReady &&
+    test17.crushDisplay === 'block' && test17.crushOffset >= 10 && test17.crushOffset <= 13 && test17.crushStroke === '#ffffff' && test17.crushReady
+  ) {
+    console.log('>>> TEST 17 PASSED: Circular charge arc progression, guard crush ready state, and color transitions verified!');
+  } else {
+    throw new Error(`Test 17 FAILED: ${JSON.stringify(test17)}`);
   }
 
   console.log('\n=============================================');

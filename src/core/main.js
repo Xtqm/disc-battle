@@ -5,12 +5,12 @@ import { config } from './config.js';
 import { renderer, scene, camera, grid, ring, floor, initGraphics, updateCamera } from '../graphics/scene.js';
 import { updateSparks } from '../graphics/particles.js';
 import { tiles, getTileAt, worldToTile, tileToWorld, triggerTileWarning, updateTiles, rebuildArenaTiles } from '../entities/Arena.js';
-import { updatePlayer, throwDisc, aimTarget, aimDir } from '../entities/Player.js';
+import { updatePlayer, throwDisc, startChargingThrow, releaseChargingThrow, aimTarget, aimDir } from '../entities/Player.js';
 import { updateFoes, spawnDuelBoss, spawnWave, killFoe } from '../entities/Bot.js';
-import { updateDiscs, spawnDisc } from '../entities/Disc.js';
+import { updateDiscs, spawnDisc, applyDamageToTarget } from '../entities/Disc.js';
 import { simulatePath, trajLine, updateThreatPaths, updateTrajectory } from '../physics/trajectory.js';
 import { InputManager, initInput, isLocked, getPlayerCurveIntent, sens, touchMove, updateCurveButtons } from '../input/InputManager.js';
-import { pollGamepads, isButtonPressed, isButtonJustPressed, GAMEPAD_BUTTONS, updateGamepadUINavigation } from '../input/gamepad.js';
+import { pollGamepads, isButtonPressed, isButtonJustPressed, isButtonJustReleased, GAMEPAD_BUTTONS, updateGamepadUINavigation } from '../input/gamepad.js';
 import { initNetwork, initMockNetwork, getRoomRef, roomGetDoc } from '../network/firebaseSetup.js';
 import { onClickCreateRoom, onClickConfirmJoin, copyRoomCode, teardownMultiplayer, startMultiplayerDuel } from '../network/roomManager.js';
 import { syncNetworkState, onTileDestabilizedByHost, updateRemotePlayers } from '../network/sync.js';
@@ -90,11 +90,14 @@ export function handleGamepadInput(dt) {
 
   // Edge-triggered combat actions during active play
   if (state.running && !state.paused && state.countdownTimer <= 0) {
-    // Throw disc on R2 just pressed
+    // Throw disc on R2 hold to charge / release
     if (isButtonJustPressed(GAMEPAD_BUTTONS.R2)) {
       if (state.player.hasDisc && state.player.alive) {
-        throwDisc();
+        startChargingThrow();
       }
+    }
+    if (isButtonJustReleased(GAMEPAD_BUTTONS.R2)) {
+      releaseChargingThrow();
     }
 
     // Jump on South button
@@ -311,7 +314,7 @@ if (typeof document !== 'undefined') {
 // Debug hooks for headless puppeteer test harness
 window.__dbg = {
   THREE,
-  spawnDisc: (p, v, owner, color, curve) => spawnDisc(p, v, owner, color, curve),
+  spawnDisc: (p, v, owner, color, curve, charge) => spawnDisc(p, v, owner, color, curve, charge),
   updateCrosshair: (aim = { dist: 10 }, traj = null) => updateCrosshair(aim, traj),
   state,
   player: state.player,
@@ -378,6 +381,7 @@ window.__dbg = {
   yaw: () => +state.player.yaw.toFixed(3),
   pitch: () => +state.player.pitch.toFixed(3),
   aim: () => { const a = aimTarget(); return { dist: +a.dist.toFixed(1), foe: !!a.foe }; },
+  simulatePath,
   discAlign: () => {
     const d = state.discs.find(x => x.owner === 'player');
     if (!d) return null;
@@ -400,8 +404,12 @@ window.__dbg = {
   })),
   lastMessage: () => (msgEl ? msgEl.textContent : ''),
   score: () => state.score,
-  simulatePath: (origin, vel, maxBounces, tMax, step, curve) => simulatePath(origin, vel, maxBounces, tMax, step, curve),
-  throwDisc: () => throwDisc(),
+  simulatePath: (origin, vel, maxBounces, tMax, step, curve, charge) => simulatePath(origin, vel, maxBounces, tMax, step, curve, charge),
+  throwDisc: (charge) => throwDisc(charge),
+  startChargingThrow: () => startChargingThrow(),
+  releaseChargingThrow: () => releaseChargingThrow(),
+  throwCharge: () => state.player.throwCharge || 0,
+  applyDamageToTarget: (f, dmg, D) => applyDamageToTarget(f, dmg, D),
   foesList: () => state.foes.map(f => ({
     pos: { x: +f.pos.x.toFixed(2), z: +f.pos.z.toFixed(2) },
     hp: f.hp,

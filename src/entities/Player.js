@@ -24,6 +24,23 @@ export function updatePlayer(dt) {
     state.player.invuln -= dt;
   }
 
+  // Handle throw charge cycle
+  if (state.player.chargingThrow) {
+    if (!state.player.hasDisc || !state.player.alive || state.countdownTimer > 0) {
+      cancelChargingThrow();
+    } else {
+      state.player.throwChargeTime = (state.player.throwChargeTime || 0) + dt;
+      const prevCharge = state.player.throwCharge || 0;
+      state.player.throwCharge = Math.min(1.0, state.player.throwChargeTime / 1.0);
+      if (SFX.chargeWindup && Math.floor(state.player.throwCharge * 10) > Math.floor(prevCharge * 10)) {
+        SFX.chargeWindup(state.player.throwCharge);
+      }
+      if (prevCharge < 0.85 && state.player.throwCharge >= 0.85) {
+        playGamepadHaptics({ duration: 90, weakMagnitude: 0.6, strongMagnitude: 0.8 });
+      }
+    }
+  }
+
   // Player re-arm failsafe watchdog
   if (!state.player.hasDisc && !state.discs.some(d => d.owner === 'player')) {
     state.player.noDiscTimer = (state.player.noDiscTimer || 0) + dt;
@@ -208,29 +225,78 @@ export function updatePlayer(dt) {
   }
 }
 
-export function throwDisc() {
+export function startChargingThrow() {
+  if (state.countdownTimer > 0) return;
+  if (!state.player.hasDisc || !state.player.alive) return;
+  state.player.chargingThrow = true;
+  state.player.throwChargeTime = 0;
+  state.player.throwCharge = 0;
+}
+
+export function releaseChargingThrow() {
+  if (!state.player.chargingThrow) return;
+  const charge = (state.player.throwChargeTime || 0) < 0.08 ? 0 : (state.player.throwCharge || 0);
+  state.player.chargingThrow = false;
+  state.player.throwChargeTime = 0;
+  state.player.throwCharge = 0;
+  throwDisc(charge);
+}
+
+export function cancelChargingThrow() {
+  state.player.chargingThrow = false;
+  state.player.throwChargeTime = 0;
+  state.player.throwCharge = 0;
+}
+
+export function throwDisc(customCharge = null) {
   if (state.countdownTimer > 0) return;
   if (!state.player.hasDisc || !state.player.alive) return;
   state.player.hasDisc = false;
   if (state.player.obj && state.player.obj.userData && state.player.obj.userData.backDisc) {
     state.player.obj.userData.backDisc.visible = false;
   }
+
+  let charge = 0;
+  if (customCharge !== null && customCharge !== undefined) {
+    charge = THREE.MathUtils.clamp(customCharge, 0, 1);
+  } else if (state.player.throwCharge > 0) {
+    charge = state.player.throwCharge;
+  }
+  state.player.chargingThrow = false;
+  state.player.throwChargeTime = 0;
+  state.player.throwCharge = 0;
+
   const aim = aimTarget();
   const chest = state.player.pos.clone().add(new THREE.Vector3(0, 1.7 + state.player.y, 0));
-  const dir = aim.point.clone().sub(chest).normalize();
-  if (_rd.y >= -0.35 && dir.y < -0.04) {
+  const toAim = aim.point.clone().sub(chest);
+  const horizontalDist = Math.hypot(toAim.x, toAim.z);
+  const dir = toAim.normalize();
+  if (horizontalDist < 2.5 && _rd.y >= -0.35 && dir.y < -0.04) {
     dir.y = Math.max(-0.04, _rd.y);
     dir.normalize();
   }
   const origin = chest.clone().add(dir.clone().multiplyScalar(1.1));
-  const curve = getPlayerCurveIntent();
-  const vel = dir.clone().multiplyScalar(38);
-  spawnDisc(origin, vel, 'player', config.CYAN, curve);
+  const rawCurve = getPlayerCurveIntent();
+  const gyroDamp = 1.0 - 0.65 * charge;
+  const curve = rawCurve * gyroDamp;
+  const speed = 38.0 + 17.0 * charge;
+  const vel = dir.clone().multiplyScalar(speed);
+  spawnDisc(origin, vel, 'player', config.CYAN, curve, charge);
   if (typeof window !== 'undefined') {
     window.__lastThrowDot = dir.clone().normalize().dot(aim.point.clone().sub(origin).normalize());
   }
-  shake(0.12);
-  playGamepadHaptics({ duration: 90, weakMagnitude: 0.25, strongMagnitude: 0.4 });
+
+  if (SFX.chargeBlast) {
+    SFX.chargeBlast(charge);
+  }
+
+  shake(0.12 + 0.18 * charge);
+  playGamepadHaptics({
+    duration: 90 + Math.round(90 * charge),
+    weakMagnitude: 0.25 + 0.5 * charge,
+    strongMagnitude: 0.4 + 0.5 * charge
+  });
+
   if (state.touchCurveL || state.touchCurveR) {
     state.touchCurveL = false;
     state.touchCurveR = false;
@@ -248,7 +314,8 @@ export function throwDisc() {
       vx: +vel.x.toFixed(2),
       vy: +vel.y.toFixed(2),
       vz: +vel.z.toFixed(2),
-      curve: +curve.toFixed(2)
+      curve: +curve.toFixed(2),
+      charge: +charge.toFixed(2)
     };
 
     if (state.webrtcPeer && state.webrtcPeer.connectionState === 'connected') {
@@ -267,6 +334,9 @@ export function throwDisc() {
 
 if (typeof window !== 'undefined') {
   window.__tronThrowDisc = throwDisc;
+  window.__tronStartChargingThrow = startChargingThrow;
+  window.__tronReleaseChargingThrow = releaseChargingThrow;
+  window.__tronCancelChargingThrow = cancelChargingThrow;
 }
 
 export const _ro = new THREE.Vector3(), _rd = new THREE.Vector3();
@@ -285,7 +355,7 @@ export function aimTarget() {
     const fwdX = -Math.sin(state.player.yaw);
     const fwdZ = -Math.cos(state.player.yaw);
     const forwardDist = dx * fwdX + dz * fwdZ;
-    if (forwardDist >= 8.0 && t > 0.5 && t < best) { best = t; hitFoe = null; }
+    if (forwardDist >= 2.5 && t > 0.5 && t < best) { best = t; hitFoe = null; }
   }
   const lim = config.ARENA - 1.5;
   for (const [axis, sign] of [['x',1],['x',-1],['z',1],['z',-1]]) {

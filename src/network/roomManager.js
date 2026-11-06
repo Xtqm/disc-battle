@@ -97,7 +97,7 @@ export function handleRemoteThrow(t) {
   if (opp) {
     const origin = new THREE.Vector3(t.x, t.y, t.z);
     const vel = new THREE.Vector3(t.vx, t.vy, t.vz);
-    const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? config.CYAN : config.PURPLE, t.curve || 0);
+    const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? config.CYAN : config.PURPLE, t.curve || 0, t.charge || 0);
     oppDisc.remoteThrowId = t.id;
     opp.hasDisc = false;
     if (opp.obj && opp.obj.userData && opp.obj.userData.backDisc) {
@@ -607,7 +607,7 @@ export function onRoomSnapshot(snap) {
     if (opp) {
       const origin = new THREE.Vector3(t.x, t.y, t.z);
       const vel = new THREE.Vector3(t.vx, t.vy, t.vz);
-      const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? config.CYAN : config.PURPLE, t.curve || 0);
+      const oppDisc = spawnDisc(origin, vel, opp, opp.team === (state.multiPlayers[state.playerRole]?.team || 1) ? config.CYAN : config.PURPLE, t.curve || 0, t.charge || 0);
       oppDisc.remoteThrowId = t.id;
       opp.hasDisc = false;
       if (opp.obj && opp.obj.userData && opp.obj.userData.backDisc) {

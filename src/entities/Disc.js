@@ -16,7 +16,17 @@ import { duelEconomyBridge } from '../modes/DuelEconomyBridge.js';
 import { playGamepadHaptics } from '../input/gamepad.js';
 
 export function applyDamageToTarget(f, dmg, D) {
+  const isGuardCrush = D && (D.charge || 0) >= 0.85;
   if (f.bossController) {
+    if (isGuardCrush) {
+      f.hp -= dmg;
+      burst(D.pos.clone(), config.WHITE, 32, 12);
+      shake(0.35);
+      message('GUARD CRUSH // SHIELD PIERCED!');
+      if (SFX.guardCrush) SFX.guardCrush();
+      playGamepadHaptics({ duration: 180, weakMagnitude: 0.8, strongMagnitude: 1.0 });
+      return f.hp <= 0;
+    }
     const res = f.bossController.onHit(dmg, D);
     if (res.absorbed) {
       burst(D.pos.clone(), f.bossController.primaryColor || config.ORANGE, 24, 8);
@@ -30,7 +40,7 @@ export function applyDamageToTarget(f, dmg, D) {
   return f.hp <= 0;
 }
 
-export function spawnDisc(pos, vel, owner, color, curve = 0) {
+export function spawnDisc(pos, vel, owner, color, curve = 0, charge = 0) {
   const obj = makeDisc(color);
   obj.position.copy(pos);
   scene.add(obj);
@@ -39,6 +49,7 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
     cosmetics = cosmeticMaterialEngine.getTrailConfig();
     cosmeticMaterialEngine.applyDiscSkin(obj, cosmeticMaterialEngine.activeDiscSkinId);
   }
+  const clCharge = THREE.MathUtils.clamp(charge || 0, 0, 1);
   const d = {
     obj,
     pos: pos.clone(),
@@ -57,6 +68,7 @@ export function spawnDisc(pos, vel, owner, color, curve = 0) {
     spin: 0,
     curve,
     initialCurve: Math.abs(curve || 0),
+    charge: clCharge,
     hitFoes: new Set()
   };
   state.discs.push(d);
@@ -151,8 +163,11 @@ export function updateDiscs(dt) {
 
     D.pos.addScaledVector(D.vel, dt);
     if (!D.returning && D.pos.y > config.DISC_R) {
-      const cruiseY = D.launchY !== undefined ? D.launchY : 1.7;
-      D.pos.y += (cruiseY - D.pos.y) * Math.min(1, dt * 2.2);
+      const isDownwardFlight = D.bounces === 0 && D.vel.y < -0.2;
+      if (!isDownwardFlight) {
+        const cruiseY = D.launchY !== undefined ? D.launchY : 1.7;
+        D.pos.y += (cruiseY - D.pos.y) * Math.min(1, dt * 2.2);
+      }
     }
     if (D.cosmetics && !D.returning && Math.random() < 0.3) {
       const trailHex = Math.random() > 0.4 ? D.cosmetics.primaryHex : D.cosmetics.secondaryEmissiveHex;
@@ -176,7 +191,7 @@ export function updateDiscs(dt) {
         if (D.vel.y < 0) {
           const significant = Math.abs(D.vel.y) >= 1.0;
           D.vel.y = 3.5;
-          D.curve = 0;
+          D.curve = (D.curve || 0) * 0.65;
           D.launchY = 1.7;
           D.vel.x *= 0.98;
           D.vel.z *= 0.98;
@@ -260,9 +275,10 @@ export function updateDiscs(dt) {
           const hasLos = lineOfSight(f.pos, D.pos);
 
           if (movingToward && facingDot > 0.2 && hasLos) {
-            const catchChance = ((state.gameMode === 'duel' || state.gameMode === 'duel_ai') && f.isBoss)
+            const isGuardCrush = (D.charge || 0) >= 0.85;
+            const catchChance = isGuardCrush ? 0 : (((state.gameMode === 'duel' || state.gameMode === 'duel_ai') && f.isBoss)
               ? Math.min(0.85, 0.75 + ((state.tier || state.duelTier) - 1) * 0.03)
-              : 0.35;
+              : 0.35);
             if (Math.random() < catchChance) {
               scene.remove(D.obj);
               state.discs.splice(i, 1);
@@ -365,9 +381,11 @@ export function updateDiscs(dt) {
           const velRear = vNorm.dot(fwd) > 0.05;
           const rear = posRear || velRear;
 
-          let dmg = 55 + D.bounces * 18;
+          const charge = D.charge || 0;
+          const baseDmg = 55 + 40 * charge;
+          let dmg = baseDmg + D.bounces * 18;
           if (rear && D.bounces > 0) {
-            dmg = (55 + D.bounces * 18) * 2.0;
+            dmg = (baseDmg + D.bounces * 18) * 2.0;
             state.score += 150;
             message('REAR STRIKE  x2');
             burst(D.pos.clone(), config.WHITE, 34, 13);
@@ -435,7 +453,8 @@ export function updateDiscs(dt) {
         const toDisc = D.pos.clone().sub(pc).setY(0).normalize();
         const facing = new THREE.Vector3(-Math.sin(state.player.yaw), 0, -Math.cos(state.player.yaw));
         const isPlayerBlocking = !!(state.player.blocking || state.touchBlocking || state.gamepadBlocking);
-        if (isPlayerBlocking && state.player.hasDisc && toDisc.dot(facing) > .35) {
+        const isGuardCrush = (D.charge || 0) >= 0.85;
+        if (isPlayerBlocking && !isGuardCrush && state.player.hasDisc && toDisc.dot(facing) > .35) {
           burst(D.pos.clone(), config.WHITE, 30, 12);
           shake(.25);
           playGamepadHaptics({ duration: 160, weakMagnitude: 0.6, strongMagnitude: 0.85 });
@@ -494,11 +513,23 @@ export function updateDiscs(dt) {
           D.pos.addScaledVector(toDisc, 1.2);
           message('DEFLECTED!');
         } else {
+          if (isPlayerBlocking && isGuardCrush) {
+            message('GUARD CRUSH // SHIELD BROKEN!');
+            shake(0.35);
+            burst(D.pos.clone(), config.WHITE, 32, 14);
+            state.player.blocking = false;
+            state.touchBlocking = false;
+            state.gamepadBlocking = false;
+            if (SFX.guardCrush) SFX.guardCrush();
+            playGamepadHaptics({ duration: 180, weakMagnitude: 0.8, strongMagnitude: 1.0 });
+          }
           const behind = toDisc.dot(facing) < -0.25;
-          damagePlayer((16 + D.bounces * 6) * (behind && D.bounces > 0 ? 1.8 : 1));
+          const charge = D.charge || 0;
+          const baseDmg = (16 + D.bounces * 6) * (1 + charge * 0.8);
+          damagePlayer(baseDmg * (behind && D.bounces > 0 ? 1.8 : 1));
           if (behind && D.bounces > 0) message('HIT FROM BEHIND');
           burst(D.pos.clone(), config.ORANGE, 18, 7);
-          shake(0.18);
+          shake(0.18 + charge * 0.15);
 
           D.vel.multiplyScalar(-0.45);
           D.vel.x += (Math.random() - 0.5) * 4;

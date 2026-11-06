@@ -183,16 +183,25 @@ export function bindMobileButtons() {
   const btnCurveR = document.getElementById('btnCurveR');
 
   if (btnThrow) {
-    const doThrow = (e) => {
+    const startThrow = (e) => {
       e.preventDefault(); e.stopPropagation();
-      if (typeof window !== 'undefined' && window.__tronThrowDisc) {
+      if (typeof window !== 'undefined' && window.__tronStartChargingThrow) {
+        window.__tronStartChargingThrow();
+      } else if (typeof window !== 'undefined' && window.__tronThrowDisc) {
         window.__tronThrowDisc();
       }
       btnThrow.classList.add('pressed');
-      setTimeout(() => btnThrow.classList.remove('pressed'), 120);
     };
-    btnThrow.addEventListener('touchstart', doThrow, { passive: false });
-    btnThrow.addEventListener('click', doThrow);
+    const endThrow = (e) => {
+      e.preventDefault(); e.stopPropagation();
+      if (typeof window !== 'undefined' && window.__tronReleaseChargingThrow) {
+        window.__tronReleaseChargingThrow();
+      }
+      btnThrow.classList.remove('pressed');
+    };
+    btnThrow.addEventListener('touchstart', startThrow, { passive: false });
+    btnThrow.addEventListener('touchend', endThrow, { passive: false });
+    btnThrow.addEventListener('touchcancel', endThrow, { passive: false });
   }
 
   if (btnJump) {

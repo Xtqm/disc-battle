@@ -8,11 +8,11 @@ import { getPlayerCurveIntent } from '../input/keyboard.js';
 
 const _trajCamDir = new THREE.Vector3();
 
-export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, curve = 0) {
+export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 / 90, curve = 0, charge = 0) {
   const p = origin.clone(), v = vel.clone();
   const pts = [p.clone()], bounceAt = [];
   let bounces = 0, t = 0, hitFoe = null;
-  let k = curve;
+  let k = curve * (1.0 - 0.65 * THREE.MathUtils.clamp(charge || 0, 0, 1));
   let cruiseY = origin.y !== undefined ? origin.y : 1.7;
   const lim = config.ARENA - 1.5;
 
@@ -42,8 +42,10 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
 
     p.addScaledVector(v, step);
     if (p.y > config.DISC_R) {
-
-      p.y += (cruiseY - p.y) * Math.min(1, step * 2.2);
+      const isDownwardFlight = bounces === 0 && v.y < -0.2;
+      if (!isDownwardFlight) {
+        p.y += (cruiseY - p.y) * Math.min(1, step * 2.2);
+      }
     }
 
     // Floor collision & void check
@@ -56,7 +58,7 @@ export function simulatePath(origin, vel, maxBounces = 3, tMax = 1.5, step = 1 /
         if (v.y < 0) {
           const sig = Math.abs(v.y) >= 1.0;
           v.y = 3.5;
-          k = 0;
+          k = (k || 0) * 0.65;
           cruiseY = 1.7;
           v.x *= 0.98;
           v.z *= 0.98;
@@ -195,15 +197,19 @@ export function updateTrajectory(aim, dt) {
   if (!show) return null;
 
   const chest = state.player.pos.clone().setY(1.7 + state.player.y);
-  const dir = aim.point.clone().sub(chest).normalize();
+  const toAim = aim.point.clone().sub(chest);
+  const horizontalDist = Math.hypot(toAim.x, toAim.z);
+  const dir = toAim.normalize();
   camera.getWorldDirection(_trajCamDir);
-  if (_trajCamDir.y >= -0.35 && dir.y < -0.04) {
+  if (horizontalDist < 2.5 && _trajCamDir.y >= -0.35 && dir.y < -0.04) {
     dir.y = Math.max(-0.04, _trajCamDir.y);
     dir.normalize();
   }
   const origin = chest.clone().addScaledVector(dir, 1.1);
+  const charge = state.player.throwCharge || 0;
   const curve = getPlayerCurveIntent();
-  const sim = simulatePath(origin, dir.clone().multiplyScalar(38), 3, 1.5, 1 / 90, curve);
+  const speed = 38.0 + 17.0 * charge;
+  const sim = simulatePath(origin, dir.clone().multiplyScalar(speed), 3, 1.5, 1 / 90, curve, charge);
 
   const willHit = !!sim.hitFoe;
   
@@ -223,10 +229,12 @@ export function updateTrajectory(aim, dt) {
   }
 
   const isCurving = Math.abs(curve) > 0.05;
-  trajLine.material.color.setHex(rearKill ? config.WHITE : willHit ? config.ORANGE : isCurving ? 0x7cf6ff : config.CYAN);
-  trajLine.material.opacity = willHit ? .95 : isCurving ? .75 : .45;
-  trajLine.material.dashSize = isCurving ? 0.28 : 0.45;
-  trajLine.material.gapSize = isCurving ? 0.20 : 0.35;
+  const isGuardCrush = charge >= 0.85;
+  const trajColor = rearKill ? config.WHITE : willHit ? config.ORANGE : isGuardCrush ? 0xffeedd : isCurving ? 0x7cf6ff : config.CYAN;
+  trajLine.material.color.setHex(trajColor);
+  trajLine.material.opacity = willHit ? .95 : isGuardCrush ? .90 : isCurving ? .75 : .45;
+  trajLine.material.dashSize = isCurving ? 0.28 : (isGuardCrush ? 0.6 : 0.45);
+  trajLine.material.gapSize = isCurving ? 0.20 : (isGuardCrush ? 0.15 : 0.35);
 
   const arr = trajLine.geometry.attributes.position.array;
   const n = Math.min(sim.pts.length, 1500);

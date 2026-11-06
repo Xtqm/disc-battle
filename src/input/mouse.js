@@ -153,7 +153,9 @@ export function initMouse(targetCanvas) {
   window.addEventListener('mousedown', e => {
     if (state.isTouchDevice || !state.running || state.paused) return;
     if (e.button === 0) {
-      if (typeof window !== 'undefined' && window.__tronThrowDisc) {
+      if (typeof window !== 'undefined' && window.__tronStartChargingThrow) {
+        window.__tronStartChargingThrow();
+      } else if (typeof window !== 'undefined' && window.__tronThrowDisc) {
         window.__tronThrowDisc();
       }
     }
@@ -164,6 +166,11 @@ export function initMouse(targetCanvas) {
 
   window.addEventListener('mouseup', e => {
     if (state.isTouchDevice) return;
+    if (e.button === 0) {
+      if (typeof window !== 'undefined' && window.__tronReleaseChargingThrow) {
+        window.__tronReleaseChargingThrow();
+      }
+    }
     if (e.button === 2 && !state.touchBlocking) {
       state.player.blocking = false;
     }
